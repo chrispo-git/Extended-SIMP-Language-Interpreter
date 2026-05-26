@@ -81,6 +81,12 @@ class Parser(tokens: List[Token]):
                 val value = parseExpr()
                 Cmd.Assign(loc, value)
             }
+            case Token.OpenBracket => {
+                advance()
+                val cmd = parseCmd()
+                expect(Token.CloseBracket)
+                cmd
+            }
             case x => throw RuntimeException(s"Unexpected '$x'")
         }
     }
