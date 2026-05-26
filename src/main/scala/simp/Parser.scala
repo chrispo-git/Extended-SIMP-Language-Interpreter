@@ -171,7 +171,7 @@ class Parser(tokens: List[Token]):
                 val inside = parseBool()
                 BoolExpr.Not(inside)
             }
-            case Token.Deref | Token.LiteralInt(_) | Token.OpenBracket => {
+            case Token.Deref | Token.LiteralInt(_)  => {
                 val left = parseExpr()
                 val bop = peek() match {
                     case Token.Gt => Bop.Gt
