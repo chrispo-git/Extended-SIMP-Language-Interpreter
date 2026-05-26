@@ -1,4 +1,4 @@
-scalaVersion := "2.13.12"
+scalaVersion := "3.6.4"
 
 name := "simp-interpreter"
 organization := "ch.epfl.scala"
