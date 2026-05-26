@@ -1,5 +1,6 @@
 package simp
 
+// Handles the Memory of the environment
 class Store:
     private val memory = scala.collection.mutable.Map[String, Int]()
 
