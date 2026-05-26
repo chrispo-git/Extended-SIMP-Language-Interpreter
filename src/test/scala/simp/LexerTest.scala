@@ -8,9 +8,7 @@ class LexerTest extends AnyFunSuite with Matchers {
   private def lex(input: String): List[Token] =
     Lexer(input).tokenise()
 
-  // -----------------------------
   // Integer literals
-  // -----------------------------
 
   test("lex single integer literal") {
     lex("123") shouldEqual List(
@@ -35,9 +33,7 @@ class LexerTest extends AnyFunSuite with Matchers {
     )
   }
 
-  // -----------------------------
   // Boolean literals
-  // -----------------------------
 
   test("lex boolean true") {
     lex("true") shouldEqual List(
@@ -62,9 +58,7 @@ class LexerTest extends AnyFunSuite with Matchers {
     )
   }
 
-  // -----------------------------
   // Arithmetic operators
-  // -----------------------------
 
   test("lex addition operator") {
     lex("+") shouldEqual List(
@@ -116,9 +110,7 @@ class LexerTest extends AnyFunSuite with Matchers {
     )
   }
 
-  // -----------------------------
   // Assignment and comparison
-  // -----------------------------
 
   test("lex assignment operator") {
     lex(":=") shouldEqual List(
@@ -171,9 +163,7 @@ class LexerTest extends AnyFunSuite with Matchers {
     )
   }
 
-  // -----------------------------
   // Boolean operators
-  // -----------------------------
 
   test("lex not operator") {
     lex("¬") shouldEqual List(
@@ -208,9 +198,9 @@ class LexerTest extends AnyFunSuite with Matchers {
     )
   }
 
-  // -----------------------------
+  
   // Keywords
-  // -----------------------------
+  
 
   test("lex skip keyword") {
     lex("skip") shouldEqual List(
@@ -254,9 +244,9 @@ class LexerTest extends AnyFunSuite with Matchers {
     )
   }
 
-  // -----------------------------
+  
   // Delimiters
-  // -----------------------------
+  
 
   test("lex semicolon") {
     lex(";") shouldEqual List(
@@ -290,9 +280,9 @@ class LexerTest extends AnyFunSuite with Matchers {
     )
   }
 
-  // -----------------------------
+  
   // Variables / identifiers
-  // -----------------------------
+  
 
   test("lex simple identifier") {
     lex("abc") shouldEqual List(
@@ -338,9 +328,9 @@ class LexerTest extends AnyFunSuite with Matchers {
     )
   }
 
-  // -----------------------------
+  
   // Whitespace handling
-  // -----------------------------
+  
 
   test("ignore spaces") {
     lex("   1   +   2   ") shouldEqual List(
@@ -378,9 +368,9 @@ class LexerTest extends AnyFunSuite with Matchers {
     )
   }
 
-  // -----------------------------
+  
   // Complex programs
-  // -----------------------------
+  
 
   test("lex assignment statement") {
     lex("x := 10") shouldEqual List(
@@ -449,9 +439,9 @@ class LexerTest extends AnyFunSuite with Matchers {
     )
   }
 
-  // -----------------------------
+  
   // Error cases
-  // -----------------------------
+  
 
   test("throw exception on invalid character") {
     val ex = intercept[RuntimeException] {
@@ -479,9 +469,9 @@ class LexerTest extends AnyFunSuite with Matchers {
     }
   }
 
-  // -----------------------------
+  
   // Edge cases
-  // -----------------------------
+  
 
   test("empty input") {
     lex("") shouldEqual List(
