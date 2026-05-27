@@ -26,9 +26,12 @@ def startRepl(store: Store, fnEnv: FunctionEnv): Unit = {
         val isComplete = openBraces == closeBraces && {
             if openBraces > 0 then {
                 val toks = Lexer(input).tokenise()
-                !(toks.contains(Token.If) && !toks.contains(Token.Else))
+                val ifCount = toks.count(t => t == Token.If || t == Token.Elif)
+                val elseCount = toks.count(t => t == Token.Else || t == Token.Elif)
+                ifCount == elseCount
             } else true
         }
+
 
         if isComplete then {
             try {

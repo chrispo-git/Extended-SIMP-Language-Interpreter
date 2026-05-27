@@ -3,16 +3,12 @@ pd fizzbuzz(n) {
     while !i <= !n do {
         if !i % 3 == 0 && !i % 5 == 0 then {
             print "Fizzbuzz!";
+        } elif !i % 3 == 0 then {
+            print "Fizz";
+        } elif !i % 5 == 0 then {
+            print "Buzz";
         } else {
-            if !i % 3 == 0 then {
-                print "Fizz";
-            } else {
-                if !i % 5 == 0 then {
-                    print "Buzz";
-                } else {
-                    print !i;
-                };
-            };
+            print !i;
         };
         i := !i + 1;
     };

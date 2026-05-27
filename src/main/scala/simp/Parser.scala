@@ -90,17 +90,48 @@ class Parser(tokens: List[Token]):
                 advance(); 
                 Cmd.Skip
             }
-            case Token.If  => {
+            case Token.If => {
                 advance()
                 val cond = parseBool()
                 expect(Token.Then)
                 expect(Token.OpenBrace)
                 val thenBranch = parseCmd()
                 expect(Token.CloseBrace)
-                expect(Token.Else)
+                val elseBranch = peek() match {
+                    case Token.Elif => {
+                        parseSingleCmd()
+                    }
+                    case Token.Else => {
+                        advance()
+                        expect(Token.OpenBrace)
+                        val e = parseCmd()
+                        expect(Token.CloseBrace)
+                        e
+                    }
+                    case _ => Cmd.Skip
+                }
+                Cmd.If(cond, thenBranch, elseBranch)
+            }
+            case Token.Elif => {
+                advance()
+                val cond = parseBool()
+                expect(Token.Then)
                 expect(Token.OpenBrace)
-                val elseBranch = parseCmd()
+                val thenBranch = parseCmd()
                 expect(Token.CloseBrace)
+                val elseBranch = peek() match {
+                    case Token.Elif => {
+                        parseSingleCmd()
+                    }
+                    case Token.Else => {
+                        advance()
+                        expect(Token.OpenBrace)
+                        val e = parseCmd()
+                        expect(Token.CloseBrace)
+                        e
+                    }
+                    case _ => Cmd.Skip
+                }
                 Cmd.If(cond, thenBranch, elseBranch)
             }
             case Token.While => {

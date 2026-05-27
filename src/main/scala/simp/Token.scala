@@ -55,3 +55,5 @@ enum Token:
     case MinusEq
     case MulEq
     case DivEq
+
+    case Elif
