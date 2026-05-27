@@ -50,3 +50,8 @@ enum Token:
     case Return 
     case Call
     case Comma
+
+    case PlusEq 
+    case MinusEq
+    case MulEq
+    case DivEq

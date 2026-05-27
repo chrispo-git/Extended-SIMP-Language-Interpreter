@@ -115,9 +115,34 @@ class Parser(tokens: List[Token]):
             case Token.Variable(l) => {
                 val loc = l
                 advance()
-                expect(Token.Assign)
-                val value = parseExpr()
-                Cmd.Assign(loc, value)
+                peek() match {
+                    case Token.Assign => {
+                        advance()
+                        val value = parseExpr()
+                        Cmd.Assign(loc, value)
+                    }
+                    case Token.PlusEq => {
+                        advance()
+                        val value = parseExpr()
+                        Cmd.Assign(loc, Expr.BinaryOp(Expr.Deref(loc), Op.Add, value))
+                    }
+                    case Token.MinusEq => {
+                        advance()
+                        val value = parseExpr()
+                        Cmd.Assign(loc, Expr.BinaryOp(Expr.Deref(loc), Op.Sub, value))
+                    }
+                    case Token.MulEq => {
+                        advance()
+                        val value = parseExpr()
+                        Cmd.Assign(loc, Expr.BinaryOp(Expr.Deref(loc), Op.Mul, value))
+                    }
+                    case Token.DivEq => {
+                        advance()
+                        val value = parseExpr()
+                        Cmd.Assign(loc, Expr.BinaryOp(Expr.Deref(loc), Op.Div, value))
+                    }
+                }
+                
             }
             case Token.Print => {
                 advance()

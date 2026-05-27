@@ -138,6 +138,12 @@ class Lexer(source: String):
             case '=' if peekNext() == '=' => {advanceN(2);Token.Eq} 
             case '!' if peekNext() == '=' => {advanceN(2);Token.Neq} 
 
+
+            case '+' if peekNext() == '=' => {advanceN(2);Token.PlusEq} 
+            case '-' if peekNext() == '=' => {advanceN(2);Token.MinusEq} 
+            case '/' if peekNext() == '=' => {advanceN(2);Token.DivEq} 
+            case '*' if peekNext() == '=' => {advanceN(2);Token.MulEq} 
+
             case '+' => {advance();Token.Add}
             case '-' => {advance();Token.Sub}
             case '/' => {advance();Token.Div} 
