@@ -2,8 +2,8 @@
 A simple imperative language + interpreter with REPL.
 
 ## What is SIMP?
-SIMP is a simple imperative language. This repository extends that language with recursive functions & procedures, compound assignment operators, and other features.
-The full Grammar is available [here](SYNTAX.md), but here is some example code:
+SIMP is a simple imperative language covered in the textbook `Programming Languages and Operational Semantics : A Concise Overview`. This repository extends that language with recursive functions & procedures, compound assignment operators, and other features.
+The full Grammar in BNF is available [here](SYNTAX.md), but here is some example code:
 
 ```
 pd fizzbuzz(n) {
