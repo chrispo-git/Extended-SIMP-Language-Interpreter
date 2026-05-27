@@ -3,7 +3,7 @@ package simp
 class Evaluator(store: Store):
 
     def evalProgram(p: Program): Unit = p match {
-        case Program.PCmd(cmd)   => execCmd(cmd); store.dump()
+        case Program.PCmd(cmd)   => execCmd(cmd)
         case Program.PExpr(expr) => println(evalExpr(expr))
         case Program.PBool(b)    => println(evalBool(b))
     }
@@ -80,6 +80,12 @@ class Evaluator(store: Store):
             }
             case Cmd.While(cond, body) => {
                 while evalBool(cond) do execCmd(body)
+            }
+            case Cmd.Print(value) => {
+                value match {
+                    case Printable.PrintStr(s) => println(s)
+                    case Printable.PrintExpr(e) => println(evalExpr(e))
+                }
             }
         }
     }

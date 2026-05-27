@@ -41,6 +41,11 @@ enum Cmd:
     case Seq(fst: Cmd, snd: Cmd)
     case If(cond: BoolExpr, thenBranch: Cmd, elseBranch: Cmd)
     case While(cond: BoolExpr, body: Cmd)
+    case Print(value: Printable)
+
+enum Printable:
+  case PrintStr(value: String)
+  case PrintExpr(expr: Expr)
 
 enum Program:
     case PCmd(cmd: Cmd)

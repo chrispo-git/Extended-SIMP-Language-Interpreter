@@ -31,11 +31,23 @@ class Lexer(source: String):
     private def peekN(n: Int): Char = if pos + n >= source.length() then '\u0000' else source.charAt(pos + n)
 
     private def getWholeWord(): String = {
-        val end = source.indexWhere(c => whitespaces.contains(c) || (!c.isLetterOrDigit && !List('_','-').contains(c)), pos) match
+        val end = source.indexWhere(c => whitespaces.contains(c) || (!c.isLetterOrDigit && !List('_','-').contains(c)), pos) match {
             case -1 => source.length
             case n  => n
+        }
 
         source.slice(pos, end)
+    }
+
+    private def getWholeString(): String = {
+        val end = source.indexWhere(c => c=='"', pos+1) match {
+            case -1 => throw RuntimeException(s"Unexpected EOF - maybe you forgot to close a string")
+            case n => n
+        }
+
+        val out = source.slice(pos+1, end)
+        pos = end + 1
+        out
     }
     private def isWordMatch(word: String): Boolean = getWholeWord() == word
 
@@ -116,6 +128,10 @@ class Lexer(source: String):
             case ';' => {advance();Token.Semicolon}
             case '(' => {advance();Token.OpenBracket}
             case ')' => {advance();Token.CloseBracket}
+
+            case '"' => Token.StringLit(getWholeString())
+
+            case x if isWordMatch("print") => {advanceUntilNextWord(); Token.Print}
 
             case x if isIdentifier(getWholeWord()) => {val word = getWholeWord(); advanceUntilNextWord(); Token.Variable(word)}
 

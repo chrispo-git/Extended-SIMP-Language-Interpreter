@@ -22,7 +22,7 @@ class Parser(tokens: List[Token]):
     }
 
     def parseProgram(): Program = {
-        val commands  = List(Token.Skip, Token.If, Token.Then, Token.Else, Token.While, Token.Do, Token.Assign)
+        val commands  = List(Token.Skip, Token.If, Token.Then, Token.Else, Token.While, Token.Do, Token.Assign, Token.Print)
         val bools = List(Token.Gt, Token.Lt, Token.Gte, Token.Lte, Token.Eq, Token.And, Token.Or, Token.Not)
 
         if commands.exists(tokens.contains) then {
@@ -80,6 +80,19 @@ class Parser(tokens: List[Token]):
                 expect(Token.Assign)
                 val value = parseExpr()
                 Cmd.Assign(loc, value)
+            }
+            case Token.Print => {
+                advance()
+                peek() match {
+                    case Token.StringLit(s) => {
+                        advance()
+                        Cmd.Print(Printable.PrintStr(s))
+                    }
+                    case e => {
+                        val value = parseExpr()
+                        Cmd.Print(Printable.PrintExpr(value))
+                    }
+                }
             }
             case Token.OpenBracket => {
                 advance()

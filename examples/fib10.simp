@@ -1,8 +1,12 @@
 a := 0; 
 b := 1; 
 n := 10; 
-while !n > 0 do
+(while !n > 0 do
     tmp := !b; 
     b := !a + !b; 
     a := !tmp; 
-    n := !n - 1
+    n := !n - 1);
+
+print "The 10th fibonacci number is..."
+print !a
+
