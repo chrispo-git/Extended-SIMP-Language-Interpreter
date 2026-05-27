@@ -86,6 +86,13 @@ class Lexer(source: String):
         }
     }
 
+    private def skipToNextLine(): Unit = {
+        while !isAtEnd() && (peek() != '\n') do {
+            advance()
+        }
+        skipWhitespace()
+    }
+
     private def advanceUntilNextWord(): Unit = {
         while !isAtEnd() && !whitespaces.contains(peek()) && !valid_symbols.contains(peek()) do {
             advance()
@@ -94,11 +101,16 @@ class Lexer(source: String):
     }
 
     private def scanToken(): Unit = {
+        if peek() == '/' && peekNext() == '/' then {
+            skipToNextLine()
+            return
+        }
         val token : Token = peek() match {
             
             case x if isInteger() => {val word = getWholeWord().toInt; advanceUntilNextWord(); Token.LiteralInt(word)}
             case x if isWordMatch("true") => {advanceUntilNextWord(); Token.BoolLit(true)}
             case x if isWordMatch("false") => {advanceUntilNextWord(); Token.BoolLit(false)}
+
 
             case '+' => {advance();Token.Add}
             case '-' => {advance();Token.Sub}
@@ -107,6 +119,7 @@ class Lexer(source: String):
             case '!' => {advance();Token.Deref} 
             
             case ':' if peekNext() == '=' => {advanceN(2);Token.Assign} 
+
             
             case '¬' => {advance();Token.Not} 
             case '&' if peekNext() == '&' => {advanceN(2);Token.And} 

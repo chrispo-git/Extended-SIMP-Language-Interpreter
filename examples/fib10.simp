@@ -1,8 +1,9 @@
+// Gets the 10th fibonacci number!
 a := 0; 
 b := 1; 
 n := 10; 
 while !n > 0 do {
-    tmp := !b; 
+    tmp := !b;
     b := !a + !b; 
     a := !tmp; 
     n := !n - 1;

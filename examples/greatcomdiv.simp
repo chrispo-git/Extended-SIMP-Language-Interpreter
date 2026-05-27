@@ -1,3 +1,4 @@
+// Gets the Greatest Common Divisor of 2 numbers
 a := 48; 
 b := 18; 
 while ¬(!a == !b) do {
