@@ -203,6 +203,7 @@ class Parser(tokens: List[Token]):
                     case Token.Lt => Bop.Lt
                     case Token.Lte => Bop.Lte
                     case Token.Eq => Bop.Eq
+                    case Token.Neq => Bop.Neq
                     case x => throw RuntimeException(s"Expected boolean operator, got '${x}'")
                 }
                 advance()

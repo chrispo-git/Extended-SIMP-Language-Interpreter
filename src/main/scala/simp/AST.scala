@@ -33,7 +33,7 @@ enum BoolExpr:
     case Or(l: BoolExpr, r: BoolExpr)
 
 enum Bop:
-    case Gt, Lt, Eq, Gte, Lte
+    case Gt, Lt, Eq, Gte, Lte, Neq
 
 enum Cmd:
     case Skip

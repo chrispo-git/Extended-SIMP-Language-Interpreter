@@ -54,6 +54,7 @@ class Evaluator(store: Store):
                     case Bop.Lt => left < right 
                     case Bop.Lte => left <= right
                     case Bop.Eq => left == right 
+                    case Bop.Neq => left != right 
                 }
             }
         }

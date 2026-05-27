@@ -112,11 +112,6 @@ class Lexer(source: String):
             case x if isWordMatch("false") => {advanceUntilNextWord(); Token.BoolLit(false)}
 
 
-            case '+' => {advance();Token.Add}
-            case '-' => {advance();Token.Sub}
-            case '/' => {advance();Token.Div} 
-            case '*' => {advance();Token.Mul} 
-            case '!' => {advance();Token.Deref} 
             
             case ':' if peekNext() == '=' => {advanceN(2);Token.Assign} 
 
@@ -130,6 +125,13 @@ class Lexer(source: String):
             case '<' if peekNext() == '=' => {advanceN(2);Token.Lte} 
             case '<' => {advance();Token.Lt}
             case '=' if peekNext() == '=' => {advanceN(2);Token.Eq} 
+            case '!' if peekNext() == '=' => {advanceN(2);Token.Neq} 
+
+            case '+' => {advance();Token.Add}
+            case '-' => {advance();Token.Sub}
+            case '/' => {advance();Token.Div} 
+            case '*' => {advance();Token.Mul} 
+            case '!' => {advance();Token.Deref} 
 
             case x if isWordMatch("skip") => {advanceUntilNextWord(); Token.Skip}
             case x if isWordMatch("if") => {advanceUntilNextWord(); Token.If}

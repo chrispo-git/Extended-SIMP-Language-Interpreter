@@ -23,6 +23,7 @@ enum Token:
     case Gte 
     case Lte 
     case Eq
+    case Neq
 
     case Skip 
     case If 
