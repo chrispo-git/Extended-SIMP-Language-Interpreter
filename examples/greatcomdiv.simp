@@ -9,5 +9,4 @@ fn gcd(a, b) {
     };
     return !a;
 }
-print "The greatest common divisor of 48 and 18 is...";
-print gcd(48, 18);
+print "The greatest common divisor of 48 and 18 is " + gcd(48, 18);

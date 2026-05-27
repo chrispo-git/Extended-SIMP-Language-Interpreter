@@ -9,6 +9,4 @@ while !n > 0 do {
     n := !n - 1;
 };
 
-print "The 10th fibonacci number is...";
-print !a;
-
+print "The 10th fibonacci number is " + !a;

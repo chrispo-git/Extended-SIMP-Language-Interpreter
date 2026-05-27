@@ -178,16 +178,7 @@ class Parser(tokens: List[Token]):
             }
             case Token.Print => {
                 advance()
-                peek() match {
-                    case Token.StringLit(s) => {
-                        advance()
-                        Cmd.Print(Printable.PrintStr(s))
-                    }
-                    case e => {
-                        val value = parseExpr()
-                        Cmd.Print(Printable.PrintExpr(value))
-                    }
-                }
+                Cmd.Print(parseExpr())
             }
             case Token.OpenBracket => {
                 advance()
@@ -287,6 +278,10 @@ class Parser(tokens: List[Token]):
             case Token.LiteralInt(n) => {
                 advance()
                 Expr.Num(n)
+            }
+            case Token.StringLit(s) => {
+                advance()
+                Expr.Str(s)
             }
             case Token.Deref => {
                 advance()
