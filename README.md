@@ -1,6 +1,7 @@
 # SIMP-Interpreter
 ![Scala Version](https://img.shields.io/badge/Scala-3.6.4-red?logo=scala)
 ![License](https://img.shields.io/badge/License-GPL--3.0-blue)
+
 A simple imperative language + interpreter with REPL.
 
 ## What is SIMP?
