@@ -1,4 +1,6 @@
 # SIMP-Interpreter
+![Scala Version](https://img.shields.io/badge/Scala-3.6.4-red?logo=scala)
+![License](https://img.shields.io/badge/License-GPL--3.0-blue)
 A simple imperative language + interpreter with REPL.
 
 ## What is SIMP?
@@ -31,21 +33,28 @@ call fizzbuzz(30);
 ### How to Use
 1. Download the repository
 2. Run `sbt compile` within the root of the repository
-3. To run a file, use `sbt "run examples/greatcomdiv.simp"`
+3. To run a file, use `sbt "run examples/factorial5.simp"`
 4. To just start the REPL, use `sbt run`
 
 ## Features
+### Core Language
 - Integer arithmetic
 - Boolean expressions
-- Comparison operators
 - Variable assignment and dereferencing
-- if / else conditionals
 - while loops
+- if / else conditionals
 - Sequencing
+- Comparison operators
+### Extensions
+- if / elif / else conditionals
 - Compound assignment operators
 - Single-line comments
 - Negative integer literals
 - Curly brace syntax for blocks
+- String Literals
+- Printing String Literals & Integer Expressions
+
+### Functions & Procedures
 - First-class functions with explicit `return`
 - Void procedures with `call` syntax
 - Recursive functions
