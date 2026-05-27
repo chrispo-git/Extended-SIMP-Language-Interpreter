@@ -141,6 +141,7 @@ class Parser(tokens: List[Token]):
                         val value = parseExpr()
                         Cmd.Assign(loc, Expr.BinaryOp(Expr.Deref(loc), Op.Div, value))
                     }
+                    case x => throw RuntimeException(s"Expected assignment, got '$x'")
                 }
                 
             }
