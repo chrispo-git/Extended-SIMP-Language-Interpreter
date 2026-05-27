@@ -6,7 +6,10 @@ class EvaluatorTest extends AnyFunSuite:
 
   def run(source: String): Store =
     val store = Store()
-    Evaluator(store).evalProgram(Parser(Lexer(source).tokenise()).parseProgram())
+    val fnEnv = FunctionEnv()
+    val tokens = Lexer(source).tokenise()
+    val program = Parser(tokens).parseProgram()
+    Evaluator(fnEnv).evalProgram(program, store)
     store
 
   def storeOf(pairs: (String, Int)*): Map[String, Int] = pairs.toMap
@@ -77,110 +80,242 @@ class EvaluatorTest extends AnyFunSuite:
 
   // If
   test("if true executes then branch") {
-    val store2 = run("if true then x := 1 else x := 2")
+    val store2 = run("if true then {x := 1} else {x := 2}")
     assert(store2.load("x") == 1)
   }
 
   test("if false executes else branch") {
-    val store = run("if false then x := 1 else x := 2")
+    val store = run("if false then {x := 1} else {x := 2}")
     assert(store.load("x") == 2)
   }
 
   test("if with comparison true") {
-    val store = run("x := 5 ; if !x > 3 then y := 1 else y := 0")
+    val store = run("x := 5 ; if !x > 3 then {y := 1} else {y := 0}")
     assert(store.load("y") == 1)
   }
 
   test("if with comparison false") {
-    val store = run("x := 1 ; if !x > 3 then y := 1 else y := 0")
+    val store = run("x := 1 ; if !x > 3 then {y := 1} else {y := 0}")
     assert(store.load("y") == 0)
   }
 
   // While
   test("while loop counts down to zero") {
-    val store = run("x := 5 ; while !x > 0 do x := !x - 1")
+    val store = run("x := 5 ; while !x > 0 do {x := !x - 1}")
     assert(store.load("x") == 0)
   }
 
   test("while loop never executes if condition false") {
-    val store = run("x := 0 ; while !x > 0 do x := !x - 1")
+    val store = run("x := 0 ; while !x > 0 do {x := !x - 1}")
     assert(store.load("x") == 0)
   }
 
   test("while loop with accumulator") {
-    val store = run("x := 5 ; acc := 0 ; while !x > 0 do (acc := !acc + !x ; x := !x - 1)")
+    val store = run("x := 5 ; acc := 0 ; while !x > 0 do {acc := !acc + !x ; x := !x - 1}")
     assert(store.load("acc") == 15)
     assert(store.load("x") == 0)
   }
 
   // Boolean logic
   test("not true is false") {
-    val store = run("if ¬true then x := 1 else x := 0")
+    val store = run("if ¬true then {x := 1} else {x := 0}")
     assert(store.load("x") == 0)
   }
 
   test("not false is true") {
-    val store = run("if ¬false then x := 1 else x := 0")
+    val store = run("if ¬false then {x := 1} else {x := 0}")
     assert(store.load("x") == 1)
   }
 
   test("and both true") {
-    val store = run("if true && true then x := 1 else x := 0")
+    val store = run("if true && true then {x := 1} else {x := 0}")
     assert(store.load("x") == 1)
   }
 
   test("and one false") {
-    val store = run("if true && false then x := 1 else x := 0")
+    val store = run("if true && false then {x := 1} else {x := 0}")
     assert(store.load("x") == 0)
   }
 
   test("or one true") {
-    val store = run("if false  || true then x := 1 else x := 0")
+    val store = run("if false  || true then {x := 1} else {x := 0}")
     assert(store.load("x") == 1)
   }
 
   test("or both false") {
-    val store = run("if false  || false then x := 1 else x := 0")
+    val store = run("if false  || false then {x := 1} else {x := 0}")
     assert(store.load("x") == 0)
   }
 
   // Comparators
   test("greater than") {
-    val store = run("x := 5 ; if !x > 3 then y := 1 else y := 0")
+    val store = run("x := 5 ; if !x > 3  then {y := 1} else {y := 0}")
     assert(store.load("y") == 1)
   }
 
   test("less than") {
-    val store = run("x := 2 ; if !x < 3 then y := 1 else y := 0")
+    val store = run("x := 2 ; if !x < 3 then {y := 1} else {y := 0}")
     assert(store.load("y") == 1)
   }
 
   test("equal") {
-    val store = run("x := 3 ; if !x == 3 then y := 1 else y := 0")
+    val store = run("x := 3 ; if !x == 3 then {y := 1} else {y := 0}")
     assert(store.load("y") == 1)
   }
 
   test("greater than or equal") {
-    val store = run("x := 3 ; if !x >= 3 then y := 1 else y := 0")
+    val store = run("x := 3 ; if !x >= 3 then {y := 1} else {y := 0}")
     assert(store.load("y") == 1)
   }
 
   test("less than or equal") {
-    val store = run("x := 3 ; if !x <= 3 then y := 1 else y := 0")
+    val store = run("x := 3 ; if !x <= 3 then {y := 1}  else {y := 0} ")
     assert(store.load("y") == 1)
   }
 
   // Integration
   test("factorial of 5") {
     val store = run(
-      "x := 5 ; acc := 1 ; while !x > 0 do (acc := !acc * !x ; x := !x - 1)"
+      "x := 5 ; acc := 1 ; while !x > 0 do {acc := !acc * !x ; x := !x - 1}"
     )
     assert(store.load("acc") == 120)
   }
 
   test("fibonacci") {
     val store = run(
-      "a := 0 ; b := 1 ; n := 10 ; while !n > 0 do (tmp := !b ; b := !a + !b ; a := !tmp ; n := !n - 1)"
+      "a := 0 ; b := 1 ; n := 10 ; while !n > 0 do {tmp := !b ; b := !a + !b ; a := !tmp ; n := !n - 1}"
     )
     assert(store.load("a") == 55)
+  }
+  test("+=") {
+    val store = run("x := 5 ; x += 3")
+    assert(store.load("x") == 8)
+  }
+
+  test("-=") {
+    val store = run("x := 5 ; x -= 2")
+    assert(store.load("x") == 3)
+  }
+
+  test("*=") {
+    val store = run("x := 5 ; x *= 3")
+    assert(store.load("x") == 15)
+  }
+
+  test("/=") {
+    val store = run("x := 10 ; x /= 2")
+    assert(store.load("x") == 5)
+  }
+
+  // Modulo
+  test("modulo") {
+    val store = run("x := 10 % 3")
+    assert(store.load("x") == 1)
+  }
+
+  test("modulo even") {
+    val store = run("x := 10 % 2")
+    assert(store.load("x") == 0)
+  }
+
+  // Not equal
+  test("!= true") {
+    val store = run("if 1 != 2 then { x := 1 } else { x := 0 }")
+    assert(store.load("x") == 1)
+  }
+
+  test("!= false") {
+    val store = run("if 1 != 1 then { x := 1 } else { x := 0 }")
+    assert(store.load("x") == 0)
+  }
+
+  // Negative literals
+  test("negative literal") {
+    val store = run("x := -5")
+    assert(store.load("x") == -5)
+  }
+
+  test("negative literal in expression") {
+    val store = run("x := -5 + 3")
+    assert(store.load("x") == -2)
+  }
+
+  // elif
+  test("elif takes second branch") {
+    val store = run(
+      "x := 2 ; if !x == 1 then { y := 1 } elif !x == 2 then { y := 2 } else { y := 3 }"
+    )
+    assert(store.load("y") == 2)
+  }
+
+  test("elif falls to else") {
+    val store = run(
+      "x := 3 ; if !x == 1 then { y := 1 } elif !x == 2 then { y := 2 } else { y := 3 }"
+    )
+    assert(store.load("y") == 3)
+  }
+
+  test("chained elif") {
+    val store = run(
+      "x := 3 ; if !x == 1 then { y := 1 } elif !x == 2 then { y := 2 } elif !x == 3 then { y := 3 } else { y := 4 }"
+    )
+    assert(store.load("y") == 3)
+  }
+
+  // Functions
+  test("simple function call") {
+    val store = run("fn double(n) { return !n * 2; } x := double(5);")
+    assert(store.load("x") == 10)
+  }
+
+  test("recursive function") {
+    val store = run(
+      "fn factorial(n) { if !n == 0 then { return 1; } else { return !n * factorial(!n - 1); }; } x := factorial(5);"
+    )
+    assert(store.load("x") == 120)
+  }
+
+  test("function with multiple params") {
+    val store = run("fn add(a, b) { return !a + !b; } x := add(3, 4);")
+    assert(store.load("x") == 7)
+  }
+
+  test("function cannot see caller store") {
+    val store = run("fn getX() { return 42; }; x := 99 ;  y := getX();")
+    assert(store.load("y") == 42)
+  }
+
+  test("function with no return throws") {
+    assertThrows[RuntimeException](
+      run("fn bad() { skip; } x := bad();")
+    )
+  }
+
+  test("wrong number of arguments throws") {
+    assertThrows[RuntimeException](
+      run("fn add(a, b) { return !a + !b; } x := add(1);")
+    )
+  }
+
+  // Procedures
+  test("procedure modifies nothing in caller store") {
+    val store = run("pd noop(n) { n := 99; } x := 5 ; call noop(!x);")
+    assert(store.load("x") == 5)
+  }
+
+  test("procedure call with side effects") {
+    val store = run("pd setY(n) { y := !n; } call setY(42);")
+    // y only exists in localStore, not in caller store
+    assertThrows[RuntimeException](store.load("y"))
+  }
+
+  // Comments
+  test("comment is ignored") {
+    val store = run("x := 5; // this is a comment")
+    assert(store.load("x") == 5)
+  }
+
+  test("inline comment does not affect result") {
+    val store = run("x := 5; // x := 99;")
+    assert(store.load("x") == 5)
   }
