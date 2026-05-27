@@ -2,8 +2,8 @@ x := 5;
 acc := 1; 
 while !x > 0 do {
     acc := !acc * !x; 
-    x := !x - 1
+    x := !x - 1;
 };
 
 print "The Factorial of 5 is...";
-print !x
+print !x;
