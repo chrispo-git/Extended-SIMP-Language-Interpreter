@@ -53,6 +53,8 @@ enum Printable:
 enum Program:
     case PCmd(cmd: Cmd)
     case PDecl(decl: Decl)
+    case PExpr(expr: Expr)
+    case PBool(boolExpr: BoolExpr)
 
 enum Decl:
   case FnDecl(name: String, params: List[String], body: Cmd)

@@ -7,6 +7,8 @@ class Evaluator(fnEnv: FunctionEnv):
             case Program.PDecl(Decl.FnDecl(name, params, body)) => fnEnv.registerFn(name, Decl.FnDecl(name, params, body))
             case Program.PDecl(Decl.PdDecl(name, params, body)) => fnEnv.registerPd(name, Decl.PdDecl(name, params, body))
             case Program.PCmd(cmd) => execCmd(cmd, store)
+            case Program.PExpr(expr) => println(evalExpr(expr, store))
+            case Program.PBool(b) => println(evalBool(b, store))
         })
     }
 

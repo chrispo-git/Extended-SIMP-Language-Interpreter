@@ -1,0 +1,11 @@
+pd swap(a, b) {
+    tmp := !a;
+    a := !b;
+    b := !tmp;
+    print !a;
+    print !b;
+}
+
+x := 10;
+y := 20;
+call swap(!x, !y);

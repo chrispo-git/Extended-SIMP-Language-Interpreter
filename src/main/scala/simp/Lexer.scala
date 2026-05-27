@@ -116,7 +116,7 @@ class Lexer(source: String):
         }
         val token : Token = peek() match {
             
-            case x if isInteger() => {val word = getWholeWord().toInt; advanceUntilNextWord(); Token.LiteralInt(word)}
+            case x if isInteger() => {val word = getWholeWord().toInt; advanceN(getWholeWord().length); Token.LiteralInt(word)}
             case x if isWordMatch("true") => {advanceUntilNextWord(); Token.BoolLit(true)}
             case x if isWordMatch("false") => {advanceUntilNextWord(); Token.BoolLit(false)}
 

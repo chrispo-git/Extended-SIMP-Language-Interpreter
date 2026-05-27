@@ -35,6 +35,39 @@ class Parser(tokens: List[Token]):
         items.toList
     }
 
+    def parseRepl(): List[Program] = {
+        val items = scala.collection.mutable.ListBuffer[Program]()
+
+        while !isAtEnd() && peek() != Token.EOF do {
+            val item = peek() match {
+                case Token.Fn | Token.Pd => Program.PDecl(parseDecl())
+                case Token.BoolLit(_) | Token.Not => Program.PBool(parseBool())
+                case Token.LiteralInt(_) | Token.Deref =>
+                    val expr = parseExpr()
+                    peek() match {
+                        case Token.Gt | Token.Lt | Token.Gte | Token.Lte | Token.Eq | Token.Neq =>
+                            val bop = peek() match {
+                                case Token.Gt  => Bop.Gt
+                                case Token.Lt  => Bop.Lt
+                                case Token.Gte => Bop.Gte
+                                case Token.Lte => Bop.Lte
+                                case Token.Eq  => Bop.Eq
+                                case Token.Neq => Bop.Neq
+                                case _ => throw RuntimeException("unreachable")
+                            }
+                            advance()
+                            val right = parseExpr()
+                            Program.PBool(BoolExpr.Compare(expr, bop, right))
+                        case _ => Program.PExpr(expr)
+                    }
+                case Token.Variable(_) if peekNext() == Token.OpenBracket => Program.PExpr(parseAtomicExpr())
+                case _ => Program.PCmd(parseCmd())
+            }
+            items += item
+            while peek() == Token.Semicolon do advance()
+        }
+        items.toList
+    }
     private def parseCmd(): Cmd = {
         val left = parseSingleCmd()
         if peek() == Token.Semicolon then {
