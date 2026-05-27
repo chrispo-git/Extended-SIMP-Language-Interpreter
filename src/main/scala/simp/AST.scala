@@ -13,9 +13,9 @@ enum Expr:
     case BinaryOp(l: Expr, op: Op, r: Expr)
     case FnCall(name: String, args: List[Expr])
 
-// Operators allowed - Add, Sub, Mul, Div
+// Operators allowed - Add, Sub, Mul, Div, Mod
 enum Op:
-    case Add, Sub, Mul, Div
+    case Add, Sub, Mul, Div, Mod
 
 
 /* Boolean Expressions can either be:

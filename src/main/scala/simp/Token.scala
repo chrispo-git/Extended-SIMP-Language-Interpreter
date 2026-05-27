@@ -9,6 +9,7 @@ enum Token:
     case Add
     case Sub 
     case Div 
+    case Mod 
     case Mul 
     case Deref
 

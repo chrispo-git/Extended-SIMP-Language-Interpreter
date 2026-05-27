@@ -212,10 +212,11 @@ class Parser(tokens: List[Token]):
     
     private def parseTerm(): Expr = {
         var left = parseAtomicExpr()
-        while List(Token.Mul, Token.Div).contains(peek()) do {
+        while List(Token.Mul, Token.Div, Token.Mod).contains(peek()) do {
             val op: Op = peek() match {
                 case Token.Mul => Op.Mul
                 case Token.Div => Op.Div
+                case Token.Mod => Op.Mod
                 case _ => throw RuntimeException("unreachable")
             }
             advance()

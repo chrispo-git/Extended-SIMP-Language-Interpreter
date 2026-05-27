@@ -33,6 +33,7 @@ class Evaluator(fnEnv: FunctionEnv):
                     case Op.Add => left + right
                     case Op.Sub => left - right 
                     case Op.Mul => left * right 
+                    case Op.Mod => left % right 
                     case Op.Div if right == 0 => throw RuntimeException(s"Division by Zero!")
                     case Op.Div => left / right 
                 }
