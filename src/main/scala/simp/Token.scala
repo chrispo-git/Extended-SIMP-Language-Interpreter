@@ -35,6 +35,9 @@ enum Token:
     case OpenBracket
     case CloseBracket
 
+    case OpenBrace 
+    case CloseBrace
+
     case Print
     case StringLit(value: String)
 

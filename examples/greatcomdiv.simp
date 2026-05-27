@@ -1,10 +1,13 @@
 a := 48; 
 b := 18; 
-(while ¬(!a == !b) do 
-    if !a > !b then 
+while ¬(!a == !b) do {
+    if !a > !b then {
         a := !a - !b 
-    else 
-        b := !b - !a);
+    }
+    else {
+        b := !b - !a
+    }
+};
 
 print "The greatest common divisor of 48 and 18 is...";
 print !a

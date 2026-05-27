@@ -43,7 +43,7 @@ class Parser(tokens: List[Token]):
 
     private def parseCmd(): Cmd = {
         val left = parseSingleCmd()
-        if peek() == Token.Semicolon then
+        if peek() == Token.Semicolon && !List(Token.EOF, Token.CloseBrace).contains(peekNext()) then
             advance()
             val right = parseCmd()
             Cmd.Seq(left, right)
@@ -62,16 +62,22 @@ class Parser(tokens: List[Token]):
                 advance()
                 val cond = parseBool()
                 expect(Token.Then)
+                expect(Token.OpenBrace)
                 val thenBranch = parseCmd()
+                expect(Token.CloseBrace)
                 expect(Token.Else)
+                expect(Token.OpenBrace)
                 val elseBranch = parseCmd()
+                expect(Token.CloseBrace)
                 Cmd.If(cond, thenBranch, elseBranch)
             }
             case Token.While => {
                 advance()
                 val cond = parseBool()
                 expect(Token.Do)
+                expect(Token.OpenBrace)
                 val body = parseCmd()
+                expect(Token.CloseBrace)
                 Cmd.While(cond, body)
             }
             case Token.Variable(l) => {

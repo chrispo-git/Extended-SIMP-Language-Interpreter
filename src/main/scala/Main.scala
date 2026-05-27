@@ -20,5 +20,6 @@ import java.io.FileNotFoundException
 
     val tokens = Lexer(source).tokenise()
     val program = Parser(tokens).parseProgram()
+    println(program)
     val store = Store()
     Evaluator(store).evalProgram(program)

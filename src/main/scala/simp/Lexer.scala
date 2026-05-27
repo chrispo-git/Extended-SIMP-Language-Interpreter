@@ -128,6 +128,8 @@ class Lexer(source: String):
             case ';' => {advance();Token.Semicolon}
             case '(' => {advance();Token.OpenBracket}
             case ')' => {advance();Token.CloseBracket}
+            case '{' => {advance();Token.OpenBrace}
+            case '}' => {advance();Token.CloseBrace}
 
             case '"' => Token.StringLit(getWholeString())
 
