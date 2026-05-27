@@ -45,6 +45,7 @@ Cmd ::= skip                                -- no-op
 Where:
 - `l ∈ L = {l₀, l₁, ...}`   i.e. l is bound, defined earlier
 - `s`                       is a string literal, e.g. "Hello World!"
+- `E, E₀, E₁, ...`          are Integer Expressions
 
 ### Integer Expressions
 ```

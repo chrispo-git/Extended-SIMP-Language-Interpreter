@@ -2,7 +2,7 @@
 A simple imperative language + interpreter with REPL.
 
 ## What is SIMP?
-SIMP is a simple imperative language that contains recursive functions & procedures, variables and basic control flow.
+SIMP is a simple imperative language. This repository extends that language with recursive functions & procedures, compound assignment operators, and other features.
 The full Grammar is available [here](SYNTAX.md), but here is some example code:
 
 ```
