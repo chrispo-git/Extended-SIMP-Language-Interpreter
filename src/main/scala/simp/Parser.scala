@@ -21,24 +21,18 @@ class Parser(tokens: List[Token]):
         else advance()
     }
 
-    def parseProgram(): Program = {
-        val commands  = List(Token.Skip, Token.If, Token.Then, Token.Else, Token.While, Token.Do, Token.Assign, Token.Print)
-        val bools = List(Token.Gt, Token.Lt, Token.Gte, Token.Lte, Token.Eq, Token.And, Token.Or, Token.Not)
-
-        if commands.exists(tokens.contains) then {
-            return Program.PCmd(parseCmd())
+    def parseProgram(): List[Program] = {
+        val items = scala.collection.mutable.ListBuffer[Program]()
+        while !isAtEnd() && peek() != Token.EOF do {
+            peek() match {
+                case Token.Fn | Token.Pd => items += Program.PDecl(parseDecl())
+                case _ => items += Program.PCmd(parseCmd())
+            }
+            while peek() == Token.Semicolon do {
+                advance()
+            }
         }
-        if bools.exists(tokens.contains) then {
-            return Program.PBool(parseBool())
-        }
-
-        peek() match {
-            case Token.BoolLit(_) => return Program.PBool(parseBool())
-            case _ =>
-        }
-
-        Program.PExpr(parseExpr())
-
+        items.toList
     }
 
     private def parseCmd(): Cmd = {
@@ -111,10 +105,63 @@ class Parser(tokens: List[Token]):
                 expect(Token.CloseBracket)
                 cmd
             }
+            case Token.Return => {
+                advance()
+                val expr = parseExpr()
+                Cmd.Return(expr)
+            }
+            case Token.Call => {
+                advance()
+                peek() match {
+                    case Token.Variable(name) => {
+                        advance()
+                        val args = parseArgs()
+                        Cmd.PdCall(name, args)
+                    }
+                    case x => throw RuntimeException(s"Expected procedure name, got '$x'")
+                }
+            }
             case x => throw RuntimeException(s"Unexpected '$x'")
         }
     }
-
+    private def parseArgs(): List[Expr] = {
+        expect(Token.OpenBracket)
+        if peek() == Token.CloseBracket then {
+            advance()
+            List()
+        } else {
+            val args = scala.collection.mutable.ListBuffer[Expr]()
+            args += parseExpr()
+            while peek() == Token.Comma do {
+                advance()
+                args += parseExpr()
+            }
+            expect(Token.CloseBracket)
+            args.toList
+        }
+    }
+    private def parseParams(): List[String] = {
+        expect(Token.OpenBracket)
+        if peek() == Token.CloseBracket then {
+            advance()
+            List()
+        } else {
+            val params = scala.collection.mutable.ListBuffer[String]()
+            peek() match {
+                case Token.Variable(name) => {advance(); params += name}
+                case x => throw RuntimeException(s"Expected parameter name, got '$x'")
+            }
+            while peek() == Token.Comma do {
+                advance()
+                peek() match {
+                    case Token.Variable(name) => {advance(); params += name}
+                    case x => throw RuntimeException(s"Expected parameter name, got '$x'")
+                }
+            }
+            expect(Token.CloseBracket)
+            params.toList
+        }
+    }
     private def parseExpr(): Expr = {
         var left = parseTerm()
         while List(Token.Add, Token.Sub).contains(peek()) do {
@@ -160,6 +207,11 @@ class Parser(tokens: List[Token]):
                     case x => throw RuntimeException(s"Expected variable after '!', got '$x'")
                 }
             }
+            case Token.Variable(name) if peekNext() == Token.OpenBracket => {
+                advance()
+                val args = parseArgs()
+                Expr.FnCall(name, args)
+            }
             case Token.OpenBracket => {
                 advance()
                 val inside = parseExpr()
@@ -183,7 +235,37 @@ class Parser(tokens: List[Token]):
         }
         left
     }
-
+    private def parseDecl(): Decl = peek() match {
+        case Token.Fn => {
+            advance()
+            peek() match {
+                case Token.Variable(name) => {
+                    advance()
+                    val params = parseParams()
+                    expect(Token.OpenBrace)
+                    val body = parseCmd()
+                    expect(Token.CloseBrace)
+                    Decl.FnDecl(name, params, body)
+                }
+                case x => throw RuntimeException(s"Expected function name, got '$x'")
+            }
+        }
+        case Token.Pd => {
+            advance()
+            peek() match {
+                case Token.Variable(name) => {
+                    advance()
+                    val params = parseParams()
+                    expect(Token.OpenBrace)
+                    val body = parseCmd()
+                    expect(Token.CloseBrace)
+                    Decl.PdDecl(name, params, body)
+                }
+                case x => throw RuntimeException(s"Expected procedure name, got '$x'")
+            }
+        }
+        case x => throw RuntimeException(s"Expected declaration, got '$x'")
+    }
     private def parseAtomicBool(): BoolExpr = {
         peek() match {
             case Token.BoolLit(b) => {

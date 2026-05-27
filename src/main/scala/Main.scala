@@ -21,4 +21,5 @@ import java.io.FileNotFoundException
     val tokens = Lexer(source).tokenise()
     val program = Parser(tokens).parseProgram()
     val store = Store()
-    Evaluator(store).evalProgram(program)
+    val fnEnv = FunctionEnv()
+    Evaluator(fnEnv).evalProgram(program, store)

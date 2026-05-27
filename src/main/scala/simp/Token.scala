@@ -43,3 +43,9 @@ enum Token:
     case StringLit(value: String)
 
     case EOF 
+
+    case Fn 
+    case Pd 
+    case Return 
+    case Call
+    case Comma

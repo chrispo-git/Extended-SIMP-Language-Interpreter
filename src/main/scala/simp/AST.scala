@@ -11,6 +11,7 @@ enum Expr:
     case Deref(loc: String)
     case Num(value: Int)
     case BinaryOp(l: Expr, op: Op, r: Expr)
+    case FnCall(name: String, args: List[Expr])
 
 // Operators allowed - Add, Sub, Mul, Div
 enum Op:
@@ -42,6 +43,8 @@ enum Cmd:
     case If(cond: BoolExpr, thenBranch: Cmd, elseBranch: Cmd)
     case While(cond: BoolExpr, body: Cmd)
     case Print(value: Printable)
+    case PdCall(name: String, args: List[Expr])
+    case Return(expr: Expr)
 
 enum Printable:
   case PrintStr(value: String)
@@ -49,6 +52,10 @@ enum Printable:
 
 enum Program:
     case PCmd(cmd: Cmd)
-    case PExpr(expr: Expr)
-    case PBool(boolExpr: BoolExpr)
+    case PDecl(decl: Decl)
 
+enum Decl:
+  case FnDecl(name: String, params: List[String], body: Cmd)
+  case PdDecl(name: String, params: List[String], body: Cmd)
+
+case class ReturnException(value: Int) extends Exception
