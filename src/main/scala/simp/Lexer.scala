@@ -57,6 +57,15 @@ class Lexer(source: String):
 
         possibleNumber.nonEmpty && possibleNumber.forall(numbers.contains)
     }
+
+    private def isNextInteger(): Boolean = {
+        pos += 1
+        val possibleNumber = getWholeWord()
+
+        pos -= 1
+
+        possibleNumber.nonEmpty && possibleNumber.forall(numbers.contains)
+    }
     private def isIdentifier(word: String): Boolean = {
         word.nonEmpty &&
         (
@@ -110,6 +119,8 @@ class Lexer(source: String):
             case x if isInteger() => {val word = getWholeWord().toInt; advanceUntilNextWord(); Token.LiteralInt(word)}
             case x if isWordMatch("true") => {advanceUntilNextWord(); Token.BoolLit(true)}
             case x if isWordMatch("false") => {advanceUntilNextWord(); Token.BoolLit(false)}
+
+            case '-' if isNextInteger() => {advance(); val word = getWholeWord().toInt; advanceUntilNextWord(); Token.LiteralInt(word * -1)}
 
 
             
