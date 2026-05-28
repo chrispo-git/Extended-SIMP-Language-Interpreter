@@ -15,17 +15,19 @@ enum Expr:
     case BoolLift(expr: BoolExpr)
     case BinaryOp(l: Expr, op: Op, r: Expr)
     case FnCall(name: String, args: List[Expr])
+    case Ref(loc: String)
 
 // Operators allowed - Add, Sub, Mul, Div, Mod
 enum Op:
     case Add, Sub, Mul, Div, Mod
 
 
-// Values allowed
+// Values allowed, including a ref value
 enum Value:
   case IntVal(n: Int)
   case StrVal(s: String)
   case BoolVal(b: Boolean)
+  case RefVal(loc: String, store: Store)
 
 /* Boolean Expressions can either be:
     - True
@@ -71,5 +73,6 @@ enum SimpType:
     case TypeInt
     case TypeString
     case TypeBool 
+    case TypeRef(inner: SimpType)
 
 case class ReturnException(value: Value) extends Exception

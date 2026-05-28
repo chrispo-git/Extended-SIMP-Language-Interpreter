@@ -237,6 +237,11 @@ class Parser(tokens: List[Token]):
         case Token.TypeInt  => { advance(); SimpType.TypeInt }
         case Token.TypeString  => { advance(); SimpType.TypeString }
         case Token.TypeBool => { advance(); SimpType.TypeBool }
+        case Token.Ref => {
+            advance();
+            val inner = parseType()
+            SimpType.TypeRef(inner)
+        }
         case x => throw RuntimeException(s"Expected type, got '$x'")
     }
     private def parseParams(): List[(String, SimpType)] = {
@@ -349,6 +354,10 @@ class Parser(tokens: List[Token]):
                 advance()
                 val args = parseArgs()
                 Expr.FnCall(name, args)
+            }
+            case Token.Variable(name) => {
+                advance()
+                Expr.Ref(name)
             }
             case Token.OpenBracket => {
                 advance()

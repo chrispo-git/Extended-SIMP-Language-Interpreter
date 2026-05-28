@@ -18,9 +18,25 @@ class Evaluator(fnEnv: FunctionEnv):
         val localStore = Store()
         params.zip(args).foreach((param, arg) => {
             val (name, expectedType) = param
-            val value = evalExpr(arg, callerStore)
-            checkType(value, expectedType, name)
-            localStore.store(name, value)
+            expectedType match {
+                case SimpType.TypeRef(inner) => {
+                    val value = evalExpr(arg, callerStore)
+                    value match {
+                        case Value.RefVal(loc, refStore) => {
+                            checkType(refStore.load(loc), inner, name)
+                            localStore.store(name, Value.RefVal(loc, refStore))
+                        }
+                        case _ => {
+                            throw RuntimeException(s"Expected a reference for parameter '$name'")
+                        }
+                    }
+                }
+                case _ => {
+                    val value = evalExpr(arg, callerStore)
+                    checkType(value, expectedType, name)
+                    localStore.store(name, value)
+                }
+            }
         })
         localStore
     }
@@ -30,6 +46,12 @@ class Evaluator(fnEnv: FunctionEnv):
             case Value.IntVal(_)  => SimpType.TypeInt
             case Value.StrVal(_)  => SimpType.TypeString
             case Value.BoolVal(_) => SimpType.TypeBool
+            case Value.RefVal(loc, refStore) => refStore.load(loc) match {
+                case Value.IntVal(_)  => SimpType.TypeInt
+                case Value.StrVal(_)  => SimpType.TypeString
+                case Value.BoolVal(_) => SimpType.TypeBool
+                case Value.RefVal(_, _) => throw RuntimeException("Nested references are not supported")
+            }
         }
         if actual != expected then {
             throw RuntimeException(s"Type mismatch for '$name': expected $expected, got $actual")
@@ -98,10 +120,16 @@ class Evaluator(fnEnv: FunctionEnv):
     private def evalExpr(expr: Expr, store: Store): Value = {
         expr match {
             case Expr.Num(n) => Value.IntVal(n)
-            case Expr.Deref(loc) => store.load(loc)
+            case Expr.Deref(loc) => {
+                store.load(loc) match {
+                    case Value.RefVal(refLoc, refStore) => refStore.load(refLoc)
+                    case v => v
+                }
+            }
             case Expr.Str(s) => Value.StrVal(s)
             case Expr.Bool(b) => Value.BoolVal(b)
             case Expr.BoolLift(b) => Value.BoolVal(evalBool(b, store))
+            case Expr.Ref(loc) => Value.RefVal(loc, store)
             case Expr.BinaryOp(l, op, r) => {
                 (evalExpr(l, store), evalExpr(r, store)) match {
                     case (Value.IntVal(left), Value.IntVal(right)) => {
@@ -165,7 +193,17 @@ class Evaluator(fnEnv: FunctionEnv):
             case Cmd.Skip => 
             case Cmd.Assign(loc, expr) => {
                 val value = evalExpr(expr, store)
-                store.store(loc, value)
+                try {
+                    store.load(loc) match {
+                        case Value.RefVal(refLoc, refStore) => {
+                            refStore.store(refLoc, value)
+                        }
+                        case _ => store.store(loc, value)
+                    }
+                } catch {
+                    case _: RuntimeException => store.store(loc, value)
+                }
+                
             }
             case Cmd.Seq(fst, snd) => {
                 execCmd(fst, store)
@@ -187,6 +225,7 @@ class Evaluator(fnEnv: FunctionEnv):
                     case Value.StrVal(s) => println(s)
                     case Value.IntVal(n) => println(n)
                     case Value.BoolVal(b) => println(b)
+                    case Value.RefVal(name,_) => println(s"Ref($name)")
                 }
             }
             case Cmd.PdCall(name, args) => {
