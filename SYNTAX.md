@@ -72,8 +72,8 @@ E ::= n                                    -- integer literal (n ∈ ℤ)
     | E op E                               -- binary operation
     | E bop E                              -- comparison (produces Bool)
     | ¬E                                   -- boolean negation (E must be Bool)
-    | E & E                                -- boolean and (E must be Bool)
-    | E | E                                -- boolean or (E must be Bool)
+    | E && E                                -- boolean and (E must be Bool)
+    | E || E                                -- boolean or (E must be Bool)
     | f(E₀, E₁, ...)                      -- function call
     | (E)                                  -- parenthesised expression
 ```
@@ -123,8 +123,8 @@ B ::= true | false                         -- boolean literals
     | !l                                   -- dereference of a Bool variable
     | E bop E                              -- comparison
     | ¬B                                   -- negation
-    | B & B                                -- conjunction (and)
-    | B | B                                -- disjunction (or)
+    | B && B                                -- conjunction (and)
+    | B || B                                -- disjunction (or)
     | (B)                                  -- parenthesised boolean
     | f(E₀, E₁, ...)                      -- function call returning Bool
 ```
@@ -202,7 +202,7 @@ print "Length: " + !x;
 flag := true;
 other := false;
 
-if !flag & ¬!other then {
+if !flag && ¬!other then {
     print "both conditions met";
 };
 
