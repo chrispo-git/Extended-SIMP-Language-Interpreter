@@ -4,7 +4,7 @@ import org.scalatest.funsuite.AnyFunSuite
 
 class ParserTest extends AnyFunSuite:
 
-  def parse(source: String): List[Program] = Parser(Lexer(source).tokenise()).parseProgram()
+  def parse(source: String): List[Program] = Parser(Lexer(source).tokenise(), StructEnv()).parseProgram()
 
   // Commands
   test("parse skip") {
@@ -103,4 +103,37 @@ class ParserTest extends AnyFunSuite:
 
   test("throw on bare variable") {
     assertThrows[RuntimeException](parse("x"))
+  }
+
+  // Structs
+  test("parse struct declaration") {
+      assert(parse("struct Point { x: Int, y: Int }") == List(Program.PDecl(
+          Decl.StructDecl("Point", List(("x", SimpType.TypeInt), ("y", SimpType.TypeInt)))
+      )))
+  }
+
+  test("parse struct literal") {
+      assert(parse("struct Point { x: Int, y: Int }; p := Point { x: 1, y: 2 }") == List(Program.PDecl(
+          Decl.StructDecl("Point", List(("x", SimpType.TypeInt), ("y", SimpType.TypeInt)))
+      ),Program.PCmd(
+          Cmd.Assign("p", Expr.StructLiteral("Point", List(("x", Expr.Num(1)), ("y", Expr.Num(2)))))
+      )))
+  }
+
+  test("parse field access") {
+      assert(parse("x := p.y") == List(Program.PCmd(
+          Cmd.Assign("x", Expr.FieldAccess(Expr.Ref("p"), "y"))
+      )))
+  }
+
+  test("parse field assignment") {
+      assert(parse("p.x := 5") == List(Program.PCmd(
+          Cmd.FieldAssign("p", "x", Expr.Num(5))
+      )))
+  }
+
+  test("parse nested field access") {
+      assert(parse("x := line.start.x") == List(Program.PCmd(
+          Cmd.Assign("x", Expr.FieldAccess(Expr.FieldAccess(Expr.Ref("line"), "start"), "x"))
+      )))
   }

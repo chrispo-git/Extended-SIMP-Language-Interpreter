@@ -74,3 +74,6 @@ enum Token:
 
     case For
     case In
+
+    case Struct
+    case Dot

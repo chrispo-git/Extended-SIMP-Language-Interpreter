@@ -1,6 +1,6 @@
 package simp
 
-class Evaluator(fnEnv: FunctionEnv):
+class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv):
 
     def evalProgram(program: List[Program], store: Store): Unit = {
         program.foreach(p => p match {
@@ -9,6 +9,7 @@ class Evaluator(fnEnv: FunctionEnv):
             case Program.PCmd(cmd) => execCmd(cmd, store)
             case Program.PExpr(expr) => println(evalExpr(expr, store))
             case Program.PBool(b) => println(evalBool(b, store))
+            case Program.PDecl(Decl.StructDecl(name, fields)) => structEnv.register(name, StructDef(fields))
         })
     }
 
@@ -48,6 +49,7 @@ class Evaluator(fnEnv: FunctionEnv):
                 case Value.IntVal(_)  => SimpType.TypeInt
                 case Value.StrVal(_)  => SimpType.TypeString
                 case Value.BoolVal(_) => SimpType.TypeBool
+                case Value.StructVal(typeName, _) => SimpType.TypeStruct(typeName)
                 case Value.RefVal(_, _) => throw RuntimeException("Nested references are not supported")
                 case Value.ArrVal(elements) => {
                     if elements.isEmpty then SimpType.TypeArr(SimpType.TypeInt)
@@ -65,9 +67,11 @@ class Evaluator(fnEnv: FunctionEnv):
                     case Value.IntVal(_) => SimpType.TypeArr(SimpType.TypeInt)
                     case Value.StrVal(_) => SimpType.TypeArr(SimpType.TypeString)
                     case Value.BoolVal(_) => SimpType.TypeArr(SimpType.TypeBool)
+                    case Value.StructVal(typeName, _) => SimpType.TypeStruct(typeName)
                     case _ => throw RuntimeException("Nested arrays not supported")
                 }
             }
+            case Value.StructVal(typeName, _) => SimpType.TypeStruct(typeName)
         }
         if actual != expected then {
             throw RuntimeException(s"Type mismatch for '$name': expected $expected, got $actual")
@@ -198,6 +202,33 @@ class Evaluator(fnEnv: FunctionEnv):
                     case _ => throw RuntimeException(s"Type mismatch in binary operation")
                 }
             }
+            case Expr.StructLiteral(typeName, fields) => {
+                val defn = structEnv.lookup(typeName)
+                val fieldMap = scala.collection.mutable.Map[String, Value]()
+
+                defn.fields.foreach((name, expectedType) => {
+                    val fieldExpr = fields.find(_._1 == name).getOrElse(
+                        throw RuntimeException(s"Missing field '$name' in $typeName literal")
+                    )
+                    val value = evalExpr(fieldExpr._2, store)
+                    checkType(value, expectedType, name)
+                    fieldMap(name) = value
+                })
+                fields.foreach((name, _) => {
+                    if !defn.fields.exists(_._1 == name) then {
+                        throw RuntimeException(s"Unknown field '$name' in $typeName literal")
+                    }
+                })
+                Value.StructVal(typeName, fieldMap)
+            }
+            case Expr.FieldAccess(expr, field) => {
+                evalExpr(expr, store) match {
+                    case Value.StructVal(_, fields) => {
+                        fields.getOrElse(field, throw RuntimeException(s"Unknown field '$field'"))
+                    }
+                    case _ => throw RuntimeException("Field access on non-struct value")
+                }
+            }
             case Expr.FnCall(name, args) => {
                 val evaluatedArgs = args.map(evalExpr(_, store))
                 fnEnv.lookupBuiltin(name) match {
@@ -237,7 +268,20 @@ class Evaluator(fnEnv: FunctionEnv):
                 } catch {
                     case _: RuntimeException => store.store(loc, value)
                 }
-                
+            }
+            case Cmd.FieldAssign(loc, field, valueExpr) => {
+                store.load(loc) match {
+                    case Value.StructVal(typeName, fields) => {
+                        val defn = structEnv.lookup(typeName)
+                        val expectedType = defn.fields.find(_._1 == field).getOrElse(
+                            throw RuntimeException(s"Unknown field '$field'")
+                        )._2
+                        val value = evalExpr(valueExpr, store)
+                        checkType(value, expectedType, field)
+                        fields(field) = value
+                    }
+                    case _ => throw RuntimeException(s"'$loc' is not a struct")
+                }
             }
             case Cmd.Seq(fst, snd) => {
                 execCmd(fst, store)
@@ -293,6 +337,7 @@ class Evaluator(fnEnv: FunctionEnv):
                     case Value.StrVal(s) => println(s)
                     case Value.IntVal(n) => println(n)
                     case Value.BoolVal(b) => println(b)
+                    case Value.StructVal(typeName, fields) => println(s"$typeName { ${fields.map((k,v) => s"$k: $v").mkString(", ")} }")
                     case Value.ArrVal(elements) => {
                         println("[" + elements.map(v => v match {
                             case Value.IntVal(n)  => n.toString

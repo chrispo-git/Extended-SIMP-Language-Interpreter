@@ -5,7 +5,7 @@
 A simple imperative language + interpreter with REPL.
 
 ## What is SIMP?
-SIMP is a simple imperative language covered in the textbook [Programming Languages and Operational Semantics : A Concise Overview](https://link.springer.com/book/10.1007/978-1-4471-6368-8). This repository extends that language with recursive functions & procedures, compound assignment operators, built-in functions, and other features like curly braces to delineate blocks.
+SIMP is a simple imperative language covered in the textbook [Programming Languages and Operational Semantics : A Concise Overview](https://link.springer.com/book/10.1007/978-1-4471-6368-8). This repository extends that language with recursive functions & procedures, structs, built-in functions, and other features like compound operators.
 The full Grammar in BNF is available [here](SYNTAX.md), but here is some example code:
 
 ```
@@ -21,7 +21,7 @@ pd fizzbuzz(n : Int) {
         } else {
             print !i;
         };
-        i := !i + 1;
+        i += 1;
     };
 }
 call fizzbuzz(30);
@@ -47,6 +47,7 @@ For running from source:
 2. Run `sbt compile` within the root of the repository
 3. To run a file, use `sbt "run examples/factorial5.simp"`
 4. To just start the REPL, use `sbt run`
+5. To run test suite, use `sbt test`
 
 ## Features
 ### Core Language

@@ -1,7 +1,7 @@
 lines := readFile("examples/factorial5.simp");
 i := 1;
-print "examples/factorial5.simp"
+print "examples/factorial5.simp";
 for line in lines {
-    print toStr(!i) + ": " + line;
+    print toStr(!i) + ": " + !line;
     i += 1;
 };

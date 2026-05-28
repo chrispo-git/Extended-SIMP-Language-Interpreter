@@ -1,7 +1,7 @@
 package simp
 
 
-class Parser(tokens: List[Token]):
+class Parser(tokens: List[Token], structEnv : StructEnv):
     private var pos: Int = 0
 
     private def isAtEnd(): Boolean = pos >= tokens.length
@@ -21,11 +21,27 @@ class Parser(tokens: List[Token]):
         else advance()
     }
 
+    private def preRegisterStructs(): Unit = {
+        var i = 0
+        while i < tokens.length do {
+            tokens(i) match {
+                case Token.Struct =>
+                    tokens(i + 1) match {
+                        case Token.Variable(name) => structEnv.preRegister(name)
+                        case _ =>
+                    }
+                case _ =>
+            }
+            i += 1
+        }
+    }
+    preRegisterStructs()
+    
     def parseProgram(): List[Program] = {
         val items = scala.collection.mutable.ListBuffer[Program]()
         while !isAtEnd() && peek() != Token.EOF do {
             peek() match {
-                case Token.Fn | Token.Pd => items += Program.PDecl(parseDecl())
+                case Token.Fn | Token.Pd | Token.Struct => items += Program.PDecl(parseDecl())
                 case _ => items += Program.PCmd(parseCmd())
             }
             while peek() == Token.Semicolon do {
@@ -40,7 +56,7 @@ class Parser(tokens: List[Token]):
 
         while !isAtEnd() && peek() != Token.EOF do {
             val item = peek() match {
-                case Token.Fn | Token.Pd => Program.PDecl(parseDecl())
+                case Token.Fn | Token.Pd | Token.Struct => Program.PDecl(parseDecl())
                 case Token.BoolLit(_) | Token.Not => Program.PBool(parseBool())
                 case Token.Variable(_) if peekNext() == Token.OpenSquare =>
                     Program.PExpr(parsePostfix(parseAtomicExpr()))
@@ -71,7 +87,11 @@ class Parser(tokens: List[Token]):
         items.toList
     }
     private def parseCmd(): Cmd = {
-        val left = parseSingleCmd()
+        val left = peek() match {
+            case Token.Fn | Token.Pd | Token.Struct =>
+                throw RuntimeException("Declarations must be at the top of the file")
+            case _ => parseSingleCmd()
+        }
         if peek() == Token.Semicolon then {
             advance()
             if List(Token.EOF, Token.CloseBrace).contains(peek()) then {
@@ -99,6 +119,19 @@ class Parser(tokens: List[Token]):
             case Token.Break => {
                 advance(); 
                 Cmd.Break
+            }
+            case Token.Variable(l) if peekNext() == Token.Dot => {
+                advance(); 
+                advance(); 
+                peek() match {
+                    case Token.Variable(field) => {
+                        advance()
+                        expect(Token.Assign)
+                        val value = parseExpr()
+                        Cmd.FieldAssign(l, field, value)
+                    }
+                    case x => throw RuntimeException(s"Expected field name after '.', got '$x'")
+                }
             }
             case Token.If => {
                 advance()
@@ -302,6 +335,7 @@ class Parser(tokens: List[Token]):
             val inner = parseType()
             SimpType.TypeRef(inner)
         }
+        case Token.Variable(name) => { advance(); SimpType.TypeStruct(name) }
         case x => throw RuntimeException(s"Expected type, got '$x'")
     }
     private def parseParams(): List[(String, SimpType)] = {
@@ -334,14 +368,6 @@ class Parser(tokens: List[Token]):
         }
         left
     }
-    private def parsePostfix(expr: Expr): Expr = {
-        if peek() == Token.OpenSquare then {
-            advance()
-            val index = parseExpr()
-            expect(Token.CloseSquare)
-            parsePostfix(Expr.ArrIndex(expr, index))
-        } else expr
-    }
     private def parseTerm(): Expr = {
         var left = parsePostfix(parseAtomicExpr())
         while List(Token.Mul, Token.Div, Token.Mod).contains(peek()) do {
@@ -356,6 +382,44 @@ class Parser(tokens: List[Token]):
             left = Expr.BinaryOp(left, op, right)
         }
         left
+    }
+    private def parseStructLiteralFields(): List[(String, Expr)] = {
+        val fields = scala.collection.mutable.ListBuffer[(String, Expr)]()
+        while peek() != Token.CloseBrace do {
+            peek() match {
+                case Token.Variable(name) => {
+                    advance()
+                    expect(Token.Colon)
+                    val value = parseExpr()
+                    fields += ((name, value))
+                    if peek() == Token.Comma then advance()
+                }
+                case x => throw RuntimeException(s"Expected field name, got '$x'")
+            }
+        }
+        fields.toList
+    }
+
+    private def parsePostfix(expr: Expr): Expr = {
+        peek() match {
+            case Token.OpenSquare => {
+                advance()
+                val index = parseExpr()
+                expect(Token.CloseSquare)
+                parsePostfix(Expr.ArrIndex(expr, index))
+            }
+            case Token.Dot => {
+                advance()
+                peek() match {
+                    case Token.Variable(field) => {
+                        advance()
+                        parsePostfix(Expr.FieldAccess(expr, field))
+                    }
+                    case x => throw RuntimeException(s"Expected field name after '.', got '$x'")
+                }
+            }
+            case _ => expr
+        }
     }
     private def parseAtomicExpr(): Expr = {
         peek() match {
@@ -398,6 +462,13 @@ class Parser(tokens: List[Token]):
                     expect(Token.CloseSquare)
                     Expr.ArrLiteral(elements.toList)
                 }
+            }
+            case Token.Variable(name) if peekNext() == Token.OpenBrace && structEnv.exists(name) => {
+                advance()
+                advance()
+                val fields = parseStructLiteralFields()
+                expect(Token.CloseBrace)
+                Expr.StructLiteral(name, fields)
             }
             case Token.Deref => {
                 advance()
@@ -465,6 +536,22 @@ class Parser(tokens: List[Token]):
         }
         left
     }
+    private def parseStructFields(): List[(String, SimpType)] = {
+        expect(Token.OpenBrace)
+        if peek() == Token.CloseBrace then {
+            advance()
+            List()
+        } else {
+            val params = scala.collection.mutable.ListBuffer[(String, SimpType)]()
+            params += parseParam()
+            while peek() == Token.Comma do {
+                advance()
+                params += parseParam()
+            }
+            expect(Token.CloseBrace)
+            params.toList
+        }
+    }
     private def parseDecl(): Decl = peek() match {
         case Token.Fn => {
             advance()
@@ -494,6 +581,17 @@ class Parser(tokens: List[Token]):
                     Decl.PdDecl(name, params, body)
                 }
                 case x => throw RuntimeException(s"Expected procedure name, got '$x'")
+            }
+        }
+        case Token.Struct => {
+            advance()
+            peek() match {
+                case Token.Variable(name) => {
+                    advance()
+                    val fields = parseStructFields()
+                    Decl.StructDecl(name, fields)
+                }
+                case x => throw RuntimeException(s"Expected struct name, got '$x'")
             }
         }
         case x => throw RuntimeException(s"Expected declaration, got '$x'")

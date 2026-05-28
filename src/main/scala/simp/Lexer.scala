@@ -8,7 +8,7 @@ class Lexer(source: String):
     private var line: Int = 1
     private val whitespaces : List[Char] = List(' ', '\t', '\n', '\r')
     private val numbers : List[Char] = List('0', '1', '2', '3', '4', '5', '6', '7', '8', '9')
-    private val valid_symbols : List[Char] = List(';', '(', ')', '&', '|', '¬', '+', '-', '/', '*', ',', '%', '{', '}',':','[',']')
+    private val valid_symbols : List[Char] = List(';', '(', ')', '&', '|', '¬', '+', '-', '/', '*', '.', ',', '%', '{', '}',':','[',']')
 
 
     def tokenise(): List[Token] = {
@@ -192,6 +192,9 @@ class Lexer(source: String):
             case x if isWordMatch("return") => {advanceUntilNextWord(); Token.Return} 
             case x if isWordMatch("call") => {advanceUntilNextWord(); Token.Call} 
             case ',' => {advance();Token.Comma} 
+
+            case x if isWordMatch("struct") => { advanceUntilNextWord(); Token.Struct }
+            case '.' => { advance(); Token.Dot }
 
             case ';' => {advance();Token.Semicolon}
             case '(' => {advance();Token.OpenBracket}

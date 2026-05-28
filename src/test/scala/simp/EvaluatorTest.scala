@@ -7,10 +7,11 @@ class EvaluatorTest extends AnyFunSuite:
   def run(source: String): Store =
     val store = Store()
     val fnEnv = FunctionEnv()
+    val structEnv = StructEnv()
     Builtins.register(fnEnv)
     val tokens = Lexer(source).tokenise()
-    val program = Parser(tokens).parseProgram()
-    Evaluator(fnEnv).evalProgram(program, store)
+    val program = Parser(tokens, structEnv).parseProgram()
+    Evaluator(fnEnv, structEnv).evalProgram(program, store)
     store
 
   def storeOf(pairs: (String, Int)*): Map[String, Int] = pairs.toMap
@@ -409,4 +410,75 @@ class EvaluatorTest extends AnyFunSuite:
   test("array index with expression") {
       val store = run("arr := [10, 20, 30]; i := 1; x := arr[!i + 1];")
       assert(store.load("x") == Value.IntVal(30))
+  }
+
+  test("create struct and read field") {
+      val store = run(
+          "struct Point { x: Int, y: Int } p := Point { x: 1, y: 2 }; r := p.x;"
+      )
+      assert(store.load("r") == Value.IntVal(1))
+  }
+
+  test("mutate struct field") {
+      val store = run(
+          "struct Point { x: Int, y: Int } p := Point { x: 1, y: 2 }; p.x := 99; r := p.x;"
+      )
+      assert(store.load("r") == Value.IntVal(99))
+  }
+
+  test("mutation does not affect other fields") {
+      val store = run(
+          "struct Point { x: Int, y: Int } p := Point { x: 1, y: 2 }; p.x := 99; r := p.y;"
+      )
+      assert(store.load("r") == Value.IntVal(2))
+  }
+
+  test("struct as function parameter") {
+      val store = run(
+          "struct Point { x: Int, y: Int }; fn getX(p: Point) -> Int { return p.x; } p := Point { x: 42, y: 0 }; r := getX(p);"
+      )
+      assert(store.load("r") == Value.IntVal(42))
+  }
+
+  test("nested struct field access") {
+      val store = run(
+          """struct Point { x: Int, y: Int };
+            struct Line { start: Point, end: Point };
+            p1 := Point { x: 1, y: 2 };
+            p2 := Point { x: 3, y: 4 };
+            line := Line { start: p1, end: p2 };
+            r := line.start.x;"""
+      )
+      assert(store.load("r") == Value.IntVal(1))
+  }
+
+  test("missing field throws") {
+      assertThrows[RuntimeException](run(
+          "struct Point { x: Int, y: Int } p := Point { x: 1 };"
+      ))
+  }
+
+  test("unknown field access throws") {
+      assertThrows[RuntimeException](run(
+          "struct Point { x: Int, y: Int } p := Point { x: 1, y: 2 }; r := p.z;"
+      ))
+  }
+
+  test("wrong field type throws") {
+      assertThrows[RuntimeException](run(
+          "struct Point { x: Int, y: Int } p := Point { x: \"hello\", y: 2 };"
+      ))
+  }
+
+  test("unknown struct type throws") {
+      assertThrows[RuntimeException](run(
+          "p := Foo { x: 1 };"
+      ))
+  }
+
+  test("struct with string field") {
+      val store = run(
+          "struct Person { name: Str, age: Int, nationality: Str }; p := Person { name: \"Angèle\", age: 30, nationality: \"Belgian\" }; r := p.name;"
+      )
+      assert(store.load("r") == Value.StrVal("Angèle"))
   }
