@@ -8,7 +8,10 @@ Program ::= (Cmd | Decl)*
 ```
 
 ### Values
-Expressions produce a value of type `Int`, `Str`, `Bool`, or an array type (`Int[]`, `Str[]`, `Bool[]`).
+Expressions produce a value in 3 categories:
+- Base type - `Int`, `Str`, `Bool`
+- Structs
+- Array Type - `Int[]`, `Str[]`, `Bool[]`, `Struct[]`,
 
 | Type | Examples |
 |------|---------|
@@ -16,16 +19,18 @@ Expressions produce a value of type `Int`, `Str`, `Bool`, or an array type (`Int
 | `Str` | `"hello"`, `"world"` |
 | `Bool` | `true`, `false` |
 | `Int[]`, `Str[]`, `Bool[]` | `[1, 2, 3]`, `["a", "b"]`, `[true, false]`, `[]` |
+| `StructName` | `Point { x: 1, y: 2 }` |
 
 ---
 
 ### Declarations
-Declarations come in 2 forms, declaring functions and declaring procedures.
+Declarations come in 3 forms, declaring functions, declaring procedures, and declaring structs.
 
 ```
-Decl ::= fn f(x₀ : t₀, x₁ : t₁, ...) -> t { Cmd }  | pd p(x₀ : t₀, x₁ : t₁, ...) { Cmd }
+Decl ::= fn f(x₀ : t₀, x₁ : t₁, ...) -> t { Cmd }  | pd p(x₀ : t₀, x₁ : t₁, ...) { Cmd } | struct S { f₀ : t₀, f₁ : t₁, ... }
 where x₀, x₁, ... are parameter names (locations)
-where t, t₀, t₁, ... are parameter types (One of Str, Int, Bool, Int[], Str[], Bool[])
+where t, t₀, t₁, ... are parameter types (One of Str, Int, Bool, Int[], Str[], Bool[], Struct, or Struct[])
+where f₀, t₁, ... are field names
 ```
 
 - Functions `fn` return a value and are treated as expressions
@@ -58,6 +63,7 @@ Cmd ::= skip                                -- no-op
       | print E                            -- print any expression
       | call p(E₀, E₁, ...)               -- procedure call
       | return E                           -- return from function
+      | l.f := E                                 -- field assignment (write)
 ```
 
 Where:
@@ -84,6 +90,8 @@ E ::= n                                    -- integer literal (n ∈ ℤ)
     | (E)                                  -- parenthesised expression
     | [E₀, E₁, ...]                            -- array literal
     | E[E]                                     -- array index (read)
+    | S { f₀: E₀, f₁: E₁, ... }              -- struct literal
+    | E.f                                      -- field access (read)
 ```
 
 #### Arithmetic Operators
