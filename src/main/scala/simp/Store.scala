@@ -9,3 +9,5 @@ class Store:
     def store(loc: String, value: Value): Unit = memory(loc) = value
 
     def dump(): Unit = memory.toSeq.sortBy(_._1).foreach((k, v) => println(s"$k = $v"))
+
+    def entries(): Iterable[(String, Value)] = memory

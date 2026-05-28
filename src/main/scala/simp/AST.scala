@@ -57,6 +57,7 @@ enum Cmd:
     case Seq(fst: Cmd, snd: Cmd)
     case If(cond: BoolExpr, thenBranch: Cmd, elseBranch: Cmd)
     case While(cond: BoolExpr, body: Cmd)
+    case For(variable: String, iterable: Expr, body: Cmd)
     case Print(value: Expr)
     case PdCall(name: String, args: List[Expr])
     case Return(expr: Expr)

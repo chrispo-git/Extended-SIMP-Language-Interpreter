@@ -153,6 +153,21 @@ class Parser(tokens: List[Token]):
                 expect(Token.CloseBrace)
                 Cmd.While(cond, body)
             }
+            case Token.For => {
+                advance()
+                peek() match {
+                    case Token.Variable(name) => {
+                        advance()
+                        expect(Token.In)
+                        val iterable = parseExpr()
+                        expect(Token.OpenBrace)
+                        val body = parseCmd()
+                        expect(Token.CloseBrace)
+                        Cmd.For(name, iterable, body)
+                    }
+                    case x => throw RuntimeException(s"Expected loop variable, got '$x'")
+                }
+            }
             case Token.Variable(l) => {
                 val loc = l
                 advance()
