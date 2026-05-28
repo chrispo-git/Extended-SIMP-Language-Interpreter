@@ -38,16 +38,36 @@ class Lexer(source: String):
 
         source.slice(pos, end)
     }
-
+    private val escapeSequences = Map(
+        'n'  -> '\n',
+        't'  -> '\t',
+        'r'  -> '\r',
+        '\'' -> '\'',
+        '"'  -> '"',
+        '\\' -> '\\',
+        'a'  -> '\u0007',
+        'b'  -> '\u0008',
+        'f'  -> '\u000C',
+        'v'  -> '\u000B',
+        '0'  -> '\u0000'
+    )
     private def getWholeString(): String = {
-        val end = source.indexWhere(c => c=='"', pos+1) match {
-            case -1 => throw RuntimeException(s"Unexpected EOF - maybe you forgot to close a string")
-            case n => n
+        val out = StringBuilder()
+        advance()
+        while !isAtEnd() && peek() != '"' do {
+            if peek() == '\\' then {
+                advance()
+                escapeSequences.get(peek()) match {
+                    case Some(escaped) => {advance(); out += escaped}
+                    case None => throw RuntimeException(s"Unknown escape sequence '\\${peek()}'")
+                }
+            } else {
+                out += advance()
+            }
         }
-
-        val out = source.slice(pos+1, end)
-        pos = end + 1
-        out
+        if isAtEnd() then throw RuntimeException("Unexpected EOF - maybe you forgot to close a string")
+        advance()
+        out.toString
     }
     private def isWordMatch(word: String): Boolean = getWholeWord() == word
 
