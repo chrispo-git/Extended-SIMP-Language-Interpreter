@@ -30,3 +30,4 @@ Each of these functions is available by default in SIMP.
 | `input` | `input(<Str>) -> Str` | Allows the user to input a String |
 | `inputInt` | `inputInt(<Str>) -> Int` | Allows the user to input an Int |
 | `inputBool` | `inputBool(<Str>) -> Bool` | Allows the user to input a Bool (Done in the form y/n, yes/no, 1/0, t/f, or true/false) |
+| `range` | `input(Int, <Int>, <Int>) -> Arr` | Returns an array of the range, 0-end, start-end, or start-end with a step value|

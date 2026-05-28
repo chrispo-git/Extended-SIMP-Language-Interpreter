@@ -124,7 +124,16 @@ object Builtins:
                 case _ => throw RuntimeException("toBool expects 1 string")
             }
         )
-
+        // range
+        fnEnv.registerBuiltin("range", args => args match {
+            case List(Value.IntVal(end)) =>
+                Value.ArrVal(scala.collection.mutable.ArrayBuffer((0 until end).map(Value.IntVal(_))* ))
+            case List(Value.IntVal(start), Value.IntVal(end)) =>
+                Value.ArrVal(scala.collection.mutable.ArrayBuffer((start until end).map(Value.IntVal(_))*))
+            case List(Value.IntVal(start), Value.IntVal(end), Value.IntVal(step)) =>
+                Value.ArrVal(scala.collection.mutable.ArrayBuffer((start until end by step).map(Value.IntVal(_))*))
+            case _ => throw RuntimeException("range expects 1-3 integer arguments")
+        })
         // abs - Absolute Value
         fnEnv.registerBuiltin("abs", args => args match {
                 case List(Value.IntVal(s)) => Value.IntVal(s.abs)
