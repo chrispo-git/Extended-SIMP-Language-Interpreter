@@ -5,7 +5,7 @@
 A simple imperative language + interpreter with REPL.
 
 ## What is SIMP?
-SIMP is a simple imperative language covered in the textbook `Programming Languages and Operational Semantics : A Concise Overview`. This repository extends that language with recursive functions & procedures, compound assignment operators, and other features like curly braces to delineate blocks.
+SIMP is a simple imperative language covered in the textbook `Programming Languages and Operational Semantics : A Concise Overview`. This repository extends that language with recursive functions & procedures, compound assignment operators, built-in functions, and other features like curly braces to delineate blocks.
 The full Grammar in BNF is available [here](SYNTAX.md), but here is some example code:
 
 ```
@@ -47,6 +47,7 @@ call fizzbuzz(30);
 - Sequencing
 - Comparison operators
 ### Extensions
+- Built-in Functions (You can see the list of those [here](BUILT-IN-FUNCTIONS.md))
 - String and Boolean variables
 - if / elif / else conditionals
 - Compound assignment operators

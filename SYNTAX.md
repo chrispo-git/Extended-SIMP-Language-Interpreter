@@ -7,18 +7,31 @@ A SIMP program is a sequence of commands and declarations:
 Program ::= (Cmd | Decl)*
 ```
 
+### Values
+SIMP has three value types:
+
+| Type | Examples |
+|------|---------|
+| `Int` | `0`, `42`, `-5` |
+| `Str` | `"hello"`, `"world"` |
+| `Bool` | `true`, `false` |
+
+---
+
 ### Declarations
 Declarations come in 2 forms, declaring functions and declaring procedures.
 
 ```
 Decl ::= fn f(x₀, x₁, ...) { Cmd }  | pd p(x₀, x₁, ...) { Cmd }
-where x₀, x₁, ... are integer terms that can be evaluated
+where x₀, x₁, ... are parameter names (locations)
 ```
 
 - Functions `fn` return a value and are treated as expressions
 - Procedures `pd` don't return a value and are treated as commands
 - All parameters are passed by value
-- Scoping is lexical, functions/procedures can't see the caller's variables
+- Scoping is lexical, functions/procedures cannot see the caller's variables
+
+---
 
 ### Commands
 
@@ -36,62 +49,113 @@ Cmd ::= skip                                -- no-op
         elif B then { Cmd }                -- (chained, sugar for nested if/else)
         else { Cmd }
       | while B do { Cmd }                 -- loop
-      | print E                            -- print integer expression
-      | print "s"                          -- print string literal
+      | print E                            -- print any expression
       | call p(E₀, E₁, ...)               -- procedure call
       | return E                           -- return from function
 ```
 
 Where:
-- `l ∈ L = {l₀, l₁, ...}`   i.e. l is bound, defined earlier
-- `s`                       is a string literal, e.g. "Hello World!"
-- `E, E₀, E₁, ...`          are Integer Expressions
+- `l ∈ L = {l₀, l₁, ...}` — locations (variable names)
+- `E, E₀, E₁, ...` — expressions of any type
 
-### Integer Expressions
+---
+
+### Expressions
+
+Expressions produce a value of type `Int`, `Str`, or `Bool`.
+
 ```
 E ::= n                                    -- integer literal (n ∈ ℤ)
+    | "s"                                  -- string literal
+    | true | false                         -- boolean literals
     | !l                                   -- dereference (value stored at l)
     | E op E                               -- binary operation
+    | E bop E                              -- comparison (produces Bool)
+    | ¬E                                   -- boolean negation (E must be Bool)
+    | E & E                                -- boolean and (E must be Bool)
+    | E | E                                -- boolean or (E must be Bool)
     | f(E₀, E₁, ...)                      -- function call
     | (E)                                  -- parenthesised expression
+```
 
+#### Arithmetic Operators
+Only valid on `Int` operands, produce `Int`:
+
+```
 op ::= + | - | * | / | %
 ```
 
-- Operators have precedence in 2 tiers, High (*, /, %) and Low (+, -)
-- All operators are left-associative
+Operator precedence (highest to lowest):
+
+| Precedence | Operators |
+|------------|-----------|
+| High | `*`, `/`, `%` |
+| Low | `+`, `-` |
+
+All arithmetic operators are left-associative.
+
+#### String Concatenation
+`+` is also valid when the left operand is a `Str`. The right operand may be any type — it is automatically converted to `Str`:
+
+```
+"hello" + " world"     -- Str + Str -> Str
+"count: " + 5          -- Str + Int -> Str
+"flag: " + true        -- Str + Bool -> Str
+```
+
+#### Comparison Operators
+Valid on `Int`/`Int` or `Str`/`Str` or `Bool`/`Bool` operand pairs, produce `Bool`:
+
+```
+bop ::= > | < | >= | <= | == | !=
+```
+
+Note: `>`, `<`, `>=`, `<=` are only valid on `Int` operands. `==` and `!=` are valid on any matching pair.
+
+---
 
 ### Boolean Expressions
+
+Boolean expressions produce a `Bool` value. They can appear anywhere an expression is expected.
+
 ```
 B ::= true | false                         -- boolean literals
+    | !l                                   -- dereference of a Bool variable
     | E bop E                              -- comparison
     | ¬B                                   -- negation
     | B & B                                -- conjunction (and)
     | B | B                                -- disjunction (or)
     | (B)                                  -- parenthesised boolean
-
-bop ::= > | < | >= | <= | == | !=
+    | f(E₀, E₁, ...)                      -- function call returning Bool
 ```
 
+---
+
 ### Syntactic Sugar
-These constructs don't appear in the AST, but are desugared by the parser. They've been included to make the code nicer and easier for people to write and understand.
+These constructs don't appear in the AST, but are desugared by the parser.
+
 | Syntax | Desugars to |
-| -------- | ------- |
-| `l += E` | `l := !l + E`|
-| `l -= E` | `l := !l - E`|
-| `l *= E` | `l := !l * E`|
-| `l /= E` | `l := !l / E`|
-| `elif B then { C }` | `else { if B then { C } }`|
+|--------|-------------|
+| `l += E` | `l := !l + E` |
+| `l -= E` | `l := !l - E` |
+| `l *= E` | `l := !l * E` |
+| `l /= E` | `l := !l / E` |
+| `elif B then { C }` | `else { if B then { C } }` |
+
+---
 
 ### Comments
-Single line comments begin with `//` and extend to the end of the line
+Single line comments begin with `//` and extend to the end of the line:
 ```
 // This is a comment
 x := 5; // This is also a comment
 // x += 5; Even this is a comment!
 ```
 
+---
+
 ### Example Programs
+
 #### Factorial
 ```
 fn factorial(n) {
@@ -112,15 +176,36 @@ fn gcd(a, b) {
     while ¬(!a == !b) do {
         if !a > !b then {
             a := !a - !b;
-        }
-        else {
+        } else {
             b := !b - !a;
-        }
+        };
     };
     return !a;
 }
+
 print "The greatest common divisor of 48 and 18 is...";
 print gcd(48, 18);
 ```
 
-More are available in [examples](examples)
+#### String Operations
+```
+name := "SIMP";
+version := 1;
+print "Welcome to " + !name + " version " + !version;
+
+x := len("hello");
+print "Length: " + !x;
+```
+
+#### Boolean Variables
+```
+flag := true;
+other := false;
+
+if !flag & ¬!other then {
+    print "both conditions met";
+};
+
+result := !flag == !other;
+print "flags equal: " + !result;
+```

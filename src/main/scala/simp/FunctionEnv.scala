@@ -4,6 +4,8 @@ class FunctionEnv:
   private val fns  = scala.collection.mutable.Map[String, Decl.FnDecl]()
   private val procs = scala.collection.mutable.Map[String, Decl.PdDecl]()
 
+  private val builtins = scala.collection.mutable.Map[String, List[Value] => Value]()
+
   def registerFn(name: String, fn: Decl.FnDecl): Unit = {
     fns(name) = fn
   }
@@ -15,4 +17,12 @@ class FunctionEnv:
   }
   def lookupPd(name: String): Decl.PdDecl = {
     procs.getOrElse(name, throw RuntimeException(s"$name not found"))
+  }
+
+  def registerBuiltin(name: String, fn: List[Value] => Value): Unit = {
+    builtins(name) = fn
+  }
+
+  def lookupBuiltin(name: String): Option[List[Value] => Value] = {
+    builtins.get(name)
   }
