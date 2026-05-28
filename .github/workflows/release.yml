@@ -1,10 +1,9 @@
 name: Release
-
 on:
   push:
     tags:
       - 'v*'
-
+  workflow_dispatch:
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -14,6 +13,8 @@ jobs:
         with:
           java-version: '21'
           distribution: 'temurin'
+      - name: Setup sbt
+        uses: sbt/setup-sbt@v1
       - name: Build package
         run: sbt universal:packageBin
       - name: Release
