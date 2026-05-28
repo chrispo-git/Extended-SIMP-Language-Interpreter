@@ -204,5 +204,51 @@ object Builtins:
                 case _ => throw RuntimeException("assert expects a boolean and an optional message")
             }
         )
+        
 
+        // Inputs
+
+        fnEnv.registerBuiltin("input", args => args match {
+            case List(Value.StrVal(prompt)) =>
+                print(prompt)
+                Value.StrVal(scala.io.StdIn.readLine())
+            case List() =>
+                Value.StrVal(scala.io.StdIn.readLine())
+            case _ => throw RuntimeException("input expects an optional string prompt")
+        })
+
+        fnEnv.registerBuiltin("inputInt", args => args match {
+            case List(Value.StrVal(prompt)) => {
+                print(prompt)
+                val line = scala.io.StdIn.readLine()
+                try Value.IntVal(line.toInt)
+                catch case _ => throw RuntimeException(s"Could not convert '$line' to Int")
+            }
+            case List() => {
+                val line = scala.io.StdIn.readLine()
+                try Value.IntVal(line.toInt)
+                catch case _ => throw RuntimeException(s"Could not convert '$line' to Int")
+            }
+            case _ => throw RuntimeException("inputInt expects an optional string prompt")
+        })
+        fnEnv.registerBuiltin("inputBool", args => args match {
+            case List(Value.StrVal(prompt)) => {
+                print(prompt)
+                val line = scala.io.StdIn.readLine().toLowerCase
+                line match {
+                    case "y" | "yes" | "true" | "t" | "1" => Value.BoolVal(true)
+                    case "n" | "no" | "false" | "f" | "0" => Value.BoolVal(true)
+                    case _ => throw RuntimeException(s"Could not convert '$line' to Bool")
+                }
+            }
+            case List() => {
+                val line = scala.io.StdIn.readLine().toLowerCase
+                line match {
+                    case "y" | "yes" | "true" | "t" | "1" => Value.BoolVal(true)
+                    case "n" | "no" | "false" | "f" | "0" => Value.BoolVal(true)
+                    case _ => throw RuntimeException(s"Could not convert '$line' to Bool")
+                }
+            }
+            case _ => throw RuntimeException("inputBool expects an optional string prompt")
+        })
     }
