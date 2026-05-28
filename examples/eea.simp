@@ -1,0 +1,48 @@
+// Extended Euclidean Algorithm
+
+fn gcd(a, b) {
+    if !b == 0 then {
+        return !a;
+    } else {
+        return gcd(!b, !a % !b);
+    };
+}
+
+fn bezoutX(a, b) {
+    if !b == 0 then {
+        return 1;
+    } else {
+        return bezoutY(!b, !a % !b);
+    };
+}
+
+fn bezoutY(a, b) {
+    if !b == 0 then {
+        return 0;
+    } else {
+        return bezoutX(!b, !a % !b) - ((!a / !b) * bezoutY(!b, !a % !b));
+    };
+}
+
+pd printExtGcd(a, b) {
+    g := gcd(!a, !b);
+    x := bezoutX(!a, !b);
+    y := bezoutY(!a, !b);
+
+    print "gcd(" + !a + ", " + !b + ") = " + !g;
+    print "Bezout coefficients: x = " + !x + ", y = " + !y;
+    
+    verification := !a * !x + !b * !y;
+    _ := assert(!verification == !g, "Bezout identity failed for " + !a + " and " + !b); // Functions have to be consumed by something! _ := is a good pattern.
+    
+    print "Verification passed: " + !a + " * " + !x + " + " + !b + " * " + !y + " = " + !g;
+    print "---";
+}
+
+print "=== Extended Euclidean Algorithm ===";
+
+call printExtGcd(35, 15);
+call printExtGcd(48, 18);
+call printExtGcd(100, 75);
+call printExtGcd(17, 13);
+call printExtGcd(1071, 462);
