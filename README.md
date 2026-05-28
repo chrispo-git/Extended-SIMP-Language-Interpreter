@@ -47,6 +47,7 @@ call fizzbuzz(30);
 - Sequencing
 - Comparison operators
 ### Extensions
+- String and Boolean variables
 - if / elif / else conditionals
 - Compound assignment operators
 - Single-line comments
