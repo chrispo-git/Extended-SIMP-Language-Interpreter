@@ -8,13 +8,14 @@ Program ::= (Cmd | Decl)*
 ```
 
 ### Values
-SIMP has three value types:
+SIMP has four value types:
 
 | Type | Examples |
 |------|---------|
 | `Int` | `-7`, `42`, `90210` |
 | `Str` | `"hello"`, `"world"` |
 | `Bool` | `true`, `false` |
+| `Int[]`, `Str[]`, `Bool[]` | `[1, 2, 3]`, `["a", "b"]`, `[]` |
 
 ---
 
@@ -24,7 +25,7 @@ Declarations come in 2 forms, declaring functions and declaring procedures.
 ```
 Decl ::= fn f(x₀ : t₀, x₁ : t₁, ...) -> t { Cmd }  | pd p(x₀ : t₀, x₁ : t₁, ...) { Cmd }
 where x₀, x₁, ... are parameter names (locations)
-where t, t₀, t₁, ... are parameter types (One of Str, Int, Bool)
+where t, t₀, t₁, ... are parameter types (One of Str, Int, Bool, Int[], Str[], Bool[])
 ```
 
 - Functions `fn` return a value and are treated as expressions
@@ -40,6 +41,7 @@ where t, t₀, t₁, ... are parameter types (One of Str, Int, Bool)
 ```
 Cmd ::= skip                                -- no-op
       | l := E                             -- assignment
+      | l[E] := E                                -- array index assignment
       | l += E                             -- compound add (just sugar for l := !l + E)
       | l -= E                             -- compound subtract (just sugar for l := !l - E)
       | l *= E                             -- compound multiply (just sugar for l := !l * E)
@@ -77,6 +79,8 @@ E ::= n                                    -- integer literal (n ∈ ℤ)
     | E || E                                -- boolean or (E must be Bool)
     | f(E₀, E₁, ...)                      -- function call
     | (E)                                  -- parenthesised expression
+    | [E₀, E₁, ...]                            -- array literal
+    | E[E]                                     -- array index (read)
 ```
 
 #### Arithmetic Operators

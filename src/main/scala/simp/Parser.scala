@@ -42,6 +42,8 @@ class Parser(tokens: List[Token]):
             val item = peek() match {
                 case Token.Fn | Token.Pd => Program.PDecl(parseDecl())
                 case Token.BoolLit(_) | Token.Not => Program.PBool(parseBool())
+                case Token.Variable(_) if peekNext() == Token.OpenSquare =>
+                    Program.PExpr(parsePostfix(parseAtomicExpr()))
                 case Token.LiteralInt(_) | Token.Deref =>
                     val expr = parseExpr()
                     peek() match {
@@ -147,6 +149,14 @@ class Parser(tokens: List[Token]):
                 val loc = l
                 advance()
                 peek() match {
+                    case Token.OpenSquare => {
+                        advance()
+                        val index = parseExpr()
+                        expect(Token.CloseSquare)
+                        expect(Token.Assign)
+                        val value = parseExpr()
+                        Cmd.ArrAssign(l, index, value)
+                    }
                     case Token.Assign => {
                         advance()
                         val value = parseExpr()
@@ -234,9 +244,36 @@ class Parser(tokens: List[Token]):
     }
 
     private def parseType(): SimpType = peek() match {
-        case Token.TypeInt  => { advance(); SimpType.TypeInt }
-        case Token.TypeString  => { advance(); SimpType.TypeString }
-        case Token.TypeBool => { advance(); SimpType.TypeBool }
+        case Token.TypeInt  => { 
+            advance(); 
+            if peek() == Token.OpenSquare then {
+                expect(Token.OpenSquare)
+                expect(Token.CloseSquare)
+                SimpType.TypeArr(SimpType.TypeInt)
+            } else {
+                SimpType.TypeInt 
+            }
+        }
+        case Token.TypeString  => { 
+            advance(); 
+            if peek() == Token.OpenSquare then {
+                expect(Token.OpenSquare)
+                expect(Token.CloseSquare)
+                SimpType.TypeArr(SimpType.TypeString)
+            } else {
+                SimpType.TypeString 
+            }
+        }
+        case Token.TypeBool  => { 
+            advance(); 
+            if peek() == Token.OpenSquare then {
+                expect(Token.OpenSquare)
+                expect(Token.CloseSquare)
+                SimpType.TypeArr(SimpType.TypeBool)
+            } else {
+                SimpType.TypeBool 
+            }
+        }
         case Token.Ref => {
             advance();
             val inner = parseType()
@@ -274,9 +311,16 @@ class Parser(tokens: List[Token]):
         }
         left
     }
-    
+    private def parsePostfix(expr: Expr): Expr = {
+        if peek() == Token.OpenSquare then {
+            advance()
+            val index = parseExpr()
+            expect(Token.CloseSquare)
+            parsePostfix(Expr.ArrIndex(expr, index))
+        } else expr
+    }
     private def parseTerm(): Expr = {
-        var left = parseAtomicExpr()
+        var left = parsePostfix(parseAtomicExpr())
         while List(Token.Mul, Token.Div, Token.Mod).contains(peek()) do {
             val op: Op = peek() match {
                 case Token.Mul => Op.Mul
@@ -315,6 +359,22 @@ class Parser(tokens: List[Token]):
             case Token.StringLit(s) => {
                 advance()
                 Expr.Str(s)
+            }
+            case Token.OpenSquare => {
+                advance()
+                if peek() == Token.CloseSquare then {
+                    advance()
+                    Expr.ArrLiteral(List())
+                } else {
+                    val elements = scala.collection.mutable.ListBuffer[Expr]()
+                    elements += parseExpr()
+                    while peek() == Token.Comma do {
+                        advance()
+                        elements += parseExpr()
+                    }
+                    expect(Token.CloseSquare)
+                    Expr.ArrLiteral(elements.toList)
+                }
             }
             case Token.Deref => {
                 advance()
