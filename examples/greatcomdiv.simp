@@ -1,4 +1,4 @@
-fn gcd(a, b) {
+fn gcd(a : Int, b : Int) -> Int {
     while ¬(!a == !b) do {
         if !a > !b then {
             a := !a - !b;

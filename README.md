@@ -9,7 +9,7 @@ SIMP is a simple imperative language covered in the textbook `Programming Langua
 The full Grammar in BNF is available [here](SYNTAX.md), but here is some example code:
 
 ```
-pd fizzbuzz(n) {
+pd fizzbuzz(n : Int) {
     i := 1;
     while !i <= !n do {
         if !i % 3 == 0 && !i % 5 == 0 then {
@@ -47,6 +47,7 @@ call fizzbuzz(30);
 - Sequencing
 - Comparison operators
 ### Extensions
+- Typed Functions & Procedures
 - Built-in Functions (You can see the list of those [here](BUILT-IN-FUNCTIONS.md))
 - String and Boolean variables
 - if / elif / else conditionals

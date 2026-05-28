@@ -64,7 +64,12 @@ enum Program:
     case PBool(boolExpr: BoolExpr)
 
 enum Decl:
-  case FnDecl(name: String, params: List[String], body: Cmd)
-  case PdDecl(name: String, params: List[String], body: Cmd)
+  case FnDecl(name: String, params: List[(String, SimpType)], body: Cmd, returnType: SimpType)
+  case PdDecl(name: String, params: List[(String, SimpType)], body: Cmd)
+
+enum SimpType:
+    case TypeInt
+    case TypeString
+    case TypeBool 
 
 case class ReturnException(value: Value) extends Exception

@@ -12,7 +12,7 @@ SIMP has three value types:
 
 | Type | Examples |
 |------|---------|
-| `Int` | `0`, `42`, `-5` |
+| `Int` | `-7`, `42`, `90210` |
 | `Str` | `"hello"`, `"world"` |
 | `Bool` | `true`, `false` |
 
@@ -22,8 +22,9 @@ SIMP has three value types:
 Declarations come in 2 forms, declaring functions and declaring procedures.
 
 ```
-Decl ::= fn f(x₀, x₁, ...) { Cmd }  | pd p(x₀, x₁, ...) { Cmd }
+Decl ::= fn f(x₀ : t₀, x₁ : t₁, ...) -> t { Cmd }  | pd p(x₀ : t₀, x₁ : t₁, ...) { Cmd }
 where x₀, x₁, ... are parameter names (locations)
+where t, t₀, t₁, ... are parameter types (One of Str, Int, Bool)
 ```
 
 - Functions `fn` return a value and are treated as expressions
@@ -38,15 +39,14 @@ where x₀, x₁, ... are parameter names (locations)
 ```
 Cmd ::= skip                                -- no-op
       | l := E                             -- assignment
-      | l += E                             -- compound add (sugar for l := !l + E)
-      | l -= E                             -- compound subtract (sugar for l := !l - E)
-      | l *= E                             -- compound multiply (sugar for l := !l * E)
-      | l /= E                             -- compound divide (sugar for l := !l / E)
+      | l += E                             -- compound add (just sugar for l := !l + E)
+      | l -= E                             -- compound subtract (just sugar for l := !l - E)
+      | l *= E                             -- compound multiply (just sugar for l := !l * E)
+      | l /= E                             -- compound divide (just sugar for l := !l / E)
       | Cmd ; Cmd                          -- sequencing
-      | if B then { Cmd }                  -- conditional (no else)
       | if B then { Cmd } else { Cmd }     -- conditional
-      | if B then { Cmd }                  -- if
-        elif B then { Cmd }                -- (chained, sugar for nested if/else)
+      | if B then { Cmd }                  
+        elif B then { Cmd }                -- (chained, just sugar for nested if/else)
         else { Cmd }
       | while B do { Cmd }                 -- loop
       | print E                            -- print any expression
@@ -55,8 +55,8 @@ Cmd ::= skip                                -- no-op
 ```
 
 Where:
-- `l ∈ L = {l₀, l₁, ...}` — locations (variable names)
-- `E, E₀, E₁, ...` — expressions of any type
+- `l ∈ L = {l₀, l₁, ...}`  locations (variable names)
+- `E, E₀, E₁, ...`  expressions of any type
 
 ---
 
@@ -95,7 +95,7 @@ Operator precedence (highest to lowest):
 All arithmetic operators are left-associative.
 
 #### String Concatenation
-`+` is also valid when the left operand is a `Str`. The right operand may be any type — it is automatically converted to `Str`:
+`+` is also valid when the left operand is a `Str`. The right operand can be any type it's automatically converted to `Str`:
 
 ```
 "hello" + " world"     -- Str + Str -> Str
@@ -158,7 +158,7 @@ x := 5; // This is also a comment
 
 #### Factorial
 ```
-fn factorial(n) {
+fn factorial(n : Int) -> Int {
     if !n == 0 then {
         return 1;
     } else {
@@ -166,25 +166,24 @@ fn factorial(n) {
     };
 }
 
-print "The Factorial of 5 is...";
-print factorial(5);
+print "The Factorial of 5 is " + factorial(5);
 ```
 
 #### GCD
 ```
-fn gcd(a, b) {
+fn gcd(a : Int, b : Int) -> Int {
     while ¬(!a == !b) do {
         if !a > !b then {
             a := !a - !b;
-        } else {
+        }
+        else {
             b := !b - !a;
-        };
+        }
     };
     return !a;
 }
 
-print "The greatest common divisor of 48 and 18 is...";
-print gcd(48, 18);
+print "The greatest common divisor of 48 and 18 is..." + gcd(48, 18);
 ```
 
 #### String Operations
