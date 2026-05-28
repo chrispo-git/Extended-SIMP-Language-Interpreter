@@ -28,11 +28,22 @@ call fizzbuzz(30);
 ```
 
 ## Getting Started
+### Download
+Pre-built binaries are available on the [releases page](https://github.com/chrispo-git/SIMP-Interpreter/releases). Download the latest zip, & extract it.
+For running simp scripts:
+```bash
+bin/simp-interpreter file.simp
+```
+For the REPL:
+```bash
+bin/simp-interpreter#
+```
 ### Prerequisites
+For running from source:
 - Scala 3
 - sbt (simple build tool)
-### How to Use
-1. Download the repository
+### Build from Source
+1. Clone the repository
 2. Run `sbt compile` within the root of the repository
 3. To run a file, use `sbt "run examples/factorial5.simp"`
 4. To just start the REPL, use `sbt run`
