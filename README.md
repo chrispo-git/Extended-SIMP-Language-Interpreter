@@ -61,6 +61,7 @@ For running from source:
 - Built-in Functions (You can see the list of those [here](BUILT-IN-FUNCTIONS.md))
 - String and Boolean variables
 - Arrays
+- for loops
 - if / elif / else conditionals
 - Compound assignment operators
 - Single-line comments

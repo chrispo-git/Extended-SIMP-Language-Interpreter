@@ -52,6 +52,7 @@ Cmd ::= skip                                -- no-op
         elif B then { Cmd }                -- (chained, just sugar for nested if/else)
         else { Cmd }
       | while B do { Cmd }                 -- loop
+      | for l in E { Cmd }                 -- foreach loop (E must be an array type, l is read-only)
       | break                            -- breaks loop
       | continue                            -- continues loop
       | print E                            -- print any expression
