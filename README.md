@@ -47,7 +47,6 @@ call fizzbuzz(30);
 - Sequencing
 - Comparison operators
 ### Extensions
-- Typed Functions & Procedures
 - Built-in Functions (You can see the list of those [here](BUILT-IN-FUNCTIONS.md))
 - String and Boolean variables
 - if / elif / else conditionals
@@ -60,7 +59,9 @@ call fizzbuzz(30);
 
 ### Functions & Procedures
 - First-class functions with explicit `return`
+- Typed Functions & Procedures
 - Void procedures with `call` syntax
+- Optional Passing by Reference in Procedures
 - Recursive functions
 - Lexical scoping with pass-by-value-semantics
 - Separate function environment from variable store
