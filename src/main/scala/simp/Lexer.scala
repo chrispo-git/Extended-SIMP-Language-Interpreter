@@ -181,6 +181,8 @@ class Lexer(source: String):
             case x if isWordMatch("Str")  => {advanceUntilNextWord(); Token.TypeString}
             case x if isWordMatch("Bool") => {advanceUntilNextWord(); Token.TypeBool}
 
+            case x if isWordMatch("ref") => { advanceUntilNextWord(); Token.Ref }
+
             case x if isWordMatch("print") => {advanceUntilNextWord(); Token.Print}
 
             case x if isIdentifier(getWholeWord()) => {val word = getWholeWord(); advanceUntilNextWord(); Token.Variable(word)}

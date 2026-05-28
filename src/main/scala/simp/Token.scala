@@ -63,3 +63,5 @@ enum Token:
     case TypeString
     case Arrow
     case Colon
+
+    case Ref

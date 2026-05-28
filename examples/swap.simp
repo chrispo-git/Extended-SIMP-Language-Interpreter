@@ -1,11 +1,20 @@
-pd swap(a : Int, b : Int) -> Int {
+pd swap(a: ref Int, b: ref Int) {
     tmp := !a;
     a := !b;
     b := !tmp;
-    print !a;
-    print !b;
+}
+
+pd increment(x: ref Int) {
+    x := !x + 1;
 }
 
 x := 10;
 y := 20;
-call swap(!x, !y);
+print "We're starting with x:=" + !x + " and y:=" + !y;
+print "Swapping them.";
+call swap(x, y);
+print "Now we have x:=" + !x + " and y:=" + !y;
+
+print "Incrementing x.";
+call increment(x);
+print "Now we have x:=" + !x + " and y:=" + !y;
