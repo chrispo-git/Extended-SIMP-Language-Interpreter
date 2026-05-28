@@ -57,3 +57,9 @@ enum Token:
     case DivEq
 
     case Elif
+
+    case TypeInt
+    case TypeBool
+    case TypeString
+    case Arrow
+    case Colon

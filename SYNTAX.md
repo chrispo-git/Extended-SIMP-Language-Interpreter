@@ -22,8 +22,9 @@ SIMP has three value types:
 Declarations come in 2 forms, declaring functions and declaring procedures.
 
 ```
-Decl ::= fn f(x₀, x₁, ...) { Cmd }  | pd p(x₀, x₁, ...) { Cmd }
+Decl ::= fn f(x₀ : t₀, x₁ : t₁, ...) -> t { Cmd }  | pd p(x₀ : t₀, x₁ : t₁, ...) { Cmd }
 where x₀, x₁, ... are parameter names (locations)
+where t, t₀, t₁, ... are parameter types (One of Str, Int, Bool)
 ```
 
 - Functions `fn` return a value and are treated as expressions

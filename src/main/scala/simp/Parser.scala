@@ -221,23 +221,35 @@ class Parser(tokens: List[Token]):
             args.toList
         }
     }
-    private def parseParams(): List[String] = {
+    private def parseParam(): (String, SimpType) = {
+        peek() match {
+            case Token.Variable(name) => {
+                advance()
+                expect(Token.Colon)
+                val t = parseType()
+                (name, t)
+            }
+            case x => throw RuntimeException(s"Expected parameter name, got '$x'")
+        }
+    }
+
+    private def parseType(): SimpType = peek() match {
+        case Token.TypeInt  => { advance(); SimpType.TypeInt }
+        case Token.TypeString  => { advance(); SimpType.TypeString }
+        case Token.TypeBool => { advance(); SimpType.TypeBool }
+        case x => throw RuntimeException(s"Expected type, got '$x'")
+    }
+    private def parseParams(): List[(String, SimpType)] = {
         expect(Token.OpenBracket)
         if peek() == Token.CloseBracket then {
             advance()
             List()
         } else {
-            val params = scala.collection.mutable.ListBuffer[String]()
-            peek() match {
-                case Token.Variable(name) => {advance(); params += name}
-                case x => throw RuntimeException(s"Expected parameter name, got '$x'")
-            }
+            val params = scala.collection.mutable.ListBuffer[(String, SimpType)]()
+            params += parseParam()
             while peek() == Token.Comma do {
                 advance()
-                peek() match {
-                    case Token.Variable(name) => {advance(); params += name}
-                    case x => throw RuntimeException(s"Expected parameter name, got '$x'")
-                }
+                params += parseParam()
             }
             expect(Token.CloseBracket)
             params.toList
@@ -368,10 +380,12 @@ class Parser(tokens: List[Token]):
                 case Token.Variable(name) => {
                     advance()
                     val params = parseParams()
+                    expect(Token.Arrow)
+                    val returnType = parseType()
                     expect(Token.OpenBrace)
                     val body = parseCmd()
                     expect(Token.CloseBrace)
-                    Decl.FnDecl(name, params, body)
+                    Decl.FnDecl(name, params, body, returnType)
                 }
                 case x => throw RuntimeException(s"Expected function name, got '$x'")
             }

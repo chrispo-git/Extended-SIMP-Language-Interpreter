@@ -1,4 +1,4 @@
-pd swap(a, b) {
+pd swap(a : Int, b : Int) -> Int {
     tmp := !a;
     a := !b;
     b := !tmp;
