@@ -61,6 +61,8 @@ enum Cmd:
     case PdCall(name: String, args: List[Expr])
     case Return(expr: Expr)
     case ArrAssign(arr: String, index: Expr, value: Expr)
+    case Continue
+    case Break
 
 
 enum Program:
@@ -81,3 +83,5 @@ enum SimpType:
     case TypeArr(inner: SimpType)
 
 case class ReturnException(value: Value) extends Exception
+case class BreakException() extends Exception
+case class ContinueException() extends Exception

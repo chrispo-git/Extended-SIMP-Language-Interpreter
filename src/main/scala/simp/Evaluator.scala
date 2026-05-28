@@ -252,7 +252,16 @@ class Evaluator(fnEnv: FunctionEnv):
                 }
             }
             case Cmd.While(cond, body) => {
-                while evalBool(cond, store) do execCmd(body, store)
+                var running = true
+
+                while running && evalBool(cond, store) do {
+                    try {
+                        execCmd(body, store)
+                    } catch {
+                        case _: BreakException => running = false
+                        case _: ContinueException =>
+                    }
+                }
             }
             case Cmd.Print(value) => {
                 evalExpr(value, store) match {
@@ -276,6 +285,8 @@ class Evaluator(fnEnv: FunctionEnv):
                 execCmd(function.body, localStore)
             }
             case Cmd.Return(expr) => throw ReturnException(evalExpr(expr, store))
+            case Cmd.Continue => throw ContinueException()
+            case Cmd.Break => throw BreakException()
 
             case Cmd.ArrAssign(loc, idx, value) => {
                 val arrVal = store.load(loc)

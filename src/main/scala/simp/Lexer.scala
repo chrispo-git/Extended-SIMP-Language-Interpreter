@@ -181,6 +181,8 @@ class Lexer(source: String):
             case x if isWordMatch("elif") => {advanceUntilNextWord(); Token.Elif}
             case x if isWordMatch("while") => {advanceUntilNextWord(); Token.While}
             case x if isWordMatch("do") => {advanceUntilNextWord(); Token.Do}
+            case x if isWordMatch("break") => {advanceUntilNextWord(); Token.Break}
+            case x if isWordMatch("continue") => {advanceUntilNextWord(); Token.Continue}
 
             case x if isWordMatch("fn") => {advanceUntilNextWord(); Token.Fn} 
             case x if isWordMatch("pd") => {advanceUntilNextWord(); Token.Pd} 
