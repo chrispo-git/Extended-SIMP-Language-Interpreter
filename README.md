@@ -1,4 +1,4 @@
-# SIMP-Interpreter
+# SIMP Language Interpreter
 ![Scala Version](https://img.shields.io/badge/Scala-3.6.4-red?logo=scala)
 ![License](https://img.shields.io/badge/License-GPL--3.0-blue)
 
