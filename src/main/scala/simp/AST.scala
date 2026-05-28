@@ -11,6 +11,8 @@ enum Expr:
     case Deref(loc: String)
     case Num(value: Int)
     case Str(value: String)
+    case Bool(value: Boolean)
+    case BoolLift(expr: BoolExpr)
     case BinaryOp(l: Expr, op: Op, r: Expr)
     case FnCall(name: String, args: List[Expr])
 
@@ -39,6 +41,7 @@ enum BoolExpr:
     case Not(expr: BoolExpr)
     case And(l: BoolExpr, r: BoolExpr)
     case Or(l: BoolExpr, r: BoolExpr)
+    case FromExpr(expr: Expr)
 
 enum Bop:
     case Gt, Lt, Eq, Gte, Lte, Neq

@@ -22,11 +22,70 @@ class Evaluator(fnEnv: FunctionEnv):
         localStore
     }
 
+    private def evalBool(boolExpr: BoolExpr, store: Store): Boolean = {
+        boolExpr match {
+            case BoolExpr.Literal(b) => b 
+            case BoolExpr.Not(inner) => {
+                val result = evalBool(inner, store)
+                !result
+            }
+            case BoolExpr.And(l, r) => {
+                val left = evalBool(l, store)
+                if !left then return false
+                val right = evalBool(r, store)
+                left && right
+            }
+            case BoolExpr.Or(l, r) => {
+                val left = evalBool(l, store)
+                if left then return true
+                val right = evalBool(r, store)
+                left || right
+            }
+            case BoolExpr.FromExpr(expr) => {
+                evalExpr(expr, store) match {
+                    case Value.BoolVal(b) => b
+                    case x => throw RuntimeException(s"Expected boolean value, got '$x'")
+                }
+            }
+            case BoolExpr.Compare(l,bop,r) => {
+                (evalExpr(l, store), evalExpr(r, store)) match {
+                    case (Value.IntVal(left), Value.IntVal(right)) => {
+                        bop match {
+                            case Bop.Gt => left > right
+                            case Bop.Gte => left >= right 
+                            case Bop.Lt => left < right 
+                            case Bop.Lte => left <= right
+                            case Bop.Eq => left == right 
+                            case Bop.Neq => left != right 
+                        }
+                    }
+                    case (Value.StrVal(left), Value.StrVal(right)) => {
+                        bop match {
+                            case Bop.Eq => left == right 
+                            case Bop.Neq => left != right 
+                            case x => throw RuntimeException(s"Unsupported operation '$x'")
+                        }
+                    }
+                    case (Value.BoolVal(left), Value.BoolVal(right)) => {
+                        bop match {
+                            case Bop.Eq => left == right 
+                            case Bop.Neq => left != right 
+                            case x => throw RuntimeException(s"Unsupported operation '$x'")
+                        }
+                    }
+                    case _ => throw RuntimeException(s"Type Mismatch")
+                }
+            }
+        }
+    }
+    
     private def evalExpr(expr: Expr, store: Store): Value = {
         expr match {
             case Expr.Num(n) => Value.IntVal(n)
             case Expr.Deref(loc) => store.load(loc)
             case Expr.Str(s) => Value.StrVal(s)
+            case Expr.Bool(b) => Value.BoolVal(b)
+            case Expr.BoolLift(b) => Value.BoolVal(evalBool(b, store))
             case Expr.BinaryOp(l, op, r) => {
                 (evalExpr(l, store), evalExpr(r, store)) match {
                     case (Value.IntVal(left), Value.IntVal(right)) => {
@@ -75,56 +134,6 @@ class Evaluator(fnEnv: FunctionEnv):
     }
 
 
-    private def evalBool(boolExpr: BoolExpr, store: Store): Boolean = {
-        boolExpr match {
-            case BoolExpr.Literal(b) => b 
-            case BoolExpr.Not(inner) => {
-                val result = evalBool(inner, store)
-                !result
-            }
-            case BoolExpr.And(l, r) => {
-                val left = evalBool(l, store)
-                if !left then return false
-                val right = evalBool(r, store)
-                left && right
-            }
-            case BoolExpr.Or(l, r) => {
-                val left = evalBool(l, store)
-                if left then return true
-                val right = evalBool(r, store)
-                left || right
-            }
-            case BoolExpr.Compare(l,bop,r) => {
-                (evalExpr(l, store), evalExpr(r, store)) match {
-                    case (Value.IntVal(left), Value.IntVal(right)) => {
-                        bop match {
-                            case Bop.Gt => left > right
-                            case Bop.Gte => left >= right 
-                            case Bop.Lt => left < right 
-                            case Bop.Lte => left <= right
-                            case Bop.Eq => left == right 
-                            case Bop.Neq => left != right 
-                        }
-                    }
-                    case (Value.StrVal(left), Value.StrVal(right)) => {
-                        bop match {
-                            case Bop.Eq => left == right 
-                            case Bop.Neq => left != right 
-                            case x => throw RuntimeException(s"Unsupported operation '$x'")
-                        }
-                    }
-                    case (Value.BoolVal(left), Value.BoolVal(right)) => {
-                        bop match {
-                            case Bop.Eq => left == right 
-                            case Bop.Neq => left != right 
-                            case x => throw RuntimeException(s"Unsupported operation '$x'")
-                        }
-                    }
-                    case _ => throw RuntimeException(s"Type Mismatch")
-                }
-            }
-        }
-    }
 
     private def execCmd(cmd: Cmd, store: Store): Unit = {
         cmd match {
