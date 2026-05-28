@@ -286,47 +286,47 @@ class EvaluatorTest extends AnyFunSuite:
 
   // Functions
   test("simple function call") {
-    val store = run("fn double(n) { return !n * 2; } x := double(5);")
+    val store = run("fn double(n : Int) -> Int { return !n * 2; } x := double(5);")
     assert(store.load("x") == Value.IntVal(10))
   }
 
   test("recursive function") {
     val store = run(
-      "fn factorial(n) { if !n == 0 then { return 1; } else { return !n * factorial(!n - 1); }; } x := factorial(5);"
+      "fn factorial(n : Int) -> Int { if !n == 0 then { return 1; } else { return !n * factorial(!n - 1); }; } x := factorial(5);"
     )
     assert(store.load("x") == Value.IntVal(120))
   }
 
   test("function with multiple params") {
-    val store = run("fn add(a, b) { return !a + !b; } x := add(3, 4);")
+    val store = run("fn add(a : Int, b : Int) -> Int { return !a + !b; } x := add(3, 4);")
     assert(store.load("x") == Value.IntVal(7))
   }
 
   test("function cannot see caller store") {
-    val store = run("fn getX() { return 42; }; x := 99 ;  y := getX();")
+    val store = run("fn getX() -> Int { return 42; }; x := 99 ;  y := getX();")
     assert(store.load("y") == Value.IntVal(42))
   }
 
   test("function with no return throws") {
     assertThrows[RuntimeException](
-      run("fn bad() { skip; } x := bad();")
+      run("fn bad() -> Int { skip; } x := bad();")
     )
   }
 
   test("wrong number of arguments throws") {
     assertThrows[RuntimeException](
-      run("fn add(a, b) { return !a + !b; } x := add(1);")
+      run("fn add(a : Int, b : Int) -> Int { return !a + !b; } x := add(1);")
     )
   }
 
   // Procedures
   test("procedure modifies nothing in caller store") {
-    val store = run("pd noop(n) { n := 99; } x := 5 ; call noop(!x);")
+    val store = run("pd noop(n : Int) { n := 99; } x := 5 ; call noop(!x);")
     assert(store.load("x") == Value.IntVal(5))
   }
 
   test("procedure call with side effects") {
-    val store = run("pd setY(n) { y := !n; } call setY(42);")
+    val store = run("pd setY(n : Int) { y := !n; } call setY(42);")
     // y only exists in localStore, not in caller store
     assertThrows[RuntimeException](store.load("y"))
   }
