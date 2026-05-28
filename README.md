@@ -67,7 +67,8 @@ For running from source:
 - Negative integer literals
 - Curly brace syntax for blocks
 - String Literals
-- Printing String Literals & Integer Expressions
+- Printing Expressions
+- Inputting Strings, Integers and Booleans
 
 ### Functions & Procedures
 - First-class functions with explicit `return`
