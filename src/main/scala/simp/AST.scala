@@ -18,6 +18,8 @@ enum Expr:
     case Ref(loc: String)
     case ArrLiteral(elements: List[Expr]) 
     case ArrIndex(arr: Expr, index: Expr)
+    case StructLiteral(typeName: String, fields: List[(String, Expr)]) 
+    case FieldAccess(expr: Expr, field: String) 
 
 // Operators allowed - Add, Sub, Mul, Div, Mod
 enum Op:
@@ -31,6 +33,7 @@ enum Value:
   case BoolVal(b: Boolean)
   case RefVal(loc: String, store: Store)
   case ArrVal(elements: scala.collection.mutable.ArrayBuffer[Value])
+  case StructVal(typeName: String, fields: scala.collection.mutable.Map[String, Value])
 
 /* Boolean Expressions can either be:
     - True
@@ -62,6 +65,7 @@ enum Cmd:
     case PdCall(name: String, args: List[Expr])
     case Return(expr: Expr)
     case ArrAssign(arr: String, index: Expr, value: Expr)
+    case FieldAssign(loc: String, field: String, value: Expr)
     case Continue
     case Break
 
@@ -75,6 +79,7 @@ enum Program:
 enum Decl:
   case FnDecl(name: String, params: List[(String, SimpType)], body: Cmd, returnType: SimpType)
   case PdDecl(name: String, params: List[(String, SimpType)], body: Cmd)
+  case StructDecl(name: String, fields: List[(String, SimpType)])
 
 enum SimpType:
     case TypeInt
@@ -82,6 +87,7 @@ enum SimpType:
     case TypeBool 
     case TypeRef(inner: SimpType)
     case TypeArr(inner: SimpType)
+    case TypeStruct(name: String)
 
 case class ReturnException(value: Value) extends Exception
 case class BreakException() extends Exception

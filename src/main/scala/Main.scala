@@ -3,9 +3,9 @@ package simp
 import scala.io.Source
 import java.io.FileNotFoundException
 
-def startRepl(store: Store, fnEnv: FunctionEnv): Unit = {
+def startRepl(store: Store, fnEnv: FunctionEnv, structEnv: StructEnv): Unit = {
     println("SIMP REPL - type 'exit' to quit")
-    val evaluator = Evaluator(fnEnv)
+    val evaluator = Evaluator(fnEnv, structEnv)
     var input = ""
 
     while true do {
@@ -36,7 +36,7 @@ def startRepl(store: Store, fnEnv: FunctionEnv): Unit = {
         if isComplete then {
             try {
                 val tokens = Lexer(input).tokenise()
-                val programs = Parser(tokens).parseRepl()
+                val programs = Parser(tokens, structEnv).parseRepl()
                 evaluator.evalProgram(programs, store)
             } catch {
                 case e: RuntimeException => println(s"Error: ${e.getMessage}")
@@ -50,8 +50,9 @@ def startRepl(store: Store, fnEnv: FunctionEnv): Unit = {
     val store = Store()
     val fnEnv = FunctionEnv()
     Builtins.register(fnEnv)
+    val structEnv = StructEnv()
     if args.isEmpty then {
-        startRepl(store, fnEnv)
+        startRepl(store, fnEnv, structEnv)
     } else {
         val filename = args(0)
 
@@ -64,7 +65,7 @@ def startRepl(store: Store, fnEnv: FunctionEnv): Unit = {
         }
 
         val tokens = Lexer(source).tokenise()
-        val program = Parser(tokens).parseProgram()
-        Evaluator(fnEnv).evalProgram(program, store)
+        val program = Parser(tokens, structEnv).parseProgram()
+        Evaluator(fnEnv, structEnv).evalProgram(program, store)
     }
 }

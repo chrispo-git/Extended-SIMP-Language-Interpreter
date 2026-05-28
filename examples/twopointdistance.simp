@@ -1,0 +1,33 @@
+struct Point {
+    x: Int,
+    y: Int
+}
+
+struct Line {
+    start: Point,
+    end: Point
+}
+
+fn distance(a: Point, b: Point) -> Int {
+    dx := a.x - b.x;
+    dy := a.y - b.y;
+    return intSqrt(dx * dx + dy * dy);
+}
+
+p1 := Point { x: 0, y: 0 };
+p2 := Point { x: 3, y: 4 };
+
+print !p1;
+print !p2;
+print p1.x;        // 0
+print p2.y;        // 4
+
+p1.x := 10;
+print p1.x;        // 10
+
+
+print distance(p1, p2);
+
+line := Line { start: p1, end: p2 };
+print line.start.x;    // 10
+print line.end.y;      // 4

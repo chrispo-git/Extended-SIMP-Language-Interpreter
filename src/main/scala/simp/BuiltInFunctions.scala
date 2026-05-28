@@ -242,6 +242,12 @@ object Builtins:
             }
             case _ => throw RuntimeException("inputInt expects an optional string prompt")
         })
+        fnEnv.registerBuiltin("intSqrt", args => args match {
+            case List(Value.IntVal(n)) =>
+                if n < 0 then throw RuntimeException("sqrt of negative number")
+                Value.IntVal(math.sqrt(n.toDouble).toInt)
+            case _ => throw RuntimeException("sqrt expects an integer")
+        })
         fnEnv.registerBuiltin("inputBool", args => args match {
             case List(Value.StrVal(prompt)) => {
                 print(prompt)
