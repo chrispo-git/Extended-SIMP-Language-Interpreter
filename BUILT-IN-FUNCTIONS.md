@@ -31,3 +31,5 @@ Each of these functions is available by default in SIMP.
 | `inputInt` | `inputInt(<Str>) -> Int` | Allows the user to input an Int |
 | `inputBool` | `inputBool(<Str>) -> Bool` | Allows the user to input a Bool (Done in the form y/n, yes/no, 1/0, t/f, or true/false) |
 | `range` | `input(Int, <Int>, <Int>) -> Arr` | Returns an array of the range, 0-end, start-end, or start-end with a step value|
+| `readFile` | `readFile(Str) -> Arr` | Reads text file |
+| `writeFile` | `writeFile(Str, Arr) -> Bool` | Writes to text file, returns true if it succeeds, false if it fails |

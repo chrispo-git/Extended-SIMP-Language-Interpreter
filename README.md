@@ -69,6 +69,7 @@ For running from source:
 - String Literals
 - Printing Expressions
 - Inputting Strings, Integers and Booleans
+- File I/O
 
 ### Functions & Procedures
 - First-class functions with explicit `return`

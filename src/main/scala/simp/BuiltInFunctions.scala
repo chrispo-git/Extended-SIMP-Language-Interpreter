@@ -1,5 +1,7 @@
 package simp 
 
+import scala.io.Source._
+
 object Builtins:
     def register(fnEnv: FunctionEnv): Unit = {
         // len - Length of a String or Array
@@ -259,5 +261,42 @@ object Builtins:
                 }
             }
             case _ => throw RuntimeException("inputBool expects an optional string prompt")
+        })
+
+        // File I/O
+
+        fnEnv.registerBuiltin("readFile", args => args match {
+            case List(Value.StrVal(file)) => {
+                try {
+                    val out = scala.collection.mutable.ArrayBuffer[Value]()
+                    val lines = fromFile(file).getLines
+                    lines.foreach(str => out += Value.StrVal(str))
+                    Value.ArrVal(out)
+                } catch case e: Exception => throw RuntimeException(s"Could not read file '$file': ${e.getMessage}")
+            }
+            case _ => throw RuntimeException("readFile expected a filepath")    
+        })
+
+        fnEnv.registerBuiltin("writeFile", args => args match {
+            case List(Value.StrVal(path), Value.ArrVal(lines)) => {
+                try {
+                    val writer = java.io.FileWriter(path)
+                    lines.foreach(v => v match {
+                        case Value.StrVal(s) => writer.write(s + "\n")
+                        case _ => throw RuntimeException("writeFile expects an array of strings")
+                    })
+                    writer.close()
+                    Value.BoolVal(true)
+                } catch case e: Exception => throw RuntimeException(s"Could not write file '$path': ${e.getMessage}")
+            }
+            case List(Value.StrVal(path), Value.StrVal(content)) => {
+                try {
+                    val writer = java.io.FileWriter(path)
+                    writer.write(content)
+                    writer.close()
+                    Value.BoolVal(true)
+                } catch case e: Exception => Value.BoolVal(false)
+            }
+            case _ => throw RuntimeException("writeFile expects a filepath and an array of strings")
         })
     }
