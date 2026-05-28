@@ -8,14 +8,14 @@ Program ::= (Cmd | Decl)*
 ```
 
 ### Values
-SIMP has four value types:
+Expressions produce a value of type `Int`, `Str`, `Bool`, or an array type (`Int[]`, `Str[]`, `Bool[]`).
 
 | Type | Examples |
 |------|---------|
 | `Int` | `-7`, `42`, `90210` |
 | `Str` | `"hello"`, `"world"` |
 | `Bool` | `true`, `false` |
-| `Int[]`, `Str[]`, `Bool[]` | `[1, 2, 3]`, `["a", "b"]`, `[]` |
+| `Int[]`, `Str[]`, `Bool[]` | `[1, 2, 3]`, `["a", "b"]`, `[true, false]`, `[]` |
 
 ---
 
@@ -212,4 +212,24 @@ if !flag && ¬!other then {
 
 result := !flag == !other;
 print "flags equal: " + !result;
+```
+
+#### Arrays
+```
+pd reverseArr(a: Int[]) {
+    i := 0;
+    j := len(a) - 1;
+    while !i < !j do {
+        tmp := a[!i];
+        a[!i] := a[!j];
+        a[!j] := !tmp;
+        i += 1;
+        j -= 1;
+    };
+}
+
+nums := [1, 2, 3, 4, 5];
+print nums;
+call reverseArr(nums);
+print nums;
 ```
