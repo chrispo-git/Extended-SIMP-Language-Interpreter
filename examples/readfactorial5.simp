@@ -1,0 +1,6 @@
+lines := readFile("examples/factorial5.simp");
+i := 1;
+for line in lines {
+    print !i + ": " + line;
+    i += 1;
+};

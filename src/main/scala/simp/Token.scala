@@ -71,3 +71,6 @@ enum Token:
 
     case Break 
     case Continue
+
+    case For
+    case In

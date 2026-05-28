@@ -263,6 +263,31 @@ class Evaluator(fnEnv: FunctionEnv):
                     }
                 }
             }
+            case Cmd.For(variable, iterable, body) => {
+                val arr = evalExpr(iterable, store)
+                arr match {
+                    case Value.ArrVal(elements) => {
+                        elements.foreach(elem => {
+                            val loopStore = Store()
+                            store.entries().foreach((k, v) => loopStore.store(k, v))
+                            loopStore.store(variable, elem)
+                            var toBreak = false
+                            try {
+                                execCmd(body, loopStore)
+                            }catch {
+                                case _: BreakException => toBreak = true
+                                case _: ContinueException =>
+                            }
+                            if toBreak != true then {
+                                loopStore.entries().foreach((k, v) =>
+                                    if k != variable then store.store(k, v)
+                                )
+                            }
+                        })
+                    }
+                    case _ => throw RuntimeException("for loop expects an array")
+                }
+            }
             case Cmd.Print(value) => {
                 evalExpr(value, store) match {
                     case Value.StrVal(s) => println(s)
