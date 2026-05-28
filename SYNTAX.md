@@ -29,7 +29,8 @@ where t, t₀, t₁, ... are parameter types (One of Str, Int, Bool)
 
 - Functions `fn` return a value and are treated as expressions
 - Procedures `pd` don't return a value and are treated as commands
-- All parameters are passed by value
+- All parameters for functions are passed by value
+- Parameters in procedures can be passed in by reference by the keyword `ref` and their type within the procedure header. By default it is by value.
 - Scoping is lexical, functions/procedures cannot see the caller's variables
 
 ---
