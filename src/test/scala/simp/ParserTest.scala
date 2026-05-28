@@ -54,6 +54,44 @@ class ParserTest extends AnyFunSuite:
     )))
   }
 
+
+  // Arrays
+  test("parse empty array") {
+      assert(parse("arr := []") == List(Program.PCmd(
+          Cmd.Assign("arr", Expr.ArrLiteral(List()))
+      )))
+  }
+
+  test("parse array literal") {
+      assert(parse("arr := [1, 2, 3]") == List(Program.PCmd(
+          Cmd.Assign("arr", Expr.ArrLiteral(List(Expr.Num(1), Expr.Num(2), Expr.Num(3))))
+      )))
+  }
+
+  test("parse array index read") {
+      assert(parse("x := arr[0]") == List(Program.PCmd(
+          Cmd.Assign("x", Expr.ArrIndex(Expr.Ref("arr"), Expr.Num(0)))
+      )))
+  }
+
+  test("parse array index assignment") {
+      assert(parse("arr[0] := 5") == List(Program.PCmd(
+          Cmd.ArrAssign("arr", Expr.Num(0), Expr.Num(5))
+      )))
+  }
+
+  test("parse array index with expression") {
+      assert(parse("arr[!i + 1] := 5") == List(Program.PCmd(
+          Cmd.ArrAssign("arr", Expr.BinaryOp(Expr.Deref("i"), Op.Add, Expr.Num(1)), Expr.Num(5))
+      )))
+  }
+
+  test("parse nested array index") {
+      assert(parse("x := arr[arr[0]]") == List(Program.PCmd(
+          Cmd.Assign("x", Expr.ArrIndex(Expr.Ref("arr"), Expr.ArrIndex(Expr.Ref("arr"), Expr.Num(0))))
+      )))
+  }
+  
   // Errors
   test("throw on missing then") {
     assertThrows[RuntimeException](parse("if true skip else skip"))

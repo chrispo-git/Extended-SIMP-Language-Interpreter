@@ -2,10 +2,11 @@ package simp
 
 object Builtins:
     def register(fnEnv: FunctionEnv): Unit = {
-        // len - Length of a String
+        // len - Length of a String or Array
         fnEnv.registerBuiltin("len", args => args match {
                 case List(Value.StrVal(s)) => Value.IntVal(s.length)
-                case _ => throw RuntimeException("len expects a string")
+                case List(Value.ArrVal(s)) => Value.IntVal(s.length)
+                case _ => throw RuntimeException("len expects a string or array")
             }
         )
         // upper - Makes a string uppercase
@@ -26,16 +27,18 @@ object Builtins:
                 case _ => throw RuntimeException("trim expects a string")
             }
         )
-        // reverse - Reverses a string
+        // reverse - Reverses a string or Array
         fnEnv.registerBuiltin("reverse", args => args match {
                 case List(Value.StrVal(s)) => Value.StrVal(s.reverse)
-                case _ => throw RuntimeException("reverse expects a string")
+                case List(Value.ArrVal(s)) => Value.ArrVal(s.reverse)
+                case _ => throw RuntimeException("reverse expects a string or array")
             }
         )
-        // contains - Checks if a string contains a value
+        // contains - Checks if a string or array contains a value
         fnEnv.registerBuiltin("contains", args => args match {
                 case List(Value.StrVal(s1), Value.StrVal(s2)) => Value.BoolVal(s1.contains(s2))
-                case _ => throw RuntimeException("contains expects 2 strings (string, contained_string)")
+                case List(Value.ArrVal(arr), term) => Value.BoolVal(arr.contains(term))
+                case _ => throw RuntimeException("contains expects 2 strings, or an array and value")
             }
         )
         // startsWith - Checks if a string starts with a value
@@ -60,6 +63,12 @@ object Builtins:
         fnEnv.registerBuiltin("substr", args => args match {
                 case List(Value.StrVal(s1), Value.IntVal(i1), Value.IntVal(i2)) => Value.StrVal(s1.substring(i1, i2))
                 case _ => throw RuntimeException("substr expects 1 string & 2 ints (string, start, end)")
+            }
+        )
+        // slice - Gets a slice of the target array
+        fnEnv.registerBuiltin("slice", args => args match {
+                case List(Value.ArrVal(arr), Value.IntVal(i1), Value.IntVal(i2)) => Value.ArrVal(arr.slice(i1, i2))
+                case _ => throw RuntimeException("slice expects 1 array & 2 ints (arr, start, end)")
             }
         )
         // indexOf - Gets the index of a substring, or -1 if it fails

@@ -49,6 +49,7 @@ call fizzbuzz(30);
 ### Extensions
 - Built-in Functions (You can see the list of those [here](BUILT-IN-FUNCTIONS.md))
 - String and Boolean variables
+- Arrays
 - if / elif / else conditionals
 - Compound assignment operators
 - Single-line comments

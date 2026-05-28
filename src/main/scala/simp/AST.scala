@@ -16,6 +16,8 @@ enum Expr:
     case BinaryOp(l: Expr, op: Op, r: Expr)
     case FnCall(name: String, args: List[Expr])
     case Ref(loc: String)
+    case ArrLiteral(elements: List[Expr]) 
+    case ArrIndex(arr: Expr, index: Expr)
 
 // Operators allowed - Add, Sub, Mul, Div, Mod
 enum Op:
@@ -28,6 +30,7 @@ enum Value:
   case StrVal(s: String)
   case BoolVal(b: Boolean)
   case RefVal(loc: String, store: Store)
+  case ArrVal(elements: scala.collection.mutable.ArrayBuffer[Value])
 
 /* Boolean Expressions can either be:
     - True
@@ -57,6 +60,7 @@ enum Cmd:
     case Print(value: Expr)
     case PdCall(name: String, args: List[Expr])
     case Return(expr: Expr)
+    case ArrAssign(arr: String, index: Expr, value: Expr)
 
 
 enum Program:
@@ -74,5 +78,6 @@ enum SimpType:
     case TypeString
     case TypeBool 
     case TypeRef(inner: SimpType)
+    case TypeArr(inner: SimpType)
 
 case class ReturnException(value: Value) extends Exception

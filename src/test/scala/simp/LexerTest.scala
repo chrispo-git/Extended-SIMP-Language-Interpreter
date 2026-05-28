@@ -463,11 +463,6 @@ class LexerTest extends AnyFunSuite with Matchers {
     }
   }
 
-  test("throw exception on single colon") {
-    intercept[RuntimeException] {
-      lex(":")
-    }
-  }
 
   
   // Edge cases

@@ -65,3 +65,6 @@ enum Token:
     case Colon
 
     case Ref
+
+    case OpenSquare
+    case CloseSquare 

@@ -7,6 +7,7 @@ class EvaluatorTest extends AnyFunSuite:
   def run(source: String): Store =
     val store = Store()
     val fnEnv = FunctionEnv()
+    Builtins.register(fnEnv)
     val tokens = Lexer(source).tokenise()
     val program = Parser(tokens).parseProgram()
     Evaluator(fnEnv).evalProgram(program, store)
@@ -340,4 +341,72 @@ class EvaluatorTest extends AnyFunSuite:
   test("inline comment does not affect result") {
     val store = run("x := 5; // x := 99;")
     assert(store.load("x") == Value.IntVal(5))
+  }
+
+  // Arrays
+  test("create and read array") {
+      val store = run("arr := [1, 2, 3]; x := arr[0];")
+      assert(store.load("x") == Value.IntVal(1))
+  }
+
+  test("read last element") {
+      val store = run("arr := [1, 2, 3]; x := arr[2];")
+      assert(store.load("x") == Value.IntVal(3))
+  }
+
+  test("mutate array element") {
+      val store = run("arr := [1, 2, 3]; arr[0] := 99; x := arr[0];")
+      assert(store.load("x") == Value.IntVal(99))
+  }
+
+  test("mutation does not affect other elements") {
+      val store = run("arr := [1, 2, 3]; arr[0] := 99; x := arr[1];")
+      assert(store.load("x") == Value.IntVal(2))
+  }
+
+  test("empty array has length 0") {
+      val store = run("arr := []; x := len(arr);")
+      assert(store.load("x") == Value.IntVal(0))
+  }
+
+  test("array length") {
+      val store = run("arr := [1, 2, 3, 4, 5]; x := len(arr);")
+      assert(store.load("x") == Value.IntVal(5))
+  }
+
+  test("array index out of bounds throws") {
+      assertThrows[RuntimeException](run("arr := [1, 2, 3]; x := arr[5];"))
+  }
+
+  test("negative array index throws") {
+      assertThrows[RuntimeException](run("arr := [1, 2, 3]; x := arr[-1];"))
+  }
+
+  test("sum array elements with while loop") {
+      val store = run(
+          "arr := [1, 2, 3, 4, 5]; sum := 0; i := 0; while !i < len(arr) do { sum += arr[!i]; i += 1; };"
+      )
+      assert(store.load("sum") == Value.IntVal(15))
+  }
+
+  test("array mutation in procedure propagates to caller") {
+      val store = run(
+          "pd double(a: Int[]) { i := 0; while !i < len(a) do { a[!i] := a[!i] * 2; i += 1; }; } nums := [1, 2, 3]; call double(nums);"
+      )
+      assert(store.load("nums") == Value.ArrVal(scala.collection.mutable.ArrayBuffer(Value.IntVal(2), Value.IntVal(4), Value.IntVal(6))))
+  }
+
+  test("array of strings") {
+      val store = run("arr := [\"hello\", \"world\"]; x := arr[0];")
+      assert(store.load("x") == Value.StrVal("hello"))
+  }
+
+  test("array of booleans") {
+      val store = run("arr := [true, false, true]; x := arr[1];")
+      assert(store.load("x") == Value.BoolVal(false))
+  }
+
+  test("array index with expression") {
+      val store = run("arr := [10, 20, 30]; i := 1; x := arr[!i + 1];")
+      assert(store.load("x") == Value.IntVal(30))
   }

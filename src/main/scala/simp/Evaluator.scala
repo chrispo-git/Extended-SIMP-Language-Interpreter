@@ -20,15 +20,13 @@ class Evaluator(fnEnv: FunctionEnv):
             val (name, expectedType) = param
             expectedType match {
                 case SimpType.TypeRef(inner) => {
-                    val value = evalExpr(arg, callerStore)
-                    value match {
-                        case Value.RefVal(loc, refStore) => {
-                            checkType(refStore.load(loc), inner, name)
-                            localStore.store(name, Value.RefVal(loc, refStore))
+                    arg match {
+                        case Expr.Ref(loc) => {
+                            val currentVal = callerStore.load(loc)
+                            checkType(currentVal, inner, name)
+                            localStore.store(name, Value.RefVal(loc, callerStore))
                         }
-                        case _ => {
-                            throw RuntimeException(s"Expected a reference for parameter '$name'")
-                        }
+                        case _ => throw RuntimeException(s"Expected a variable name for ref parameter '$name', got a value. Tip: Don't use '!' ")   
                     }
                 }
                 case _ => {
@@ -51,6 +49,24 @@ class Evaluator(fnEnv: FunctionEnv):
                 case Value.StrVal(_)  => SimpType.TypeString
                 case Value.BoolVal(_) => SimpType.TypeBool
                 case Value.RefVal(_, _) => throw RuntimeException("Nested references are not supported")
+                case Value.ArrVal(elements) => {
+                    if elements.isEmpty then SimpType.TypeArr(SimpType.TypeInt)
+                    else elements.head match {
+                        case Value.IntVal(_) => SimpType.TypeArr(SimpType.TypeInt)
+                        case Value.StrVal(_) => SimpType.TypeArr(SimpType.TypeString)
+                        case Value.BoolVal(_) => SimpType.TypeArr(SimpType.TypeBool)
+                        case _ => throw RuntimeException("Nested arrays not supported")
+                    }
+                }
+            }
+            case Value.ArrVal(elements) => {
+                if elements.isEmpty then SimpType.TypeArr(SimpType.TypeInt)
+                else elements.head match {
+                    case Value.IntVal(_) => SimpType.TypeArr(SimpType.TypeInt)
+                    case Value.StrVal(_) => SimpType.TypeArr(SimpType.TypeString)
+                    case Value.BoolVal(_) => SimpType.TypeArr(SimpType.TypeBool)
+                    case _ => throw RuntimeException("Nested arrays not supported")
+                }
             }
         }
         if actual != expected then {
@@ -129,7 +145,25 @@ class Evaluator(fnEnv: FunctionEnv):
             case Expr.Str(s) => Value.StrVal(s)
             case Expr.Bool(b) => Value.BoolVal(b)
             case Expr.BoolLift(b) => Value.BoolVal(evalBool(b, store))
-            case Expr.Ref(loc) => Value.RefVal(loc, store)
+            case Expr.Ref(loc) => store.load(loc)
+            case Expr.ArrLiteral(elements) => {
+                val evaluated = elements.map(evalExpr(_, store))
+                Value.ArrVal(scala.collection.mutable.ArrayBuffer(evaluated*))
+            }
+            case Expr.ArrIndex(arr, idx) => {
+                val arrVal = evalExpr(arr, store)
+                val index = evalExpr(idx, store)
+                (arrVal, index) match {
+                    case (Value.ArrVal(elements), Value.IntVal(i)) => {
+                        if i < 0 || i >= elements.length then {
+                            throw RuntimeException(s"Index $i out of bounds for array of length ${elements.length}")
+                        } else {
+                            elements(i)
+                        }
+                    }
+                    case _ => throw RuntimeException("Expected array and integer index")
+                }
+            }
             case Expr.BinaryOp(l, op, r) => {
                 (evalExpr(l, store), evalExpr(r, store)) match {
                     case (Value.IntVal(left), Value.IntVal(right)) => {
@@ -225,6 +259,14 @@ class Evaluator(fnEnv: FunctionEnv):
                     case Value.StrVal(s) => println(s)
                     case Value.IntVal(n) => println(n)
                     case Value.BoolVal(b) => println(b)
+                    case Value.ArrVal(elements) => {
+                        println("[" + elements.map(v => v match {
+                            case Value.IntVal(n)  => n.toString
+                            case Value.StrVal(s)  => "\"" + s + "\""
+                            case Value.BoolVal(b) => b.toString
+                            case _ => "?"
+                        }).mkString(", ") + "]")
+                    }
                     case Value.RefVal(name,_) => println(s"Ref($name)")
                 }
             }
@@ -234,5 +276,21 @@ class Evaluator(fnEnv: FunctionEnv):
                 execCmd(function.body, localStore)
             }
             case Cmd.Return(expr) => throw ReturnException(evalExpr(expr, store))
+
+            case Cmd.ArrAssign(loc, idx, value) => {
+                val arrVal = store.load(loc)
+                val index = evalExpr(idx, store)
+                val v = evalExpr(value, store)
+                (arrVal, index) match {
+                    case (Value.ArrVal(elements), Value.IntVal(i)) => {
+                        if i < 0 || i >= elements.length then {
+                            throw RuntimeException(s"Index $i out of bounds for array of length ${elements.length}")
+                        } else {
+                            elements(i) = v
+                        }
+                    }
+                    case _ => throw RuntimeException("Expected array and integer index")
+                }
+            }
         }
     }
