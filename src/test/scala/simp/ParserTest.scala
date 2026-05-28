@@ -47,7 +47,7 @@ class ParserTest extends AnyFunSuite:
       Cmd.Seq(
         Cmd.Assign("x", Expr.Num(5)),
         Cmd.While(
-          BoolExpr.Compare(Expr.Deref("x"), Bop.Gt, Expr.Num(0)),
+          BoolExpr.FromExpr(Expr.BoolLift(BoolExpr.Compare(Expr.Deref("x"), Bop.Gt, Expr.Num(0)))),
           Cmd.Assign("x", Expr.BinaryOp(Expr.Deref("x"), Op.Sub, Expr.Num(1)))
         )
       )
