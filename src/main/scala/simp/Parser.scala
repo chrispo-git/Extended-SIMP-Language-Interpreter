@@ -92,6 +92,14 @@ class Parser(tokens: List[Token]):
                 advance(); 
                 Cmd.Skip
             }
+            case Token.Continue => {
+                advance(); 
+                Cmd.Continue
+            }
+            case Token.Break => {
+                advance(); 
+                Cmd.Break
+            }
             case Token.If => {
                 advance()
                 val cond = parseBool()

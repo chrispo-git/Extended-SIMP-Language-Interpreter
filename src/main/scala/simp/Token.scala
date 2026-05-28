@@ -68,3 +68,6 @@ enum Token:
 
     case OpenSquare
     case CloseSquare 
+
+    case Break 
+    case Continue

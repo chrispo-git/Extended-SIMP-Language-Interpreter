@@ -52,6 +52,8 @@ Cmd ::= skip                                -- no-op
         elif B then { Cmd }                -- (chained, just sugar for nested if/else)
         else { Cmd }
       | while B do { Cmd }                 -- loop
+      | break                            -- breaks loop
+      | continue                            -- continues loop
       | print E                            -- print any expression
       | call p(E₀, E₁, ...)               -- procedure call
       | return E                           -- return from function
