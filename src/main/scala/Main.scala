@@ -49,6 +49,7 @@ def startRepl(store: Store, fnEnv: FunctionEnv): Unit = {
 @main def run(args: String*): Unit = {
     val store = Store()
     val fnEnv = FunctionEnv()
+    Builtins.register(fnEnv)
     if args.isEmpty then {
         startRepl(store, fnEnv)
     } else {

@@ -121,13 +121,19 @@ class Evaluator(fnEnv: FunctionEnv):
                 }
             }
             case Expr.FnCall(name, args) => {
-                val function = fnEnv.lookupFn(name)
-                val localStore = populateStore(function.params, args, store)
-                try {
-                    execCmd(function.body, localStore)
-                    throw RuntimeException(s"Function '$name' has no return statement")
-                } catch {
-                    case ReturnException(value) => value
+                val evaluatedArgs = args.map(evalExpr(_, store))
+                fnEnv.lookupBuiltin(name) match {
+                    case Some(fn) => fn(evaluatedArgs)
+                    case None => {
+                        val function = fnEnv.lookupFn(name)
+                        val localStore = populateStore(function.params, args, store)
+                        try {
+                            execCmd(function.body, localStore)
+                            throw RuntimeException(s"Function '$name' has no return statement")
+                        } catch {
+                            case ReturnException(value) => value
+                        }
+                    }
                 }
             }
         }
