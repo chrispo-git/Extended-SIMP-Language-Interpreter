@@ -1,6 +1,6 @@
 // Extended Euclidean Algorithm
 
-fn gcd(a, b) {
+fn gcd(a : Int, b : Int) -> Int {
     if !b == 0 then {
         return !a;
     } else {
@@ -8,7 +8,7 @@ fn gcd(a, b) {
     };
 }
 
-fn bezoutX(a, b) {
+fn bezoutX(a : Int, b : Int) -> Int {
     if !b == 0 then {
         return 1;
     } else {
@@ -16,7 +16,7 @@ fn bezoutX(a, b) {
     };
 }
 
-fn bezoutY(a, b) {
+fn bezoutY(a : Int, b : Int) -> Int {
     if !b == 0 then {
         return 0;
     } else {
@@ -24,7 +24,7 @@ fn bezoutY(a, b) {
     };
 }
 
-pd printExtGcd(a, b) {
+pd printExtGcd(a : Int, b : Int) {
     g := gcd(!a, !b);
     x := bezoutX(!a, !b);
     y := bezoutY(!a, !b);

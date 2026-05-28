@@ -1,4 +1,4 @@
-pd sumTo(n) {
+pd sumTo(n : Int) -> Int {
     acc := 0;
     i := 1;
     while !i <= !n do {

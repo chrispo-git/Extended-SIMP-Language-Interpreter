@@ -8,7 +8,7 @@ class Lexer(source: String):
     private var line: Int = 1
     private val whitespaces : List[Char] = List(' ', '\t', '\n', '\r')
     private val numbers : List[Char] = List('0', '1', '2', '3', '4', '5', '6', '7', '8', '9')
-    private val valid_symbols : List[Char] = List(';', '(', ')', '&', '|', '¬', '+', '-', '/', '*', ',', '%', '{', '}')
+    private val valid_symbols : List[Char] = List(';', '(', ')', '&', '|', '¬', '+', '-', '/', '*', ',', '%', '{', '}',':')
 
 
     def tokenise(): List[Token] = {
@@ -144,6 +144,9 @@ class Lexer(source: String):
             case '/' if peekNext() == '=' => {advanceN(2);Token.DivEq} 
             case '*' if peekNext() == '=' => {advanceN(2);Token.MulEq} 
 
+
+            case '-' if peekNext() == '>' => {advanceN(2);Token.Arrow} 
+
             case '+' => {advance();Token.Add}
             case '-' => {advance();Token.Sub}
             case '/' => {advance();Token.Div} 
@@ -172,6 +175,11 @@ class Lexer(source: String):
             case '}' => {advance();Token.CloseBrace}
 
             case '"' => Token.StringLit(getWholeString())
+
+            case ':' => {advance();Token.Colon}
+            case x if isWordMatch("Int")  => {advanceUntilNextWord(); Token.TypeInt}
+            case x if isWordMatch("Str")  => {advanceUntilNextWord(); Token.TypeString}
+            case x if isWordMatch("Bool") => {advanceUntilNextWord(); Token.TypeBool}
 
             case x if isWordMatch("print") => {advanceUntilNextWord(); Token.Print}
 

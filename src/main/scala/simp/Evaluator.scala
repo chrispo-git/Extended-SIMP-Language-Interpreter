@@ -4,7 +4,7 @@ class Evaluator(fnEnv: FunctionEnv):
 
     def evalProgram(program: List[Program], store: Store): Unit = {
         program.foreach(p => p match {
-            case Program.PDecl(Decl.FnDecl(name, params, body)) => fnEnv.registerFn(name, Decl.FnDecl(name, params, body))
+            case Program.PDecl(Decl.FnDecl(name, params, body, returnType)) => fnEnv.registerFn(name, Decl.FnDecl(name, params, body, returnType))
             case Program.PDecl(Decl.PdDecl(name, params, body)) => fnEnv.registerPd(name, Decl.PdDecl(name, params, body))
             case Program.PCmd(cmd) => execCmd(cmd, store)
             case Program.PExpr(expr) => println(evalExpr(expr, store))
@@ -12,15 +12,31 @@ class Evaluator(fnEnv: FunctionEnv):
         })
     }
 
-    private def populateStore(params: List[String], args: List[Expr], callerStore: Store): Store = {
+    private def populateStore(params: List[(String, SimpType)], args: List[Expr], callerStore: Store): Store = {
         if params.length != args.length then
             throw RuntimeException(s"Expected ${params.length} arguments, got ${args.length}")
         val localStore = Store()
-        params.zip(args).foreach((param, arg) =>
-            localStore.store(param, evalExpr(arg, callerStore))
-        )
+        params.zip(args).foreach((param, arg) => {
+            val (name, expectedType) = param
+            val value = evalExpr(arg, callerStore)
+            checkType(value, expectedType, name)
+            localStore.store(name, value)
+        })
         localStore
     }
+
+    private def checkType(value: Value, expected: SimpType, name: String): Unit = {
+        val actual = value match {
+            case Value.IntVal(_)  => SimpType.TypeInt
+            case Value.StrVal(_)  => SimpType.TypeString
+            case Value.BoolVal(_) => SimpType.TypeBool
+        }
+        if actual != expected then {
+            throw RuntimeException(s"Type mismatch for '$name': expected $expected, got $actual")
+        }
+    }
+    
+        
 
     private def evalBool(boolExpr: BoolExpr, store: Store): Boolean = {
         boolExpr match {
@@ -131,7 +147,10 @@ class Evaluator(fnEnv: FunctionEnv):
                             execCmd(function.body, localStore)
                             throw RuntimeException(s"Function '$name' has no return statement")
                         } catch {
-                            case ReturnException(value) => value
+                            case ReturnException(value) => {
+                                checkType(value, function.returnType, s"return value of '$name'")
+                                value
+                            }
                         }
                     }
                 }
