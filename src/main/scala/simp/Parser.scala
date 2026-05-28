@@ -178,16 +178,7 @@ class Parser(tokens: List[Token]):
             }
             case Token.Print => {
                 advance()
-                peek() match {
-                    case Token.StringLit(s) => {
-                        advance()
-                        Cmd.Print(Printable.PrintStr(s))
-                    }
-                    case e => {
-                        val value = parseExpr()
-                        Cmd.Print(Printable.PrintExpr(value))
-                    }
-                }
+                Cmd.Print(parseExpr())
             }
             case Token.OpenBracket => {
                 advance()
@@ -286,17 +277,61 @@ class Parser(tokens: List[Token]):
         peek() match {
             case Token.LiteralInt(n) => {
                 advance()
-                Expr.Num(n)
+                val left = Expr.Num(n)
+                peek() match {
+                    case Token.Gt | Token.Lt | Token.Gte | Token.Lte | Token.Eq | Token.Neq =>
+                        val bop = peek() match {
+                            case Token.Gt  => Bop.Gt
+                            case Token.Lt  => Bop.Lt
+                            case Token.Gte => Bop.Gte
+                            case Token.Lte => Bop.Lte
+                            case Token.Eq  => Bop.Eq
+                            case Token.Neq => Bop.Neq
+                            case _ => throw RuntimeException("unreachable")
+                        }
+                        advance()
+                        val right = parseExpr()
+                        Expr.BoolLift(BoolExpr.Compare(left, bop, right))
+                    case _ => left
+                }
+            }
+            case Token.StringLit(s) => {
+                advance()
+                Expr.Str(s)
             }
             case Token.Deref => {
                 advance()
-                peek() match {
+                val left = peek() match {
                     case Token.Variable(l) => {
                         advance()
                         Expr.Deref(l)
                     }
                     case x => throw RuntimeException(s"Expected variable after '!', got '$x'")
                 }
+                peek() match {
+                    case Token.Gt | Token.Lt | Token.Gte | Token.Lte | Token.Eq | Token.Neq =>
+                        val bop = peek() match {
+                            case Token.Gt  => Bop.Gt
+                            case Token.Lt  => Bop.Lt
+                            case Token.Gte => Bop.Gte
+                            case Token.Lte => Bop.Lte
+                            case Token.Eq  => Bop.Eq
+                            case Token.Neq => Bop.Neq
+                            case _ => throw RuntimeException("unreachable")
+                        }
+                        advance()
+                        val right = parseExpr()
+                        Expr.BoolLift(BoolExpr.Compare(left, bop, right))
+                    case _ => left
+                }
+            }
+            case Token.Not => {
+                Expr.BoolLift(parseBool())
+            }
+            
+            case Token.BoolLit(b) => {
+                advance()
+                Expr.Bool(b)
             }
             case Token.Variable(name) if peekNext() == Token.OpenBracket => {
                 advance()
@@ -370,18 +405,23 @@ class Parser(tokens: List[Token]):
             }
             case Token.Deref | Token.LiteralInt(_)  => {
                 val left = parseExpr()
-                val bop = peek() match {
-                    case Token.Gt => Bop.Gt
-                    case Token.Gte => Bop.Gte
-                    case Token.Lt => Bop.Lt
-                    case Token.Lte => Bop.Lte
-                    case Token.Eq => Bop.Eq
-                    case Token.Neq => Bop.Neq
-                    case x => throw RuntimeException(s"Expected boolean operator, got '${x}'")
+                peek() match {
+                    case Token.Gt | Token.Lt | Token.Gte | Token.Lte | Token.Eq | Token.Neq => {
+                        val bop = peek() match {
+                            case Token.Gt => Bop.Gt
+                            case Token.Gte => Bop.Gte
+                            case Token.Lt => Bop.Lt
+                            case Token.Lte => Bop.Lte
+                            case Token.Eq => Bop.Eq
+                            case Token.Neq => Bop.Neq
+                            case x => throw RuntimeException(s"Expected boolean operator, got '${x}'")
+                        }
+                        advance()
+                        val right = parseExpr()
+                        BoolExpr.Compare(left, bop, right)
+                    }
+                    case _ => BoolExpr.FromExpr(left)
                 }
-                advance()
-                val right = parseExpr()
-                BoolExpr.Compare(left, bop, right)
             }
             case Token.OpenBracket => {
                 advance()

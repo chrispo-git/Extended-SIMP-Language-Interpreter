@@ -22,36 +22,6 @@ class Evaluator(fnEnv: FunctionEnv):
         localStore
     }
 
-    private def evalExpr(expr: Expr, store: Store): Int = {
-        expr match {
-            case Expr.Num(n) => n 
-            case Expr.Deref(loc) => store.load(loc)
-            case Expr.BinaryOp(l, op, r) => {
-                val left = evalExpr(l, store)
-                val right = evalExpr(r, store)
-                op match {
-                    case Op.Add => left + right
-                    case Op.Sub => left - right 
-                    case Op.Mul => left * right 
-                    case Op.Mod => left % right 
-                    case Op.Div if right == 0 => throw RuntimeException(s"Division by Zero!")
-                    case Op.Div => left / right 
-                }
-            }
-            case Expr.FnCall(name, args) => {
-                val function = fnEnv.lookupFn(name)
-                val localStore = populateStore(function.params, args, store)
-                try {
-                    execCmd(function.body, localStore)
-                    throw RuntimeException(s"Function '$name' has no return statement")
-                } catch {
-                    case ReturnException(value) => value
-                }
-            }
-        }
-    }
-
-
     private def evalBool(boolExpr: BoolExpr, store: Store): Boolean = {
         boolExpr match {
             case BoolExpr.Literal(b) => b 
@@ -71,20 +41,99 @@ class Evaluator(fnEnv: FunctionEnv):
                 val right = evalBool(r, store)
                 left || right
             }
+            case BoolExpr.FromExpr(expr) => {
+                evalExpr(expr, store) match {
+                    case Value.BoolVal(b) => b
+                    case x => throw RuntimeException(s"Expected boolean value, got '$x'")
+                }
+            }
             case BoolExpr.Compare(l,bop,r) => {
-                val left = evalExpr(l, store)
-                val right = evalExpr(r, store)
-                bop match {
-                    case Bop.Gt => left > right
-                    case Bop.Gte => left >= right 
-                    case Bop.Lt => left < right 
-                    case Bop.Lte => left <= right
-                    case Bop.Eq => left == right 
-                    case Bop.Neq => left != right 
+                (evalExpr(l, store), evalExpr(r, store)) match {
+                    case (Value.IntVal(left), Value.IntVal(right)) => {
+                        bop match {
+                            case Bop.Gt => left > right
+                            case Bop.Gte => left >= right 
+                            case Bop.Lt => left < right 
+                            case Bop.Lte => left <= right
+                            case Bop.Eq => left == right 
+                            case Bop.Neq => left != right 
+                        }
+                    }
+                    case (Value.StrVal(left), Value.StrVal(right)) => {
+                        bop match {
+                            case Bop.Eq => left == right 
+                            case Bop.Neq => left != right 
+                            case x => throw RuntimeException(s"Unsupported operation '$x'")
+                        }
+                    }
+                    case (Value.BoolVal(left), Value.BoolVal(right)) => {
+                        bop match {
+                            case Bop.Eq => left == right 
+                            case Bop.Neq => left != right 
+                            case x => throw RuntimeException(s"Unsupported operation '$x'")
+                        }
+                    }
+                    case _ => throw RuntimeException(s"Type Mismatch")
                 }
             }
         }
     }
+    
+    private def evalExpr(expr: Expr, store: Store): Value = {
+        expr match {
+            case Expr.Num(n) => Value.IntVal(n)
+            case Expr.Deref(loc) => store.load(loc)
+            case Expr.Str(s) => Value.StrVal(s)
+            case Expr.Bool(b) => Value.BoolVal(b)
+            case Expr.BoolLift(b) => Value.BoolVal(evalBool(b, store))
+            case Expr.BinaryOp(l, op, r) => {
+                (evalExpr(l, store), evalExpr(r, store)) match {
+                    case (Value.IntVal(left), Value.IntVal(right)) => {
+                        op match {
+                            case Op.Add => Value.IntVal(left + right)
+                            case Op.Sub => Value.IntVal(left - right)
+                            case Op.Mul => Value.IntVal(left * right)
+                            case Op.Mod => Value.IntVal(left % right)
+                            case Op.Div if right == 0 => throw RuntimeException(s"Division by Zero!")
+                            case Op.Div => Value.IntVal(left / right)
+                        }
+                    }
+                    case (Value.StrVal(left), Value.StrVal(right)) => {
+                        op match {
+                            case Op.Add => Value.StrVal(left+right)
+                            case x => throw RuntimeException(s"Unsupported operation '$x'")
+                        }
+                    }
+                    case (Value.StrVal(left), Value.IntVal(right)) => {
+                        op match {
+                            case Op.Add => Value.StrVal(left + (right.toString))
+                            case x => throw RuntimeException(s"Unsupported operation '$x'")
+                        }
+                    }
+                    case (Value.StrVal(left), Value.BoolVal(right)) => {
+                        op match {
+                            case Op.Add if right==true => Value.StrVal(left + "true")
+                            case Op.Add if right==false => Value.StrVal(left + "false")
+                            case x => throw RuntimeException(s"Unsupported operation '$x'")
+                        }
+                    }
+                    case _ => throw RuntimeException(s"Type mismatch in binary operation")
+                }
+            }
+            case Expr.FnCall(name, args) => {
+                val function = fnEnv.lookupFn(name)
+                val localStore = populateStore(function.params, args, store)
+                try {
+                    execCmd(function.body, localStore)
+                    throw RuntimeException(s"Function '$name' has no return statement")
+                } catch {
+                    case ReturnException(value) => value
+                }
+            }
+        }
+    }
+
+
 
     private def execCmd(cmd: Cmd, store: Store): Unit = {
         cmd match {
@@ -109,9 +158,10 @@ class Evaluator(fnEnv: FunctionEnv):
                 while evalBool(cond, store) do execCmd(body, store)
             }
             case Cmd.Print(value) => {
-                value match {
-                    case Printable.PrintStr(s) => println(s)
-                    case Printable.PrintExpr(e) => println(evalExpr(e, store))
+                evalExpr(value, store) match {
+                    case Value.StrVal(s) => println(s)
+                    case Value.IntVal(n) => println(n)
+                    case Value.BoolVal(b) => println(b)
                 }
             }
             case Cmd.PdCall(name, args) => {

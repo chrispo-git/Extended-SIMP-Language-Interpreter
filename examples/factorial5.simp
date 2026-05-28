@@ -6,5 +6,4 @@ fn factorial(n) {
     };
 }
 
-print "The Factorial of 5 is...";
-print factorial(5);
+print "The Factorial of 5 is " + factorial(5);

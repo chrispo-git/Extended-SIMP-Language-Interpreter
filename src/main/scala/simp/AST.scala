@@ -10,6 +10,9 @@ package simp
 enum Expr:
     case Deref(loc: String)
     case Num(value: Int)
+    case Str(value: String)
+    case Bool(value: Boolean)
+    case BoolLift(expr: BoolExpr)
     case BinaryOp(l: Expr, op: Op, r: Expr)
     case FnCall(name: String, args: List[Expr])
 
@@ -17,6 +20,12 @@ enum Expr:
 enum Op:
     case Add, Sub, Mul, Div, Mod
 
+
+// Values allowed
+enum Value:
+  case IntVal(n: Int)
+  case StrVal(s: String)
+  case BoolVal(b: Boolean)
 
 /* Boolean Expressions can either be:
     - True
@@ -32,6 +41,7 @@ enum BoolExpr:
     case Not(expr: BoolExpr)
     case And(l: BoolExpr, r: BoolExpr)
     case Or(l: BoolExpr, r: BoolExpr)
+    case FromExpr(expr: Expr)
 
 enum Bop:
     case Gt, Lt, Eq, Gte, Lte, Neq
@@ -42,13 +52,10 @@ enum Cmd:
     case Seq(fst: Cmd, snd: Cmd)
     case If(cond: BoolExpr, thenBranch: Cmd, elseBranch: Cmd)
     case While(cond: BoolExpr, body: Cmd)
-    case Print(value: Printable)
+    case Print(value: Expr)
     case PdCall(name: String, args: List[Expr])
     case Return(expr: Expr)
 
-enum Printable:
-  case PrintStr(value: String)
-  case PrintExpr(expr: Expr)
 
 enum Program:
     case PCmd(cmd: Cmd)
@@ -60,4 +67,4 @@ enum Decl:
   case FnDecl(name: String, params: List[String], body: Cmd)
   case PdDecl(name: String, params: List[String], body: Cmd)
 
-case class ReturnException(value: Int) extends Exception
+case class ReturnException(value: Value) extends Exception
