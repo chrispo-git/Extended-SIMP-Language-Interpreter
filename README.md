@@ -40,7 +40,6 @@ bin/simp-interpreter
 ```
 ### Building from Source
 #### Prerequisites
-For running from source:
 - Scala 3
 - sbt (simple build tool)
 #### Instructions
