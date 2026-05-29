@@ -80,6 +80,7 @@ enum Decl:
   case FnDecl(name: String, params: List[(String, SimpType)], body: Cmd, returnType: SimpType)
   case PdDecl(name: String, params: List[(String, SimpType)], body: Cmd)
   case StructDecl(name: String, fields: List[(String, SimpType)])
+  case ImportDecl(path: String, alias: String)
 
 enum SimpType:
     case TypeInt

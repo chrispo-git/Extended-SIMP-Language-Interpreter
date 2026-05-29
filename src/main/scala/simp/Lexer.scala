@@ -187,6 +187,11 @@ class Lexer(source: String):
             case x if isWordMatch("for") => { advanceUntilNextWord(); Token.For }
             case x if isWordMatch("in")  => { advanceUntilNextWord(); Token.In }
 
+
+            case x if isWordMatch("import") => { advanceUntilNextWord(); Token.Import }
+            case x if isWordMatch("as")  => { advanceUntilNextWord(); Token.As }
+            case ':' if peekNext() == ':' => {advanceN(2);Token.DoubleColon} 
+
             case x if isWordMatch("fn") => {advanceUntilNextWord(); Token.Fn} 
             case x if isWordMatch("pd") => {advanceUntilNextWord(); Token.Pd} 
             case x if isWordMatch("return") => {advanceUntilNextWord(); Token.Return} 

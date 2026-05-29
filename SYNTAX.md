@@ -24,13 +24,18 @@ Expressions produce a value in 3 categories:
 ---
 
 ### Declarations
-Declarations come in 3 forms, declaring functions, declaring procedures, and declaring structs.
+Declarations come in 4 forms, declaring functions, declaring procedures, declaring structs, and imports.
 
 ```
-Decl ::= fn f(x₀ : t₀, x₁ : t₁, ...) -> t { Cmd }  | pd p(x₀ : t₀, x₁ : t₁, ...) { Cmd } | struct S { f₀ : t₀, f₁ : t₁, ... }
+Decl ::= fn f(x₀ : t₀, x₁ : t₁, ...) -> t { Cmd }  
+        | pd p(x₀ : t₀, x₁ : t₁, ...) { Cmd } 
+        | struct S { f₀ : t₀, f₁ : t₁, ... } 
+        | import "F"
+        | import "F" as A
 where x₀, x₁, ... are parameter names (locations)
 where t, t₀, t₁, ... are parameter types (One of Str, Int, Bool, Int[], Str[], Bool[], Struct, or Struct[])
-where f₀, t₁, ... are field names
+where f₀, f₁, ... are field names
+where F is the path of a file, and A is an optional alias
 ```
 
 - Functions `fn` return a value and are treated as expressions
@@ -38,6 +43,11 @@ where f₀, t₁, ... are field names
 - All parameters for functions are passed by value
 - Parameters in procedures can be passed in by reference by the keyword `ref` and their type within the procedure header. By default it is by value.
 - Scoping is lexical, functions/procedures cannot see the caller's variables
+- Declarations from imported files are accessible via `A::name` syntax
+- If no alias is given, the filename without extension is used as the namespace
+- Importing the same file with the same alias twice is ignored
+- Importing the same file with different aliases registers it under both
+- Circular imports throw a runtime error
 
 ---
 

@@ -77,3 +77,7 @@ enum Token:
 
     case Struct
     case Dot
+
+    case Import 
+    case As 
+    case DoubleColon

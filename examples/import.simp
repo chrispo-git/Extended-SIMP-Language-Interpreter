@@ -1,0 +1,6 @@
+import "mathstuff.simp" as coolestMathImport
+import "mathstuff.simp" as uncoolImport
+
+print "5! = " + coolestMathImport::factorial(5);
+print "6! = " + uncoolImport::factorial(6);
+print "gcd of 24 and 308 is " + uncoolImport::gcd(24, 38);

@@ -1,0 +1,28 @@
+fn factorial(n: Int) -> Int {
+    if !n == 0 then {
+        return 1;
+    } else {
+        return !n * factorial(!n - 1);
+    };
+}
+
+fn fibonacci(n: Int) -> Int {
+    if !n <= 1 then {
+        return !n;
+    } else {
+        return fibonacci(!n - 1) + fibonacci(!n - 2);
+    };
+}
+
+fn gcd(a : Int, b : Int) -> Int {
+    while ¬(!a == !b) do {
+        if !a > !b then {
+            a := !a - !b;
+        }
+        else {
+            b := !b - !a;
+        }
+    };
+    return !a;
+}
+

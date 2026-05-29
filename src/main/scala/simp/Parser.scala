@@ -41,7 +41,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv):
         val items = scala.collection.mutable.ListBuffer[Program]()
         while !isAtEnd() && peek() != Token.EOF do {
             peek() match {
-                case Token.Fn | Token.Pd | Token.Struct => items += Program.PDecl(parseDecl())
+                case Token.Fn | Token.Pd | Token.Struct | Token.Import => items += Program.PDecl(parseDecl())
                 case _ => items += Program.PCmd(parseCmd())
             }
             while peek() == Token.Semicolon do {
@@ -56,7 +56,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv):
 
         while !isAtEnd() && peek() != Token.EOF do {
             val item = peek() match {
-                case Token.Fn | Token.Pd | Token.Struct => Program.PDecl(parseDecl())
+                case Token.Fn | Token.Pd | Token.Struct | Token.Import => Program.PDecl(parseDecl())
                 case Token.BoolLit(_) | Token.Not => Program.PBool(parseBool())
                 case Token.Variable(_) if peekNext() == Token.OpenSquare =>
                     Program.PExpr(parsePostfix(parseAtomicExpr()))
@@ -88,7 +88,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv):
     }
     private def parseCmd(): Cmd = {
         val left = peek() match {
-            case Token.Fn | Token.Pd | Token.Struct =>
+            case Token.Fn | Token.Pd | Token.Struct | Token.Import =>
                 throw RuntimeException("Declarations must be at the top of the file")
             case _ => parseSingleCmd()
         }
@@ -260,6 +260,18 @@ class Parser(tokens: List[Token], structEnv : StructEnv):
             case Token.Call => {
                 advance()
                 peek() match {
+                    case Token.Variable(namespace) if peekNext() == Token.DoubleColon => {
+                        advance()
+                        advance()
+                        peek() match {
+                            case Token.Variable(name) if peekNext() == Token.OpenBracket => {
+                                advance()
+                                val args = parseArgs()
+                                Cmd.PdCall(s"$namespace::$name", args)
+                            }
+                            case x => throw RuntimeException(s"Expected procedure name, got '$x'")
+                        }
+                    }
                     case Token.Variable(name) => {
                         advance()
                         val args = parseArgs()
@@ -463,6 +475,25 @@ class Parser(tokens: List[Token], structEnv : StructEnv):
                     Expr.ArrLiteral(elements.toList)
                 }
             }
+            case Token.Variable(namespace) if peekNext() == Token.DoubleColon => {
+                advance()
+                advance()
+                peek() match {
+                    case Token.Variable(name) if peekNext() == Token.OpenBrace && structEnv.exists(s"$namespace::$name") => {
+                        advance()
+                        advance()
+                        val fields = parseStructLiteralFields()
+                        expect(Token.CloseBrace)
+                        Expr.StructLiteral(s"$namespace::$name", fields)
+                    }
+                    case Token.Variable(name) if peekNext() == Token.OpenBracket => {
+                        advance()
+                        val args = parseArgs()
+                        Expr.FnCall(s"$namespace::$name", args)
+                    }
+                    case x => throw RuntimeException(s"Expected name after '::', got '$x'")
+                }
+            }
             case Token.Variable(name) if peekNext() == Token.OpenBrace && structEnv.exists(name) => {
                 advance()
                 advance()
@@ -592,6 +623,28 @@ class Parser(tokens: List[Token], structEnv : StructEnv):
                     Decl.StructDecl(name, fields)
                 }
                 case x => throw RuntimeException(s"Expected struct name, got '$x'")
+            }
+        }
+        case Token.Import => {
+            advance()
+            peek() match {
+                case Token.StringLit(path) => {
+                    advance()
+                    val alias = peek() match {
+                        case Token.As => {
+                            advance()
+                            peek() match {
+                                case Token.Variable(name) => { advance(); name }
+                                case x => throw RuntimeException(s"Expected alias, got '$x'")
+                            }
+                        }
+                        case _ => {
+                            path.split("/").last.split("\\.").head
+                        }
+                    }
+                    Decl.ImportDecl(path, alias)
+                }
+                case x => throw RuntimeException(s"Expected path as string literal, got '$x'")
             }
         }
         case x => throw RuntimeException(s"Expected declaration, got '$x'")

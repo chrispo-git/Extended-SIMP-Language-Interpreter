@@ -63,9 +63,10 @@ def startRepl(store: Store, fnEnv: FunctionEnv, structEnv: StructEnv): Unit = {
                 sys.exit(1)
             }
         }
-
+        val file = java.io.File(filename)
+        val currentDir = file.getParentFile.getAbsolutePath
         val tokens = Lexer(source).tokenise()
         val program = Parser(tokens, structEnv).parseProgram()
-        Evaluator(fnEnv, structEnv).evalProgram(program, store)
+        Evaluator(fnEnv, structEnv, currentDir).evalProgram(program, store)
     }
 }
