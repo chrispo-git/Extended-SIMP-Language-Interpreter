@@ -38,11 +38,12 @@ For the REPL:
 ```bash
 bin/simp-interpreter
 ```
-### Prerequisites
+### Building from Source
+#### Prerequisites
 For running from source:
 - Scala 3
 - sbt (simple build tool)
-### Build from Source
+#### Instructions
 1. Clone the repository
 2. Run `sbt compile` within the root of the repository
 3. To run a file, use `sbt "run examples/factorial5.simp"`
