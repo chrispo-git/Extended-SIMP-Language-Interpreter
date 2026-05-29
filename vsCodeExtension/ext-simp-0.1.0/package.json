@@ -1,0 +1,21 @@
+{
+  "name": "ext-simp",
+  "displayName": "ExtSimp",
+  "description": "Syntax highlighting for ExtSimp",
+  "version": "0.1.0",
+  "engines": { "vscode": "^1.80.0" },
+  "categories": ["Programming Languages"],
+  "contributes": {
+    "languages": [{
+      "id": "ext-simp",
+      "aliases": ["ExtSimp", "ext-simp"],
+      "extensions": [".simp"],
+      "configuration": "./language-configuration.json"
+    }],
+    "grammars": [{
+      "language": "ext-simp",
+      "scopeName": "source.ext-simp",
+      "path": "./syntaxes/ext-simp.tmLanguage.json"
+    }]
+  }
+}

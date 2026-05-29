@@ -43,6 +43,12 @@ For the REPL:
 ```bash
 bin/simp-interpreter
 ```
+
+### Syntax Highlighting
+A VS Code extension for SIMP+ syntax highlighting is available [here](vsCodeExtension/). To install:
+1. Copy the `vsCodeExtension/` folder to `~/.vscode/extensions/`
+2. Reload VS Code (`Ctrl+Shift+P` → `Developer: Reload Window`)
+
 ## Building from Source
 ### Prerequisites
 - Scala 3
@@ -53,6 +59,7 @@ bin/simp-interpreter
 3. To run a file, use `sbt "run examples/factorial5.simp"`
 4. To just start the REPL, use `sbt run`
 5. To run test suite, use `sbt test`
+
 
 ## Features
 ### Core Language
@@ -93,6 +100,7 @@ bin/simp-interpreter
 - Interactive REPL with persistent state `sbt run`
 - Multiline input support in the REPL
 - Meaningful runtime error messages
+- VSCode Syntax Highlighting extension
 
 ## Architecture
 The pipeline from Source to output is
