@@ -36,7 +36,7 @@ bin/simp-interpreter file.simp
 ```
 For the REPL:
 ```bash
-bin/simp-interpreter#
+bin/simp-interpreter
 ```
 ### Prerequisites
 For running from source:
