@@ -26,6 +26,15 @@ jobs:
         uses: sbt/setup-sbt@v1
       - name: Build package
         run: sbt universal:packageBin
+      - name: Add install script to package
+        run: |
+          cd target/universal
+          ZIP=$(ls *.zip)
+          unzip "$ZIP"
+          DIR="${ZIP%.zip}"
+          cp ../../install.sh "$DIR/"
+          zip -r "$ZIP" "$DIR"
+          rm -rf "$DIR"
       - name: Release
         uses: softprops/action-gh-release@v1
         with:

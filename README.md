@@ -28,8 +28,13 @@ call fizzbuzz(30);
 ```
 
 ## Getting Started
+### Prerequisites
+The only prerequisite is Java 21 or later.
 ### Download
 Pre-built binaries are available on the [releases page](https://github.com/chrispo-git/SIMP-Interpreter/releases). Download the latest zip, & extract it.
+### Instructions
+Download the release, and run `install.sh`
+
 For running simp scripts:
 ```bash
 bin/simp-interpreter file.simp
@@ -38,11 +43,11 @@ For the REPL:
 ```bash
 bin/simp-interpreter
 ```
-### Building from Source
-#### Prerequisites
+## Building from Source
+### Prerequisites
 - Scala 3
 - sbt (simple build tool)
-#### Instructions
+### Instructions
 1. Clone the repository
 2. Run `sbt compile` within the root of the repository
 3. To run a file, use `sbt "run examples/factorial5.simp"`
