@@ -33,7 +33,7 @@ The only prerequisite is Java 21 or later.
 ### Download
 Pre-built binaries are available on the [releases page](https://github.com/chrispo-git/SIMP-Interpreter/releases). Download the latest zip, & extract it.
 ### Instructions
-Download the release, and run `install.sh`
+Download the release, and run `install.bat` (for Windows/MacOS) `install.sh` (for Linux)
 
 For running simp scripts:
 ```bash

@@ -33,6 +33,7 @@ jobs:
           unzip "$ZIP"
           DIR="${ZIP%.zip}"
           cp ../../install.sh "$DIR/"
+          cp ../../install.bat "$DIR/"
           zip -r "$ZIP" "$DIR"
           rm -rf "$DIR"
       - name: Release
