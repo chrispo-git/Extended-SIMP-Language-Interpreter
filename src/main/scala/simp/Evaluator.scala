@@ -1,16 +1,86 @@
 package simp
+import java.io.File
 
-class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv):
+class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
+    private val importedFiles = scala.collection.mutable.Set[String]()
+    private val completedImports = scala.collection.mutable.Map[String, Set[String]]()
+
 
     def evalProgram(program: List[Program], store: Store): Unit = {
         program.foreach(p => p match {
             case Program.PDecl(Decl.FnDecl(name, params, body, returnType)) => fnEnv.registerFn(name, Decl.FnDecl(name, params, body, returnType))
             case Program.PDecl(Decl.PdDecl(name, params, body)) => fnEnv.registerPd(name, Decl.PdDecl(name, params, body))
+            case Program.PDecl(Decl.ImportDecl(path, alias)) => processImport(path, alias, cwd, store)
+            case Program.PDecl(Decl.StructDecl(name, fields)) => structEnv.register(name, StructDef(fields))
             case Program.PCmd(cmd) => execCmd(cmd, store)
             case Program.PExpr(expr) => println(evalExpr(expr, store))
             case Program.PBool(b) => println(evalBool(b, store))
-            case Program.PDecl(Decl.StructDecl(name, fields)) => structEnv.register(name, StructDef(fields))
         })
+    }
+
+    private def processImport(path: String, alias: String, currentDir: String, store: Store ):  Unit = {
+        val fullPath = java.io.File(s"$currentDir/$path").getCanonicalPath
+
+
+        if importedFiles.contains(fullPath) then throw RuntimeException(s"Circular import detected: $path")
+
+
+        val existingAliases = completedImports.getOrElse(fullPath, Set())
+        if existingAliases.contains(alias) then return
+            
+        importedFiles += fullPath
+
+        val source = try {
+            scala.io.Source.fromFile(fullPath).mkString
+        } catch case _ => throw RuntimeException(s"Could not find import $path")
+
+        val tokens = Lexer(source).tokenise()
+        val importStructEnv = StructEnv()
+        val program = Parser(tokens, importStructEnv).parseProgram()
+
+
+        val declaredNames = program.collect {
+            case Program.PDecl(Decl.FnDecl(name, _, _, _)) => name
+            case Program.PDecl(Decl.PdDecl(name, _, _)) => name
+        }.toSet
+
+        program.foreach(p => p match {
+            case Program.PDecl(Decl.FnDecl(name, params, body, returnType)) => {
+                val qualifiedBody = qualifyBody(body, alias, declaredNames)
+                fnEnv.registerFn(s"$alias::$name", Decl.FnDecl(s"$alias::$name", params, qualifiedBody, returnType))
+            }
+            case Program.PDecl(Decl.PdDecl(name, params, body)) => {
+                val qualifiedBody = qualifyBody(body, alias, declaredNames)
+                fnEnv.registerPd(s"$alias::$name", Decl.PdDecl(s"$alias::$name", params, qualifiedBody))
+            }
+            case Program.PDecl(Decl.ImportDecl(path, alias)) => {
+                val importDir = File(fullPath).getParentFile.getAbsolutePath
+                processImport(path, alias, importDir, store)
+            }
+            case Program.PDecl(Decl.StructDecl(name, fields)) => structEnv.register(s"$alias::$name", StructDef(fields))
+            case _ => throw RuntimeException(s"Imports can only contain declarations")
+        })
+
+        importedFiles -= fullPath 
+        completedImports(fullPath) = existingAliases + alias
+    }
+
+
+    private def qualifyBody(cmd: Cmd, alias: String, declaredNames: Set[String]): Cmd = cmd match {
+        case Cmd.Seq(a, b) => Cmd.Seq(qualifyBody(a, alias, declaredNames), qualifyBody(b, alias, declaredNames))
+        case Cmd.If(cond, t, e) => Cmd.If(cond, qualifyBody(t, alias, declaredNames), qualifyBody(e, alias, declaredNames))
+        case Cmd.While(cond, body) => Cmd.While(cond, qualifyBody(body, alias, declaredNames))
+        case Cmd.Return(expr) => Cmd.Return(qualifyExpr(expr, alias, declaredNames))
+        case Cmd.Assign(loc, expr) => Cmd.Assign(loc, qualifyExpr(expr, alias, declaredNames))
+        case other => other
+    }
+
+    private def qualifyExpr(expr: Expr, alias: String, declaredNames: Set[String]): Expr = expr match {
+        case Expr.FnCall(name, args) if declaredNames.contains(name) =>
+            Expr.FnCall(s"$alias::$name", args.map(qualifyExpr(_, alias, declaredNames)))
+        case Expr.BinaryOp(l, op, r) => 
+            Expr.BinaryOp(qualifyExpr(l, alias, declaredNames), op, qualifyExpr(r, alias, declaredNames))
+        case other => other
     }
 
     private def populateStore(params: List[(String, SimpType)], args: List[Expr], callerStore: Store): Store = {

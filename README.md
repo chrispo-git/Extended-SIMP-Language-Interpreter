@@ -63,6 +63,7 @@ For running from source:
 - String and Boolean variables
 - Arrays
 - for loops
+- Basic import system
 - if / elif / else conditionals
 - Compound assignment operators
 - Single-line comments
@@ -121,3 +122,6 @@ Initially, this project was implemented with Int being the only type that could 
 
 ### Implementing Built-In Functions
 Unlike user-defined functions, these built-in functions are registered in a separate environment, and are handled with a scala implementation of the function. The reason I went with this method is manually reimplementing them all in SIMP individually would both be brittle, and not possible for most String operations (as strings are not treated as lists of characters, due to there not being lists in this language). In the process of adding these built-in functions, I had to decide which functions would both be invaluable to have and reasonable to expect in the standard library, I landed on [31 of them](BUILT-IN-FUNCTIONS.md). These functions should cover many basic use cases of the language and make it more friendly to end-users of the language.
+
+### Implementing Import system
+This was difficult for one big reason - what if the file you're importing calls one of it's own functions within itself? This is far too common to be ignored, and therefore required dynamically rewriting it in the Evaluator during the process of the import. This ended up requiring me to check for any possible area where a function could be called, and rewrite it to the alias being used by the importing program (e.g. myMathLib::factorial(n - 1) ). This isn't the best solution, really it should be using module namespaces to handle this correctly, but it's still fairly usable, somewhat like a C #include but with less namespace pollution by default. This is more so a pragmatic choice in implementing imports than the theoretical best one, but it still correctly handles circular imports, implements aliases well, and provides clean namespace separation between files. If I were to expand on this it would likely involve actually introducing modules rather than simply a flat file import system.
