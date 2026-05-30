@@ -314,40 +314,49 @@ class Parser(tokens: List[Token], structEnv : StructEnv):
     private def parseType(): SimpType = peek() match {
         case Token.TypeInt  => { 
             advance(); 
-            if peek() == Token.OpenSquare then {
+            var t: SimpType = SimpType.TypeInt
+            while peek() == Token.OpenSquare do {
                 expect(Token.OpenSquare)
                 expect(Token.CloseSquare)
-                SimpType.TypeArr(SimpType.TypeInt)
-            } else {
-                SimpType.TypeInt 
+                t = SimpType.TypeArr(t)
             }
+            t
         }
         case Token.TypeString  => { 
             advance(); 
-            if peek() == Token.OpenSquare then {
+            var t: SimpType = SimpType.TypeString
+            while peek() == Token.OpenSquare do {
                 expect(Token.OpenSquare)
                 expect(Token.CloseSquare)
-                SimpType.TypeArr(SimpType.TypeString)
-            } else {
-                SimpType.TypeString 
+                t = SimpType.TypeArr(t)
             }
+            t
         }
         case Token.TypeBool  => { 
             advance(); 
-            if peek() == Token.OpenSquare then {
+            var t: SimpType = SimpType.TypeBool
+            while peek() == Token.OpenSquare do {
                 expect(Token.OpenSquare)
                 expect(Token.CloseSquare)
-                SimpType.TypeArr(SimpType.TypeBool)
-            } else {
-                SimpType.TypeBool 
+                t = SimpType.TypeArr(t)
             }
+            t
         }
         case Token.Ref => {
             advance();
             val inner = parseType()
             SimpType.TypeRef(inner)
         }
-        case Token.Variable(name) => { advance(); SimpType.TypeStruct(name) }
+        case Token.Variable(name) => { 
+            advance(); 
+            var t: SimpType = SimpType.TypeStruct(name) 
+            while peek() == Token.OpenSquare do {
+                expect(Token.OpenSquare)
+                expect(Token.CloseSquare)
+                t = SimpType.TypeArr(t)
+            }
+            t
+        }
         case x => throw RuntimeException(s"Expected type, got '$x'")
     }
     private def parseParams(): List[(String, SimpType)] = {

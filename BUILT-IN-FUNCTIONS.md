@@ -33,3 +33,4 @@ Each of these functions is available by default in SIMP.
 | `range` | `input(Int, <Int>, <Int>) -> Arr` | Returns an array of the range, 0-end, start-end, or start-end with a step value|
 | `readFile` | `readFile(Str) -> Arr` | Reads text file |
 | `writeFile` | `writeFile(Str, Arr) -> Bool` | Writes to text file, returns true if it succeeds, false if it fails |
+| `typeOf` | `typeOf(Var) -> Str` | returns the type of a variable as a string

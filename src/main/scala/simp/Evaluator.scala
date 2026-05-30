@@ -109,9 +109,8 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
         })
         localStore
     }
-
-    private def checkType(value: Value, expected: SimpType, name: String): Unit = {
-        val actual = value match {
+    private def getType(value: Value): SimpType = {
+        value match {
             case Value.IntVal(_)  => SimpType.TypeInt
             case Value.StrVal(_)  => SimpType.TypeString
             case Value.BoolVal(_) => SimpType.TypeBool
@@ -137,12 +136,16 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
                     case Value.IntVal(_) => SimpType.TypeArr(SimpType.TypeInt)
                     case Value.StrVal(_) => SimpType.TypeArr(SimpType.TypeString)
                     case Value.BoolVal(_) => SimpType.TypeArr(SimpType.TypeBool)
-                    case Value.StructVal(typeName, _) => SimpType.TypeStruct(typeName)
-                    case _ => throw RuntimeException("Nested arrays not supported")
+                    case Value.StructVal(typeName, _) => SimpType.TypeArr(SimpType.TypeStruct(typeName))
+                    case Value.ArrVal(e) => SimpType.TypeArr(getType(e.head))
+                    case _ => throw RuntimeException("Type resolving failed")
                 }
             }
             case Value.StructVal(typeName, _) => SimpType.TypeStruct(typeName)
         }
+    }
+    private def checkType(value: Value, expected: SimpType, name: String): Unit = {
+        val actual = getType(value);
         if actual != expected then {
             throw RuntimeException(s"Type mismatch for '$name': expected $expected, got $actual")
         }
@@ -321,7 +324,16 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
         }
     }
 
-
+    private def getPrettyPrint(value: Value): String = {
+        value match {
+            case Value.StrVal(s) => s
+            case Value.IntVal(n) => n.toString
+            case Value.BoolVal(b) => b.toString
+            case Value.RefVal(name,_) => s"Ref($name)"
+            case Value.StructVal(typeName, fields) => s"$typeName { ${fields.map((k,v) => s"$k: ${getPrettyPrint(v)}").mkString(", ")} }"
+            case Value.ArrVal(elements) => "[" + elements.map(v => getPrettyPrint(v)).mkString(", ") + "]"
+        }
+    }
 
     private def execCmd(cmd: Cmd, store: Store): Unit = {
         cmd match {
@@ -403,21 +415,7 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
                 }
             }
             case Cmd.Print(value) => {
-                evalExpr(value, store) match {
-                    case Value.StrVal(s) => println(s)
-                    case Value.IntVal(n) => println(n)
-                    case Value.BoolVal(b) => println(b)
-                    case Value.StructVal(typeName, fields) => println(s"$typeName { ${fields.map((k,v) => s"$k: $v").mkString(", ")} }")
-                    case Value.ArrVal(elements) => {
-                        println("[" + elements.map(v => v match {
-                            case Value.IntVal(n)  => n.toString
-                            case Value.StrVal(s)  => "\"" + s + "\""
-                            case Value.BoolVal(b) => b.toString
-                            case _ => "?"
-                        }).mkString(", ") + "]")
-                    }
-                    case Value.RefVal(name,_) => println(s"Ref($name)")
-                }
+                println(getPrettyPrint(evalExpr(value, store)))
             }
             case Cmd.PdCall(name, args) => {
                 val function = fnEnv.lookupPd(name)
