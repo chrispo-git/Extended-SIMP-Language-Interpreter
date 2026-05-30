@@ -1,0 +1,192 @@
+// Graph implementation using adjacency lists
+// Nodes are structs, edges are arrays of node references
+
+struct Graph {
+    nodes: Int[],
+    edges: Int[][]
+}
+
+struct Queue {
+    data: Int[],
+    front: Int,
+    back: Int
+}
+
+// Queue operations
+fn makeQueue() -> Queue {
+    return Queue { data: [], front: 0, back: 0 };
+}
+
+fn enqueue(q: Queue, val: Int) -> Queue {
+    q.data[q.back] := val;
+    q.back := q.back + 1;
+    return q;
+}
+
+fn dequeue(q: Queue) -> Int {
+    val := q.data[q.front];
+    q.front := q.front + 1;
+    return val;
+}
+
+fn queueEmpty(q: Queue) -> Bool {
+    return q.front == q.back;
+}
+
+// Graph operations
+fn makeGraph(size: Int) -> Graph {
+    nodes := [];
+    edges := [];
+    i := 0;
+    while !i < size do {
+        nodes[!i] := !i;
+        edges[!i] := [];
+        i += 1;
+    };
+    return Graph { nodes: nodes, edges: edges };
+}
+
+fn addEdge(g: Graph, from: Int, to: Int) -> Graph {
+    edges := g.edges;
+    row := edges[!from];
+    row[len(row)] := !to;
+    edges[!from] := row;
+    g.edges := edges;
+    return g;
+}
+
+fn bfs(g: Graph, start: Int) -> Void {
+    size := len(g.nodes);
+    visited := [];
+    i := 0;
+    while !i < size do {
+        visited[!i] := false;
+        i += 1;
+    };
+
+    q := makeQueue();
+    q := enqueue(q, start);
+    visited[start] := true;
+
+    print "BFS traversal from node " + start + ":";
+
+    while ¬queueEmpty(q) do {
+        node := dequeue(q);
+        print "Visiting node: " + !node;
+
+        neighbours := g.edges[!node];
+        j := 0;
+        while !j < len(neighbours) do {
+            neighbour := neighbours[!j];
+            if ¬visited[!neighbour] then {
+                visited[!neighbour] := true;
+                q := enqueue(q, !neighbour);
+            };
+            j += 1;
+        };
+    };
+}
+
+fn dfs(g: Graph, node: Int, visited: Bool[]) -> Void {
+    visited[!node] := true;
+    print "Visiting node: " + !node;
+
+    neighbours := g.edges[!node];
+    i := 0;
+    while !i < len(neighbours) do {
+        neighbour := neighbours[!i];
+        if ¬visited[!neighbour] then {
+            _ := dfs(g, !neighbour, visited);
+        };
+        i += 1;
+    };
+}
+
+fn hasCycle(g: Graph) -> Bool {
+    size := len(g.nodes);
+    visited := [];
+    i := 0;
+    while !i < size do {
+        visited[!i] := false;
+        i += 1;
+    };
+
+    fn dfsCheck(node: Int, parent: Int) -> Bool {
+        visited[!node] := true;
+        neighbours := g.edges[!node];
+        j := 0;
+        while !j < len(neighbours) do {
+            neighbour := neighbours[!j];
+            if ¬visited[!neighbour] then {
+                if dfsCheck(!neighbour, !node) then {
+                    return true;
+                };
+            } elif !neighbour != !parent then {
+                return true;
+            };
+            j += 1;
+        };
+        return false;
+    };
+
+    i := 0;
+    while !i < size do {
+        if ¬visited[!i] then {
+            if dfsCheck(!i, -1) then {
+                return true;
+            };
+        };
+        i += 1;
+    };
+    return false;
+}
+
+// Build a graph with 5 nodes
+//     0
+//    / \
+//   1   2
+//  / \   \
+// 3   4   (back to 0)
+
+g := makeGraph(5);
+g := addEdge(g, 0, 1);
+g := addEdge(g, 0, 2);
+g := addEdge(g, 1, 3);
+g := addEdge(g, 1, 4);
+g := addEdge(g, 2, 0);  // creates a cycle
+
+print "=== Graph Traversal ===";
+_ := bfs(g, 0);
+
+print "";
+print "=== DFS Traversal ===";
+size := len(g.nodes);
+visited := [];
+i := 0;
+while !i < size do {
+    visited[!i] := false;
+    i += 1;
+};
+_ := dfs(g, 0, visited);
+
+print "";
+print "=== Cycle Detection ===";
+if hasCycle(g) then {
+    print "Graph contains a cycle";
+} else {
+    print "Graph is acyclic";
+};
+
+// Build an acyclic graph
+print "";
+print "=== Acyclic Graph ===";
+g2 := makeGraph(4);
+g2 := addEdge(g2, 0, 1);
+g2 := addEdge(g2, 0, 2);
+g2 := addEdge(g2, 1, 3);
+
+if hasCycle(g2) then {
+    print "Graph contains a cycle";
+} else {
+    print "Graph is acyclic";
+};
