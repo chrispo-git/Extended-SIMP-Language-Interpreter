@@ -1,4 +1,4 @@
-pd sumTo(n : Int) -> Int {
+fn sumTo(n : Int) -> Void {
     acc := 0;
     i := 1;
     while !i <= !n do {
@@ -8,4 +8,4 @@ pd sumTo(n : Int) -> Int {
     print "Sum is:" + !acc;
 }
 
-call sumTo(100);
+_ := sumTo(100);

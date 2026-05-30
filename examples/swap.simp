@@ -1,10 +1,10 @@
-pd swap(a: ref Int, b: ref Int) {
+fn swap(a: ref Int, b: ref Int) -> Void {
     tmp := !a;
     a := !b;
     b := !tmp;
 }
 
-pd increment(x: ref Int) {
+fn increment(x: ref Int) -> Void {
     x := !x + 1;
 }
 
@@ -12,9 +12,9 @@ x := 10;
 y := 20;
 print "We're starting with x:=" + !x + " and y:=" + !y;
 print "Swapping them.";
-call swap(x, y);
+_ := swap(x, y);
 print "Now we have x:=" + !x + " and y:=" + !y;
 
 print "Incrementing x.";
-call increment(x);
+_ := increment(x);
 print "Now we have x:=" + !x + " and y:=" + !y;

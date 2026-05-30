@@ -193,9 +193,7 @@ class Lexer(source: String):
             case ':' if peekNext() == ':' => {advanceN(2);Token.DoubleColon} 
 
             case x if isWordMatch("fn") => {advanceUntilNextWord(); Token.Fn} 
-            case x if isWordMatch("pd") => {advanceUntilNextWord(); Token.Pd} 
             case x if isWordMatch("return") => {advanceUntilNextWord(); Token.Return} 
-            case x if isWordMatch("call") => {advanceUntilNextWord(); Token.Call} 
             case ',' => {advance();Token.Comma} 
 
             case x if isWordMatch("struct") => { advanceUntilNextWord(); Token.Struct }
@@ -215,8 +213,8 @@ class Lexer(source: String):
             case x if isWordMatch("Int")  => {advanceUntilNextWord(); Token.TypeInt}
             case x if isWordMatch("Str")  => {advanceUntilNextWord(); Token.TypeString}
             case x if isWordMatch("Bool") => {advanceUntilNextWord(); Token.TypeBool}
+            case x if isWordMatch("Void") => {advanceUntilNextWord(); Token.TypeNull}
 
-            case x if isWordMatch("ref") => { advanceUntilNextWord(); Token.Ref }
 
             case x if isWordMatch("print") => {advanceUntilNextWord(); Token.Print}
 

@@ -34,6 +34,7 @@ enum Value:
   case RefVal(loc: String, store: Store)
   case ArrVal(elements: scala.collection.mutable.ArrayBuffer[Value])
   case StructVal(typeName: String, fields: scala.collection.mutable.Map[String, Value])
+  case NullVal
 
 /* Boolean Expressions can either be:
     - True
@@ -62,8 +63,7 @@ enum Cmd:
     case While(cond: BoolExpr, body: Cmd)
     case For(variable: String, iterable: Expr, body: Cmd)
     case Print(value: Expr)
-    case PdCall(name: String, args: List[Expr])
-    case Return(expr: Expr)
+    case Return(expr: Option[Expr] = None)
     case ArrAssign(arr: String, index: Expr, value: Expr)
     case FieldAssign(loc: String, field: String, value: Expr)
     case Continue
@@ -78,7 +78,6 @@ enum Program:
 
 enum Decl:
   case FnDecl(name: String, params: List[(String, SimpType)], body: Cmd, returnType: SimpType)
-  case PdDecl(name: String, params: List[(String, SimpType)], body: Cmd)
   case StructDecl(name: String, fields: List[(String, SimpType)])
   case ImportDecl(path: String, alias: String)
 
@@ -86,10 +85,11 @@ enum SimpType:
     case TypeInt
     case TypeString
     case TypeBool 
+    case TypeNull
     case TypeRef(inner: SimpType)
     case TypeArr(inner: SimpType)
     case TypeStruct(name: String)
 
-case class ReturnException(value: Value) extends Exception
+case class ReturnException(value: Option[Value] = None) extends Exception
 case class BreakException() extends Exception
 case class ContinueException() extends Exception

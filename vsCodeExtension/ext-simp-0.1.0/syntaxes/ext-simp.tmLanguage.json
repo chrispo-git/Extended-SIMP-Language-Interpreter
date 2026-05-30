@@ -42,7 +42,7 @@
 
     "keywords-declaration": {
       "name": "storage.modifier.ext-simp",
-      "match": "\\b(fn|pd|struct)\\b"
+      "match": "\\b(fn|struct)\\b"
     },
 
     "types": {
@@ -51,11 +51,6 @@
           "comment": "array types like Int[], Str[], Bool[]",
           "name": "storage.type.ext-simp",
           "match": "\\b(Int|Str|Bool|Void)(?=\\s*\\[\\])"
-        },
-        {
-          "comment": "ref modifier",
-          "name": "storage.modifier.ext-simp",
-          "match": "\\bref\\b"
         },
         {
           "comment": "primitive types",

@@ -46,9 +46,7 @@ enum Token:
     case EOF 
 
     case Fn 
-    case Pd 
     case Return 
-    case Call
     case Comma
 
     case PlusEq 
@@ -61,6 +59,7 @@ enum Token:
     case TypeInt
     case TypeBool
     case TypeString
+    case TypeNull
     case Arrow
     case Colon
 

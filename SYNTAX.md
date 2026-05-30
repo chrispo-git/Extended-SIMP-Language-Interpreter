@@ -9,7 +9,7 @@ Program ::= (Cmd | Decl)*
 
 ### Values
 Expressions produce a value in 3 categories:
-- Base type - `Int`, `Str`, `Bool`
+- Primitive type - `Int`, `Str`, `Bool`
 - Structs
 - Array Type - `Int[]`, `Str[]`, `Bool[]`, `Struct[]`,
 
@@ -24,25 +24,22 @@ Expressions produce a value in 3 categories:
 ---
 
 ### Declarations
-Declarations come in 4 forms, declaring functions, declaring procedures, declaring structs, and imports.
+Declarations come in 3 forms, declaring functions, declaring structs, and imports.
 
 ```
 Decl ::= fn f(x₀ : t₀, x₁ : t₁, ...) -> t { Cmd }  
-        | pd p(x₀ : t₀, x₁ : t₁, ...) { Cmd } 
         | struct S { f₀ : t₀, f₁ : t₁, ... } 
         | import "F"
         | import "F" as A
 where x₀, x₁, ... are parameter names (locations)
-where t, t₀, t₁, ... are parameter types (One of Str, Int, Bool, Int[], Str[], Bool[], Struct, or Struct[])
+where t, t₀, t₁, ... are parameter types (One of Str, Int, Bool, Int[], Str[], Bool[], Struct, Struct[], or Void)
 where f₀, f₁, ... are field names
 where F is the path of a file, and A is an optional alias
 ```
 
 - Functions `fn` return a value and are treated as expressions
-- Procedures `pd` don't return a value and are treated as commands
-- All parameters for functions are passed by value
-- Parameters in procedures can be passed in by reference by the keyword `ref` and their type within the procedure header. By default it is by value.
-- Scoping is lexical, functions/procedures cannot see the caller's variables
+- primitives for functions are passed by value, arrays and structs are passed by reference
+- Scoping is lexical, functions cannot see the caller's variables
 - Declarations from imported files are accessible via `A::name` syntax
 - If no alias is given, the filename without extension is used as the namespace
 - Importing the same file with the same alias twice is ignored
@@ -71,7 +68,6 @@ Cmd ::= skip                                -- no-op
       | break                            -- breaks loop
       | continue                            -- continues loop
       | print E                            -- print any expression
-      | call p(E₀, E₁, ...)               -- procedure call
       | return E                           -- return from function
       | l.f := E                                 -- field assignment (write)
 ```
@@ -237,7 +233,7 @@ print "flags equal: " + !result;
 
 #### Arrays
 ```
-pd reverseArr(a: Int[]) {
+fn reverseArr(a: Int[]) -> Void {
     i := 0;
     j := len(a) - 1;
     while !i < !j do {
@@ -251,6 +247,6 @@ pd reverseArr(a: Int[]) {
 
 nums := [1, 2, 3, 4, 5];
 print nums;
-call reverseArr(nums);
+_ := reverseArr(nums);
 print nums;
 ```

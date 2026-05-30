@@ -321,17 +321,6 @@ class EvaluatorTest extends AnyFunSuite:
     )
   }
 
-  // Procedures
-  test("procedure modifies nothing in caller store") {
-    val store = run("pd noop(n : Int) { n := 99; } x := 5 ; call noop(!x);")
-    assert(store.load("x") == Value.IntVal(5))
-  }
-
-  test("procedure call with side effects") {
-    val store = run("pd setY(n : Int) { y := !n; } call setY(42);")
-    // y only exists in localStore, not in caller store
-    assertThrows[RuntimeException](store.load("y"))
-  }
 
   // Comments
   test("comment is ignored") {
@@ -390,12 +379,6 @@ class EvaluatorTest extends AnyFunSuite:
       assert(store.load("sum") == Value.IntVal(15))
   }
 
-  test("array mutation in procedure propagates to caller") {
-      val store = run(
-          "pd double(a: Int[]) { i := 0; while !i < len(a) do { a[!i] := a[!i] * 2; i += 1; }; } nums := [1, 2, 3]; call double(nums);"
-      )
-      assert(store.load("nums") == Value.ArrVal(scala.collection.mutable.ArrayBuffer(Value.IntVal(2), Value.IntVal(4), Value.IntVal(6))))
-  }
 
   test("array of strings") {
       val store = run("arr := [\"hello\", \"world\"]; x := arr[0];")
