@@ -3,6 +3,17 @@ package simp
 import scala.io.Source._
 
 object Builtins:
+
+    private def getTypeName(value: Value): String = value match {
+        case Value.IntVal(_)  => "Int"
+        case Value.StrVal(_)  => "Str"
+        case Value.BoolVal(_) => "Bool"
+        case Value.StructVal(typeName, _) => typeName
+        case Value.RefVal(loc, refStore)  => s"ref ${getTypeName(refStore.load(loc))}"
+        case Value.ArrVal(elements) =>
+            if elements.isEmpty then "Unknown[]"
+            else s"${getTypeName(elements.head)}[]"
+    }
     def register(fnEnv: FunctionEnv): Unit = {
         // len - Length of a String or Array
         fnEnv.registerBuiltin("len", args => args match {
@@ -304,5 +315,10 @@ object Builtins:
                 } catch case e: Exception => Value.BoolVal(false)
             }
             case _ => throw RuntimeException("writeFile expects a filepath and an array of strings")
+        })
+
+        fnEnv.registerBuiltin("typeOf", args => args match {
+            case List(value) => Value.StrVal(getTypeName(value))
+            case _ => throw RuntimeException("typeOf expects exactly one argument")
         })
     }
