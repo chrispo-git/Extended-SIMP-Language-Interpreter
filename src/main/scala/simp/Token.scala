@@ -80,3 +80,5 @@ enum Token:
     case Import 
     case As 
     case DoubleColon
+
+    case Null

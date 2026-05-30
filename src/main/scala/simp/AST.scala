@@ -20,6 +20,7 @@ enum Expr:
     case ArrIndex(arr: Expr, index: Expr)
     case StructLiteral(typeName: String, fields: List[(String, Expr)]) 
     case FieldAccess(expr: Expr, field: String) 
+    case Null
 
 // Operators allowed - Add, Sub, Mul, Div, Mod
 enum Op:

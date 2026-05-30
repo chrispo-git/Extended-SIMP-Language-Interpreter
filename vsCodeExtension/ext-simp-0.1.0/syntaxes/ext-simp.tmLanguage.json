@@ -15,7 +15,8 @@
     { "include": "#struct-literal" },
     { "include": "#operators" },
     { "include": "#punctuation" },
-    { "include": "#variables" }
+    { "include": "#variables" },
+    { "include": "#null" }
   ],
   "repository": {
     "comments": {
@@ -73,6 +74,11 @@
     "numbers": {
       "name": "constant.numeric.integer.ext-simp",
       "match": "-?\\b[0-9]+\\b"
+    },
+
+    "null": {
+        "name": "constant.language.null.ext-simp",
+        "match": "\\bnull\\b"
     },
 
     "namespace-call": {

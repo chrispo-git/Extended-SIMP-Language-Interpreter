@@ -1,0 +1,15 @@
+struct Node {
+    value: Int,
+    next: Node
+}
+
+head := Node { value: 1, next: null };
+head := Node { value: 2, next: head };
+head := Node { value: 3, next: head };
+
+// traverse the list
+current := head;
+while ¬isNull(current) do {
+    print current.value;
+    current := current.next;
+};
