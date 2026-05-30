@@ -53,11 +53,6 @@
           "match": "\\b(Int|Str|Bool|Void)(?=\\s*\\[\\])"
         },
         {
-          "comment": "ref modifier",
-          "name": "storage.modifier.ext-simp",
-          "match": "\\bref\\b"
-        },
-        {
           "comment": "primitive types",
           "name": "storage.type.ext-simp",
           "match": "\\b(Int|Str|Bool|Void)\\b"

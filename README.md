@@ -90,7 +90,6 @@ A VS Code extension for SIMP+ syntax highlighting is available [here](vsCodeExte
 - First-class functions with explicit `return`
 - Typed Functions & Procedures
 - Void procedures with `call` syntax
-- Optional Passing by Reference in Procedures
 - Recursive functions
 - Lexical scoping with pass-by-value-semantics
 - Separate function environment from variable store
