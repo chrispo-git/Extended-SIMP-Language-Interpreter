@@ -360,15 +360,22 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
         }
     }
 
-    private def getPrettyPrint(value: Value): String = {
+    private def getPrettyPrint(value: Value, visited: Set[AnyRef] = Set()): String = {
         value match {
             case Value.StrVal(s) => s
             case Value.IntVal(n) => n.toString
             case Value.BoolVal(b) => b.toString
             case Value.NullVal => "null"
             case Value.RefVal(name,_) => s"Ref($name)"
-            case Value.StructVal(typeName, fields) => s"$typeName { ${fields.map((k,v) => s"$k: ${getPrettyPrint(v)}").mkString(", ")} }"
-            case Value.ArrVal(elements) => "[" + elements.map(v => getPrettyPrint(v)).mkString(", ") + "]"
+            case Value.StructVal(typeName, fields) => {
+                if visited.contains(fields) then {
+                    s"$typeName { ... }"
+                } else {
+                    val newVisited = visited + fields
+                    s"$typeName { ${fields.map((k,v) => s"$k: ${getPrettyPrint(v, newVisited)}").mkString(", ")} }"
+                }
+            }
+            case Value.ArrVal(elements) => "[" + elements.map(v => getPrettyPrint(v, visited)).mkString(", ") + "]"
         }
     }
 

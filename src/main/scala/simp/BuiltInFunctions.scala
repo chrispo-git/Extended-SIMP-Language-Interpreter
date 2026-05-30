@@ -15,13 +15,20 @@ object Builtins:
             else s"${getTypeName(elements.head)}[]"
         case Value.NullVal => "Null"
     }
-    private def deepCopyValue(value: Value): Value = value match {
+    private def deepCopyValue(value: Value, visited: Set[AnyRef] = Set()): Value = value match {
         case Value.IntVal(_)  => value 
         case Value.StrVal(_)  => value
         case Value.BoolVal(_) => value
         case Value.NullVal    => value
-        case Value.ArrVal(elements) => Value.ArrVal(scala.collection.mutable.ArrayBuffer.from(elements.map(deepCopyValue)))
-        case Value.StructVal(typeName, fields) => Value.StructVal(typeName, scala.collection.mutable.Map(fields.map((k, v) => k -> deepCopyValue(v)).toSeq*))
+        case Value.ArrVal(elements) => Value.ArrVal(scala.collection.mutable.ArrayBuffer.from(elements.map(e => deepCopyValue(e, visited))))
+        case Value.StructVal(typeName, fields) => {
+            if visited.contains(fields) then {
+                throw RuntimeException("deepCopy doesn't support Cyclical references")
+            } else {
+                val newVisisted = visited + fields
+                Value.StructVal(typeName, scala.collection.mutable.Map(fields.map((k, v) => k -> deepCopyValue(v, newVisisted)).toSeq*))
+            }  
+        }
         case Value.RefVal(loc, refStore) => Value.RefVal(loc, refStore)
     }
     def register(fnEnv: FunctionEnv): Unit = {

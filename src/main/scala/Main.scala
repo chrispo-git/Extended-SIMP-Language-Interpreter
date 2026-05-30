@@ -3,6 +3,9 @@ package simp
 import scala.io.Source
 import java.io.FileNotFoundException
 
+val RED = "\u001b[31m"
+val RESET = "\u001b[0m"
+
 def startRepl(store: Store, fnEnv: FunctionEnv, structEnv: StructEnv): Unit = {
     println("SIMP REPL - type 'exit' to quit")
     val evaluator = Evaluator(fnEnv, structEnv)
@@ -39,7 +42,7 @@ def startRepl(store: Store, fnEnv: FunctionEnv, structEnv: StructEnv): Unit = {
                 val programs = Parser(tokens, structEnv).parseRepl()
                 evaluator.evalProgram(programs, store)
             } catch {
-                case e: RuntimeException => println(s"Error: ${e.getMessage}")
+                case e: RuntimeException => println(s"[${RED}Error${RESET}]  ${e.getMessage}")
             }
             input = ""
         }
@@ -67,6 +70,10 @@ def startRepl(store: Store, fnEnv: FunctionEnv, structEnv: StructEnv): Unit = {
         val currentDir = file.getParentFile.getAbsolutePath
         val tokens = Lexer(source).tokenise()
         val program = Parser(tokens, structEnv).parseProgram()
-        Evaluator(fnEnv, structEnv, currentDir).evalProgram(program, store)
+        try {
+            Evaluator(fnEnv, structEnv, currentDir).evalProgram(program, store)
+        } catch {
+            case e: RuntimeException => println(s"[${RED}Error${RESET}] ${e.getMessage}")
+        }
     }
 }
