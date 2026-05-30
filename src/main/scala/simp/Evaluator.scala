@@ -9,7 +9,6 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
     def evalProgram(program: List[Program], store: Store): Unit = {
         program.foreach(p => p match {
             case Program.PDecl(Decl.FnDecl(name, params, body, returnType)) => fnEnv.registerFn(name, Decl.FnDecl(name, params, body, returnType))
-            case Program.PDecl(Decl.PdDecl(name, params, body)) => fnEnv.registerPd(name, Decl.PdDecl(name, params, body))
             case Program.PDecl(Decl.ImportDecl(path, alias)) => processImport(path, alias, cwd, store)
             case Program.PDecl(Decl.StructDecl(name, fields)) => structEnv.register(name, StructDef(fields))
             case Program.PCmd(cmd) => execCmd(cmd, store)
@@ -41,17 +40,12 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
 
         val declaredNames = program.collect {
             case Program.PDecl(Decl.FnDecl(name, _, _, _)) => name
-            case Program.PDecl(Decl.PdDecl(name, _, _)) => name
         }.toSet
 
         program.foreach(p => p match {
             case Program.PDecl(Decl.FnDecl(name, params, body, returnType)) => {
                 val qualifiedBody = qualifyBody(body, alias, declaredNames)
                 fnEnv.registerFn(s"$alias::$name", Decl.FnDecl(s"$alias::$name", params, qualifiedBody, returnType))
-            }
-            case Program.PDecl(Decl.PdDecl(name, params, body)) => {
-                val qualifiedBody = qualifyBody(body, alias, declaredNames)
-                fnEnv.registerPd(s"$alias::$name", Decl.PdDecl(s"$alias::$name", params, qualifiedBody))
             }
             case Program.PDecl(Decl.ImportDecl(path, alias)) => {
                 val importDir = File(fullPath).getParentFile.getAbsolutePath
@@ -70,7 +64,7 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
         case Cmd.Seq(a, b) => Cmd.Seq(qualifyBody(a, alias, declaredNames), qualifyBody(b, alias, declaredNames))
         case Cmd.If(cond, t, e) => Cmd.If(cond, qualifyBody(t, alias, declaredNames), qualifyBody(e, alias, declaredNames))
         case Cmd.While(cond, body) => Cmd.While(cond, qualifyBody(body, alias, declaredNames))
-        case Cmd.Return(expr) => Cmd.Return(qualifyExpr(expr, alias, declaredNames))
+        case Cmd.Return(Some(expr)) => Cmd.Return(Some(qualifyExpr(expr, alias, declaredNames)))
         case Cmd.Assign(loc, expr) => Cmd.Assign(loc, qualifyExpr(expr, alias, declaredNames))
         case other => other
     }
@@ -114,6 +108,7 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
             case Value.IntVal(_)  => SimpType.TypeInt
             case Value.StrVal(_)  => SimpType.TypeString
             case Value.BoolVal(_) => SimpType.TypeBool
+            case Value.NullVal => SimpType.TypeNull
             case Value.RefVal(loc, refStore) => refStore.load(loc) match {
                 case Value.IntVal(_)  => SimpType.TypeInt
                 case Value.StrVal(_)  => SimpType.TypeString
@@ -141,6 +136,7 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
                         }
                     }
                 }
+                case _ => throw RuntimeException("Type resolving failed") 
             }
             case Value.ArrVal(elements) => {
                 if elements.isEmpty then SimpType.TypeArr(SimpType.TypeInt)
@@ -151,7 +147,7 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
                     case Value.StructVal(typeName, _) => SimpType.TypeArr(SimpType.TypeStruct(typeName))
                     case Value.ArrVal(e) => SimpType.TypeArr(getType(e.head))
                     case Value.RefVal(loc, refStore) => SimpType.TypeArr(getType(Value.RefVal(loc, refStore)))
-                    case null => throw RuntimeException("Type resolving failed")
+                    case _ => throw RuntimeException("Type resolving failed")
                 }
             }
             case Value.StructVal(typeName, _) => SimpType.TypeStruct(typeName)
@@ -324,11 +320,26 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
                         val localStore = populateStore(function.params, args, store)
                         try {
                             execCmd(function.body, localStore)
-                            throw RuntimeException(s"Function '$name' has no return statement")
+                            if function.returnType != SimpType.TypeNull then {
+                                throw RuntimeException(s"Function '$name' has no return statement")
+                            } else {
+                                Value.NullVal
+                            }
                         } catch {
-                            case ReturnException(value) => {
-                                checkType(value, function.returnType, s"return value of '$name'")
-                                value
+                            case ReturnException(Some(value)) => {
+                                if function.returnType != SimpType.TypeNull then {
+                                    checkType(value, function.returnType, s"return value of '$name'")
+                                    value
+                                } else {
+                                    throw RuntimeException(s"Function '$name' has invalid return statement")
+                                }
+                            }
+                            case ReturnException(None) => {
+                                if function.returnType == SimpType.TypeNull then {
+                                    Value.NullVal
+                                } else {
+                                    throw RuntimeException(s"Function '$name' has invalid return statement")
+                                }
                             }
                         }
                     }
@@ -430,12 +441,8 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
             case Cmd.Print(value) => {
                 println(getPrettyPrint(evalExpr(value, store)))
             }
-            case Cmd.PdCall(name, args) => {
-                val function = fnEnv.lookupPd(name)
-                val localStore = populateStore(function.params, args, store)
-                execCmd(function.body, localStore)
-            }
-            case Cmd.Return(expr) => throw ReturnException(evalExpr(expr, store))
+            case Cmd.Return(None) => throw ReturnException(None)
+            case Cmd.Return(Some(expr)) => throw ReturnException(Some(evalExpr(expr, store)))
             case Cmd.Continue => throw ContinueException()
             case Cmd.Break => throw BreakException()
 

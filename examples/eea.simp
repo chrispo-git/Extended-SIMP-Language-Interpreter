@@ -24,7 +24,7 @@ fn bezoutY(a : Int, b : Int) -> Int {
     };
 }
 
-pd printExtGcd(a : Int, b : Int) {
+fn printExtGcd(a : Int, b : Int) -> Void {
     g := gcd(!a, !b);
     x := bezoutX(!a, !b);
     y := bezoutY(!a, !b);
@@ -41,8 +41,8 @@ pd printExtGcd(a : Int, b : Int) {
 
 print "=== Extended Euclidean Algorithm ===";
 
-call printExtGcd(35, 15);
-call printExtGcd(48, 18);
-call printExtGcd(100, 75);
-call printExtGcd(17, 13);
-call printExtGcd(1071, 462);
+_ := printExtGcd(35, 15);
+_ := printExtGcd(48, 18);
+_ := printExtGcd(100, 75);
+_ := printExtGcd(17, 13);
+_ := printExtGcd(1071, 462);

@@ -13,6 +13,16 @@ object Builtins:
         case Value.ArrVal(elements) =>
             if elements.isEmpty then "Unknown[]"
             else s"${getTypeName(elements.head)}[]"
+        case Value.NullVal => "Null"
+    }
+    private def deepCopyValue(value: Value): Value = value match {
+        case Value.IntVal(_)  => value 
+        case Value.StrVal(_)  => value
+        case Value.BoolVal(_) => value
+        case Value.NullVal    => value
+        case Value.ArrVal(elements) => Value.ArrVal(scala.collection.mutable.ArrayBuffer.from(elements.map(deepCopyValue)))
+        case Value.StructVal(typeName, fields) => Value.StructVal(typeName, scala.collection.mutable.Map(fields.map((k, v) => k -> deepCopyValue(v)).toSeq*))
+        case Value.RefVal(loc, refStore) => Value.RefVal(loc, refStore)
     }
     def register(fnEnv: FunctionEnv): Unit = {
         // len - Length of a String or Array
@@ -320,5 +330,10 @@ object Builtins:
         fnEnv.registerBuiltin("typeOf", args => args match {
             case List(value) => Value.StrVal(getTypeName(value))
             case _ => throw RuntimeException("typeOf expects exactly one argument")
+        })
+
+        fnEnv.registerBuiltin("deepCopy", args => args match {
+            case List(value) => deepCopyValue(value)
+            case _ => throw RuntimeException("deepCopy expects exactly one argument")
         })
     }

@@ -9,7 +9,7 @@ SIMP is a simple imperative language covered in the textbook [Programming Langua
 The full Grammar in BNF is available [here](SYNTAX.md), but here is some example code:
 
 ```
-pd fizzbuzz(n : Int) {
+fn fizzbuzz(n : Int) -> Void {
     i := 1;
     while !i <= !n do {
         if !i % 3 == 0 && !i % 5 == 0 then {
@@ -24,7 +24,7 @@ pd fizzbuzz(n : Int) {
         i += 1;
     };
 }
-call fizzbuzz(30);
+_ := fizzbuzz(30);
 ```
 
 ## Getting Started
@@ -89,7 +89,7 @@ A VS Code extension for SIMP+ syntax highlighting is available [here](vsCodeExte
 ### Functions & Procedures
 - First-class functions with explicit `return`
 - Typed Functions & Procedures
-- Void procedures with `call` syntax
+- Void functions
 - Recursive functions
 - Lexical scoping with pass-by-value-semantics
 - Separate function environment from variable store
@@ -133,7 +133,14 @@ Implementing lexical scoping for recursive functions allowed me to delve deeper 
 Initially, this project was implemented with Int being the only type that could be stored within memory, akin to base SIMP. I later decided this was too limiting for many use cases, and thus went off and reworked the codebase to allow for storing Strings and Bools, along with how to handle them. This required adjustments to practically every facet of the project, including moving away from handling raw Integers and Booleans until the very end, treating Strings & Booleans like expressions at points, and transitioning away from the previous Printable enum for print to using the more robust enum Value for all aspects including print. This took some effort, but as a whole makes adding more types a matter of extending the Value Enum rather than a full rearchitecture of the system.
 
 ### Implementing Built-In Functions
-Unlike user-defined functions, these built-in functions are registered in a separate environment, and are handled with a scala implementation of the function. The reason I went with this method is manually reimplementing them all in SIMP individually would be brittle, as the language was still evolving. In the process of adding these built-in functions, I had to decide which functions would both be invaluable to have and reasonable to expect in the standard library, I landed on [32 of them](BUILT-IN-FUNCTIONS.md). These functions should cover many basic use cases of the language and make it more friendly to end-users of the language.
+Unlike user-defined functions, these built-in functions are registered in a separate environment, and are handled with a scala implementation of the function. The reason I went with this method is manually reimplementing them all in SIMP individually would be brittle, as the language was still evolving. In the process of adding these built-in functions, I had to decide which functions would both be invaluable to have and reasonable to expect in the standard library, I landed on [33 of them](BUILT-IN-FUNCTIONS.md). These functions should cover many basic use cases of the language and make it more friendly to end-users of the language.
 
 ### Implementing Import system
 This was difficult for one big reason - what if the file you're importing calls one of it's own functions within itself? This is far too common to be ignored, and therefore required dynamically rewriting it in the Evaluator during the process of the import. This ended up requiring me to check for any possible area where a function could be called, and rewrite it to the alias being used by the importing program (e.g. myMathLib::factorial(n - 1) ). This isn't the best solution, really it should be using module namespaces to handle this correctly, but it's still fairly usable, somewhat like a C #include but with less namespace pollution by default. This is more so a pragmatic choice in implementing imports than the theoretical best one, but it still correctly handles circular imports, implements aliases well, and provides clean namespace separation between files. If I were to expand on this it would likely involve actually introducing modules rather than simply a flat file import system.
+
+### References & Aliasing
+An early design goal of ExtSimp was the choice to distinguish between pure functions and side-effecting procedures (which would have variables passed by reference via the `ref` keyword). During testing, however, I discovered that arrays and structs could still be mutated within functions because assignment was shallow in the evaluator. This meant the language didn't actually enforce the separation of mutability between functions and procedures. 
+
+Rather than introducing pervasive deep copying, I instead decided to simplify the syntax of the language. To do so, I chose to remove both the `ref` keyword and procedures, instead introducing the ability for functions to return `Void`, so that side-effect-oriented operations could still be expressed cleanly.
+
+This redesign highlighted the need for explicit control over aliasing. To allow users to create deep copies themselve, I introduced the `deepCopy` built-in function, which recursively clones composite values while leaving the default reference semantics unchanged.

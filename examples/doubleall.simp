@@ -1,4 +1,4 @@
-pd doubleAll(a: Int[]) {
+fn doubleAll(a: Int[]) -> Void {
     i := 0;
     while !i < len(a) do {
         a[!i] := a[!i] * 2;
@@ -8,5 +8,5 @@ pd doubleAll(a: Int[]) {
 
 nums := [1, 2, 3, 4, 5];
 print nums;
-call doubleAll(nums);
+_ := doubleAll(nums);
 print nums;

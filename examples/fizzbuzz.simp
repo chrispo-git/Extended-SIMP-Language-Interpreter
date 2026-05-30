@@ -1,4 +1,4 @@
-pd fizzbuzz(n : Int) {
+fn fizzbuzz(n : Int) -> Void {
     i := 1;
     while !i <= !n do {
         if !i % 3 == 0 && !i % 5 == 0 then {
@@ -14,4 +14,4 @@ pd fizzbuzz(n : Int) {
     };
 }
 
-call fizzbuzz(30);
+_ := fizzbuzz(30);

@@ -68,7 +68,6 @@ Cmd ::= skip                                -- no-op
       | break                            -- breaks loop
       | continue                            -- continues loop
       | print E                            -- print any expression
-      | call p(E₀, E₁, ...)               -- procedure call
       | return E                           -- return from function
       | l.f := E                                 -- field assignment (write)
 ```
@@ -234,7 +233,7 @@ print "flags equal: " + !result;
 
 #### Arrays
 ```
-pd reverseArr(a: Int[]) {
+fn reverseArr(a: Int[]) -> Void {
     i := 0;
     j := len(a) - 1;
     while !i < !j do {
@@ -248,6 +247,6 @@ pd reverseArr(a: Int[]) {
 
 nums := [1, 2, 3, 4, 5];
 print nums;
-call reverseArr(nums);
+_ := reverseArr(nums);
 print nums;
 ```

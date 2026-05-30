@@ -41,7 +41,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv):
         val items = scala.collection.mutable.ListBuffer[Program]()
         while !isAtEnd() && peek() != Token.EOF do {
             peek() match {
-                case Token.Fn | Token.Pd | Token.Struct | Token.Import => items += Program.PDecl(parseDecl())
+                case Token.Fn  | Token.Struct | Token.Import => items += Program.PDecl(parseDecl())
                 case _ => items += Program.PCmd(parseCmd())
             }
             while peek() == Token.Semicolon do {
@@ -56,7 +56,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv):
 
         while !isAtEnd() && peek() != Token.EOF do {
             val item = peek() match {
-                case Token.Fn | Token.Pd | Token.Struct | Token.Import => Program.PDecl(parseDecl())
+                case Token.Fn |  Token.Struct | Token.Import => Program.PDecl(parseDecl())
                 case Token.BoolLit(_) | Token.Not => Program.PBool(parseBool())
                 case Token.LiteralInt(_) | Token.Deref =>
                     val expr = parseExpr()
@@ -105,7 +105,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv):
     }
     private def parseCmd(): Cmd = {
         val left = peek() match {
-            case Token.Fn | Token.Pd | Token.Struct | Token.Import =>
+            case Token.Fn |  Token.Struct | Token.Import =>
                 throw RuntimeException("Declarations must be at the top of the file")
             case _ => parseSingleCmd()
         }
@@ -271,32 +271,12 @@ class Parser(tokens: List[Token], structEnv : StructEnv):
             }
             case Token.Return => {
                 advance()
-                val expr = parseExpr()
-                Cmd.Return(expr)
-            }
-            case Token.Call => {
-                advance()
                 peek() match {
-                    case Token.Variable(namespace) if peekNext() == Token.DoubleColon => {
-                        advance()
-                        advance()
-                        peek() match {
-                            case Token.Variable(name) if peekNext() == Token.OpenBracket => {
-                                advance()
-                                val args = parseArgs()
-                                Cmd.PdCall(s"$namespace::$name", args)
-                            }
-                            case x => throw RuntimeException(s"Expected procedure name, got '$x'")
-                        }
-                    }
-                    case Token.Variable(name) => {
-                        advance()
-                        val args = parseArgs()
-                        Cmd.PdCall(name, args)
-                    }
-                    case x => throw RuntimeException(s"Expected procedure name, got '$x'")
+                    case Token.Semicolon | Token.CloseBrace | Token.EOF => Cmd.Return(None)
+                    case _ => Cmd.Return(Some(parseExpr()))
                 }
             }
+            
             case x => throw RuntimeException(s"Unexpected '$x'")
         }
     }
@@ -359,6 +339,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv):
             }
             t
         }
+        case Token.TypeNull => {advance(); SimpType.TypeNull}
         case Token.Ref => {
             advance();
             val inner = parseType()
@@ -624,20 +605,6 @@ class Parser(tokens: List[Token], structEnv : StructEnv):
                     Decl.FnDecl(name, params, body, returnType)
                 }
                 case x => throw RuntimeException(s"Expected function name, got '$x'")
-            }
-        }
-        case Token.Pd => {
-            advance()
-            peek() match {
-                case Token.Variable(name) => {
-                    advance()
-                    val params = parseParams()
-                    expect(Token.OpenBrace)
-                    val body = parseCmd()
-                    expect(Token.CloseBrace)
-                    Decl.PdDecl(name, params, body)
-                }
-                case x => throw RuntimeException(s"Expected procedure name, got '$x'")
             }
         }
         case Token.Struct => {
