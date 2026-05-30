@@ -244,7 +244,9 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
         }
     }
     private def structsEqual(f1: scala.collection.mutable.Map[String, Value], f2: scala.collection.mutable.Map[String, Value], visited: Set[(AnyRef, AnyRef)] = Set()): Boolean = {
-        val pair = (f1, f2)
+        val id1 = System.identityHashCode(f1)
+        val id2 = System.identityHashCode(f2)
+        val pair = if id1 <= id2 then (f1, f2) else (f2, f1)
         if visited.contains(pair) then return true
         if f1.keySet != f2.keySet then return false
         val newVisited = visited + pair
