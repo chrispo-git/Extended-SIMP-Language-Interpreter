@@ -336,4 +336,9 @@ object Builtins:
             case List(value) => deepCopyValue(value)
             case _ => throw RuntimeException("deepCopy expects exactly one argument")
         })
+
+        fnEnv.registerBuiltin("isNull", args => args match {
+            case List(value) => Value.BoolVal(value == Value.NullVal)
+            case _ => throw RuntimeException("isNull expects one argument")
+        })
     }

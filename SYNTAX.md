@@ -8,10 +8,11 @@ Program ::= (Cmd | Decl)*
 ```
 
 ### Values
-Expressions produce a value in 3 categories:
+Expressions produce a value in 4 categories:
 - Primitive type - `Int`, `Str`, `Bool`
 - Structs
-- Array Type - `Int[]`, `Str[]`, `Bool[]`, `Struct[]`,
+- Array Type - `Int[]`, `Str[]`, `Bool[]`, `Struct[]`
+- Null Type - `null` 
 
 | Type | Examples |
 |------|---------|
@@ -20,6 +21,7 @@ Expressions produce a value in 3 categories:
 | `Bool` | `true`, `false` |
 | `Int[]`, `Str[]`, `Bool[]` | `[1, 2, 3]`, `["a", "b"]`, `[true, false]`, `[]` |
 | `StructName` | `Point { x: 1, y: 2 }` |
+| `null` | `null` |
 
 ---
 
@@ -98,6 +100,7 @@ E ::= n                                    -- integer literal (n ∈ ℤ)
     | E[E]                                     -- array index (read)
     | S { f₀: E₀, f₁: E₁, ... }              -- struct literal
     | E.f                                      -- field access (read)
+    | null                                      -- null value for non-primitive types
 ```
 
 #### Arithmetic Operators

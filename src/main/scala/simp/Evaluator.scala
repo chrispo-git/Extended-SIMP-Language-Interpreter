@@ -103,6 +103,10 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
         })
         localStore
     }
+    private def isNullable(t: SimpType): Boolean = t match {
+        case SimpType.TypeInt | SimpType.TypeString | SimpType.TypeBool => false
+        case _ => true
+    }
     private def getType(value: Value): SimpType = {
         value match {
             case Value.IntVal(_)  => SimpType.TypeInt
@@ -118,6 +122,7 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
                 case Value.ArrVal(elements) => {
                     if elements.isEmpty then SimpType.TypeArr(SimpType.TypeInt)
                     else elements.head match {
+                        case Value.NullVal => SimpType.TypeNull
                         case Value.IntVal(_) => SimpType.TypeArr(SimpType.TypeInt)
                         case Value.StrVal(_) => SimpType.TypeArr(SimpType.TypeString)
                         case Value.BoolVal(_) => SimpType.TypeArr(SimpType.TypeBool)
@@ -155,8 +160,14 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
     }
     private def checkType(value: Value, expected: SimpType, name: String): Unit = {
         val actual = getType(value);
-        if actual != expected then {
-            throw RuntimeException(s"Type mismatch for '$name': expected $expected, got $actual")
+        if actual == SimpType.TypeNull then {
+            if !isNullable(expected) then {
+                throw RuntimeException(s"'$name' of type $expected cannot be Null")
+            }
+        } else {
+            if actual != expected then {
+                throw RuntimeException(s"Type mismatch for '$name': expected $expected, got $actual")
+            }
         }
     }
     
@@ -228,6 +239,7 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
                     case v => v
                 }
             }
+            case Expr.Null => Value.NullVal
             case Expr.Str(s) => Value.StrVal(s)
             case Expr.Bool(b) => Value.BoolVal(b)
             case Expr.BoolLift(b) => Value.BoolVal(evalBool(b, store))
@@ -353,6 +365,7 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
             case Value.StrVal(s) => s
             case Value.IntVal(n) => n.toString
             case Value.BoolVal(b) => b.toString
+            case Value.NullVal => "null"
             case Value.RefVal(name,_) => s"Ref($name)"
             case Value.StructVal(typeName, fields) => s"$typeName { ${fields.map((k,v) => s"$k: ${getPrettyPrint(v)}").mkString(", ")} }"
             case Value.ArrVal(elements) => "[" + elements.map(v => getPrettyPrint(v)).mkString(", ") + "]"

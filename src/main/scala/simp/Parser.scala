@@ -508,6 +508,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv):
                 expect(Token.CloseBrace)
                 Expr.StructLiteral(name, fields)
             }
+            case Token.Null => { advance(); Expr.Null }
             case Token.Deref => {
                 advance()
                 val left = peek() match {
