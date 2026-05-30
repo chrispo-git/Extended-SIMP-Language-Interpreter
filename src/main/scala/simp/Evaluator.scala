@@ -233,8 +233,8 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
                     }
                     case (Value.StructVal(t1, f1), Value.StructVal(t2, f2)) => {
                         bop match {
-                            case Bop.Eq => t1 == t2 && f1 == f2
-                            case Bop.Neq => t1 != t2 || f1 != f2
+                            case Bop.Eq => t1 == t2 && structsEqual(f1, f2)
+                            case Bop.Neq => t1 != t2 || !structsEqual(f1, f2)
                             case x => throw RuntimeException(s"Unsupported operation '$x'")
                         }
                     }
@@ -243,7 +243,25 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
             }
         }
     }
-    
+    private def structsEqual(f1: scala.collection.mutable.Map[String, Value], f2: scala.collection.mutable.Map[String, Value], visited: Set[(AnyRef, AnyRef)] = Set()): Boolean = {
+        val pair = (f1, f2)
+        if visited.contains(pair) then return true
+        if f1.keySet != f2.keySet then return false
+        val newVisited = visited + pair
+        f1.forall((k, v1) => 
+            f2.get(k).exists(v2 => valuesEqual(v1, v2, newVisited))
+        )
+    }
+
+    private def valuesEqual(v1: Value, v2: Value, visited: Set[(AnyRef, AnyRef)]): Boolean = (v1, v2) match {
+        case (Value.IntVal(a), Value.IntVal(b))   => a == b
+        case (Value.StrVal(a), Value.StrVal(b))   => a == b
+        case (Value.BoolVal(a), Value.BoolVal(b)) => a == b
+        case (Value.NullVal, Value.NullVal)        => true
+        case (Value.ArrVal(a), Value.ArrVal(b))   => a.length == b.length && a.zip(b).forall((x, y) => valuesEqual(x, y, visited))
+        case (Value.StructVal(t1, f1), Value.StructVal(t2, f2)) => t1 == t2 && structsEqual(f1, f2, visited)
+        case _ => false
+    }
     private def evalExpr(expr: Expr, store: Store): Value = {
         expr match {
             case Expr.Num(n) => Value.IntVal(n)
