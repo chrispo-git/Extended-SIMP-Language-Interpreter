@@ -6,7 +6,7 @@ import org.scalatest.matchers.should.Matchers
 class LexerTest extends AnyFunSuite with Matchers {
 
   private def lex(input: String): List[Token] =
-    Lexer(input).tokenise()
+    Lexer(input).tokenise()._1
 
   // Integer literals
 

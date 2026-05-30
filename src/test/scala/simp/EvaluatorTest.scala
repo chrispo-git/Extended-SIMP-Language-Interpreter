@@ -10,7 +10,7 @@ class EvaluatorTest extends AnyFunSuite:
     val structEnv = StructEnv()
     Builtins.register(fnEnv)
     val tokens = Lexer(source).tokenise()
-    val program = Parser(tokens, structEnv).parseProgram()
+    val program = Parser(tokens._1, StructEnv(), tokens._2).parseProgram()
     Evaluator(fnEnv, structEnv).evalProgram(program, store)
     store
 

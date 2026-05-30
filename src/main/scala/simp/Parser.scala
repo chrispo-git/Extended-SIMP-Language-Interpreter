@@ -1,7 +1,7 @@
 package simp
 
 
-class Parser(tokens: List[Token], structEnv : StructEnv):
+class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
     private var pos: Int = 0
 
     private def isAtEnd(): Boolean = pos >= tokens.length
@@ -17,9 +17,13 @@ class Parser(tokens: List[Token], structEnv : StructEnv):
     private def advanceTo(n: Int): Token = if isAtEnd() then Token.EOF else {val t = tokens(pos);pos+=n;t} 
 
     private def expect(expected: Token): Unit = {
-        if peek() != expected then throw RuntimeException(s"Expected '$expected', got '${peek()}'")
+        if peek() != expected then throwError(s"Expected '$expected', got '${peek()}'")
         else advance()
     }
+
+    private def currentLine(): Int = if pos < lines.length then lines(pos) else -1
+    private def throwError(msg: String): Nothing = throw RuntimeException(s"on line ${currentLine()}: $msg")
+
 
     private def preRegisterStructs(): Unit = {
         var i = 0
@@ -69,7 +73,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv):
                                 case Token.Lte => Bop.Lte
                                 case Token.Eq  => Bop.Eq
                                 case Token.Neq => Bop.Neq
-                                case _ => throw RuntimeException("unreachable")
+                                case _ => throwError("unreachable")
                             }
                             advance()
                             val right = parseExpr()
@@ -106,7 +110,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv):
     private def parseCmd(): Cmd = {
         val left = peek() match {
             case Token.Fn |  Token.Struct | Token.Import =>
-                throw RuntimeException("Declarations must be at the top of the file")
+                throwError("Declarations must be at the top of the file")
             case _ => parseSingleCmd()
         }
         if peek() == Token.Semicolon then {
@@ -147,7 +151,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv):
                         val value = parseExpr()
                         Cmd.FieldAssign(l, field, value)
                     }
-                    case x => throw RuntimeException(s"Expected field name after '.', got '$x'")
+                    case x => throwError(s"Expected field name after '.', got '$x'")
                 }
             }
             case Token.If => {
@@ -215,7 +219,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv):
                         expect(Token.CloseBrace)
                         Cmd.For(name, iterable, body)
                     }
-                    case x => throw RuntimeException(s"Expected loop variable, got '$x'")
+                    case x => throwError(s"Expected loop variable, got '$x'")
                 }
             }
             case Token.Variable(l) => {
@@ -255,7 +259,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv):
                         val value = parseExpr()
                         Cmd.Assign(loc, Expr.BinaryOp(Expr.Deref(loc), Op.Div, value))
                     }
-                    case x => throw RuntimeException(s"Expected assignment, got '$x'")
+                    case x => throwError(s"Expected assignment, got '$x'")
                 }
                 
             }
@@ -277,7 +281,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv):
                 }
             }
             
-            case x => throw RuntimeException(s"Unexpected '$x'")
+            case x => throwError(s"Unexpected '$x'")
         }
     }
     private def parseArgs(): List[Expr] = {
@@ -304,7 +308,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv):
                 val t = parseType()
                 (name, t)
             }
-            case x => throw RuntimeException(s"Expected parameter name, got '$x'")
+            case x => throwError(s"Expected parameter name, got '$x'")
         }
     }
 
@@ -355,7 +359,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv):
             }
             t
         }
-        case x => throw RuntimeException(s"Expected type, got '$x'")
+        case x => throwError(s"Expected type, got '$x'")
     }
     private def parseParams(): List[(String, SimpType)] = {
         expect(Token.OpenBracket)
@@ -379,7 +383,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv):
             val op: Op  = peek() match {
                 case Token.Add => Op.Add
                 case Token.Sub => Op.Sub
-                case _ => throw RuntimeException("unreachable")
+                case _ => throwError("unreachable")
             }
             advance()
             val right = parseTerm()
@@ -394,7 +398,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv):
                 case Token.Mul => Op.Mul
                 case Token.Div => Op.Div
                 case Token.Mod => Op.Mod
-                case _ => throw RuntimeException("unreachable")
+                case _ => throwError("unreachable")
             }
             advance()
             val right = parseAtomicExpr()
@@ -413,7 +417,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv):
                     fields += ((name, value))
                     if peek() == Token.Comma then advance()
                 }
-                case x => throw RuntimeException(s"Expected field name, got '$x'")
+                case x => throwError(s"Expected field name, got '$x'")
             }
         }
         fields.toList
@@ -434,7 +438,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv):
                         advance()
                         parsePostfix(Expr.FieldAccess(expr, field))
                     }
-                    case x => throw RuntimeException(s"Expected field name after '.', got '$x'")
+                    case x => throwError(s"Expected field name after '.', got '$x'")
                 }
             }
             case _ => expr
@@ -454,7 +458,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv):
                             case Token.Lte => Bop.Lte
                             case Token.Eq  => Bop.Eq
                             case Token.Neq => Bop.Neq
-                            case _ => throw RuntimeException("unreachable")
+                            case _ => throwError("unreachable")
                         }
                         advance()
                         val right = parseExpr()
@@ -498,7 +502,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv):
                         val args = parseArgs()
                         Expr.FnCall(s"$namespace::$name", args)
                     }
-                    case x => throw RuntimeException(s"Expected name after '::', got '$x'")
+                    case x => throwError(s"Expected name after '::', got '$x'")
                 }
             }
             case Token.Variable(name) if peekNext() == Token.OpenBrace && structEnv.exists(name) => {
@@ -516,7 +520,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv):
                         advance()
                         Expr.Deref(l)
                     }
-                    case x => throw RuntimeException(s"Expected variable after '!', got '$x'")
+                    case x => throwError(s"Expected variable after '!', got '$x'")
                 }
                 peek() match {
                     case Token.Gt | Token.Lt | Token.Gte | Token.Lte | Token.Eq | Token.Neq =>
@@ -527,7 +531,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv):
                             case Token.Lte => Bop.Lte
                             case Token.Eq  => Bop.Eq
                             case Token.Neq => Bop.Neq
-                            case _ => throw RuntimeException("unreachable")
+                            case _ => throwError("unreachable")
                         }
                         advance()
                         val right = parseExpr()
@@ -558,7 +562,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv):
                 expect(Token.CloseBracket)
                 inside
             }
-            case x => throw RuntimeException(s"Unexpected '$x'")
+            case x => throwError(s"Unexpected '$x'")
         }
     }
     private def parseBool(): BoolExpr = {
@@ -570,7 +574,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv):
             left = op match {
                 case Token.And => BoolExpr.And(left, right)
                 case Token.Or => BoolExpr.Or(left, right)
-                case _ => throw RuntimeException("unreachable")
+                case _ => throwError("unreachable")
             }
         }
         left
@@ -605,7 +609,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv):
                     expect(Token.CloseBrace)
                     Decl.FnDecl(name, params, body, returnType)
                 }
-                case x => throw RuntimeException(s"Expected function name, got '$x'")
+                case x => throwError(s"Expected function name, got '$x'")
             }
         }
         case Token.Struct => {
@@ -616,7 +620,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv):
                     val fields = parseStructFields()
                     Decl.StructDecl(name, fields)
                 }
-                case x => throw RuntimeException(s"Expected struct name, got '$x'")
+                case x => throwError(s"Expected struct name, got '$x'")
             }
         }
         case Token.Import => {
@@ -629,7 +633,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv):
                             advance()
                             peek() match {
                                 case Token.Variable(name) => { advance(); name }
-                                case x => throw RuntimeException(s"Expected alias, got '$x'")
+                                case x => throwError(s"Expected alias, got '$x'")
                             }
                         }
                         case _ => {
@@ -638,10 +642,10 @@ class Parser(tokens: List[Token], structEnv : StructEnv):
                     }
                     Decl.ImportDecl(path, alias)
                 }
-                case x => throw RuntimeException(s"Expected path as string literal, got '$x'")
+                case x => throwError(s"Expected path as string literal, got '$x'")
             }
         }
-        case x => throw RuntimeException(s"Expected declaration, got '$x'")
+        case x => throwError(s"Expected declaration, got '$x'")
     }
     private def parseAtomicBool(): BoolExpr = {
         peek() match {
@@ -665,7 +669,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv):
                             case Token.Lte => Bop.Lte
                             case Token.Eq => Bop.Eq
                             case Token.Neq => Bop.Neq
-                            case x => throw RuntimeException(s"Expected boolean operator, got '${x}'")
+                            case x => throwError(s"Expected boolean operator, got '${x}'")
                         }
                         advance()
                         val right = parseExpr()
@@ -680,6 +684,6 @@ class Parser(tokens: List[Token], structEnv : StructEnv):
                 expect(Token.CloseBracket)
                 inside
             }
-            case x => throw RuntimeException(s"Expected boolean expression, got '$x'")
+            case x => throwError(s"Expected boolean expression, got '$x'")
         }
     }

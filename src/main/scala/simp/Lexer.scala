@@ -5,20 +5,23 @@ package simp
 class Lexer(source: String):
     private var pos: Int = 0
     private val tokens = scala.collection.mutable.ListBuffer[Token]()
+    private val lines = scala.collection.mutable.ListBuffer[Int]()
     private var line: Int = 1
     private val whitespaces : List[Char] = List(' ', '\t', '\n', '\r')
     private val numbers : List[Char] = List('0', '1', '2', '3', '4', '5', '6', '7', '8', '9')
     private val valid_symbols : List[Char] = List(';', '(', ')', '&', '|', '¬', '+', '-', '/', '*', '.', ',', '%', '{', '}',':','[',']')
 
+    private def throwError(msg: String): Nothing = throw RuntimeException(s"on line $line: $msg")
 
-    def tokenise(): List[Token] = {
+    def tokenise(): (List[Token], List[Int]) = {
         while !isAtEnd() do {
             skipWhitespace()
             if !isAtEnd() then scanToken()
         }
         tokens += Token.EOF 
+        lines += line
 
-        tokens.toList
+        (tokens.toList, lines.toList)
     }
 
     private def isAtEnd(): Boolean = pos >= source.length()
@@ -59,13 +62,13 @@ class Lexer(source: String):
                 advance()
                 escapeSequences.get(peek()) match {
                     case Some(escaped) => {advance(); out += escaped}
-                    case None => throw RuntimeException(s"Unknown escape sequence '\\${peek()}'")
+                    case None => throwError(s"Unknown escape sequence '\\${peek()}'")
                 }
             } else {
                 out += advance()
             }
         }
-        if isAtEnd() then throw RuntimeException("Unexpected EOF - maybe you forgot to close a string")
+        if isAtEnd() then throwError("Unexpected EOF - maybe you forgot to close a string")
         advance()
         out.toString
     }
@@ -111,6 +114,7 @@ class Lexer(source: String):
 
     private def skipWhitespace(): Unit = {
         while (whitespaces.contains(peek())) do {
+            if peek() == '\n' then line += 1;
             advance()
         }
     }
@@ -119,6 +123,7 @@ class Lexer(source: String):
         while !isAtEnd() && (peek() != '\n') do {
             advance()
         }
+        line += 1;
         skipWhitespace()
     }
 
@@ -222,8 +227,9 @@ class Lexer(source: String):
 
             case x if isIdentifier(getWholeWord()) => {val word = getWholeWord(); advanceUntilNextWord(); Token.Variable(word)}
 
-            case c => throw RuntimeException(s"Unexpected character '$c' at line $line")
+            case c => throwError(s"Unexpected character '$c' at line $line")
         }
 
+        lines += line
         tokens += token
     }

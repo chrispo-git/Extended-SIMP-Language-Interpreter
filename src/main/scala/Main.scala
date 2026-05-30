@@ -28,7 +28,7 @@ def startRepl(store: Store, fnEnv: FunctionEnv, structEnv: StructEnv): Unit = {
 
         val isComplete = openBraces == closeBraces && {
             if openBraces > 0 then {
-                val toks = Lexer(input).tokenise()
+                val toks = Lexer(input).tokenise()._1
                 val ifCount = toks.count(t => t == Token.If || t == Token.Elif)
                 val elseCount = toks.count(t => t == Token.Else || t == Token.Elif)
                 ifCount == elseCount
@@ -39,7 +39,7 @@ def startRepl(store: Store, fnEnv: FunctionEnv, structEnv: StructEnv): Unit = {
         if isComplete then {
             try {
                 val tokens = Lexer(input).tokenise()
-                val programs = Parser(tokens, structEnv).parseRepl()
+                val programs = Parser(tokens._1, structEnv, tokens._2).parseRepl()
                 evaluator.evalProgram(programs, store)
             } catch {
                 case e: RuntimeException => println(s"[${RED}Error${RESET}]  ${e.getMessage}")
@@ -68,9 +68,9 @@ def startRepl(store: Store, fnEnv: FunctionEnv, structEnv: StructEnv): Unit = {
         }
         val file = java.io.File(filename)
         val currentDir = file.getParentFile.getAbsolutePath
-        val tokens = Lexer(source).tokenise()
-        val program = Parser(tokens, structEnv).parseProgram()
         try {
+            val tokens = Lexer(source).tokenise()
+            val program = Parser(tokens._1, structEnv, tokens._2).parseProgram()
             Evaluator(fnEnv, structEnv, currentDir).evalProgram(program, store)
         } catch {
             case e: RuntimeException => println(s"[${RED}Error${RESET}] ${e.getMessage}")

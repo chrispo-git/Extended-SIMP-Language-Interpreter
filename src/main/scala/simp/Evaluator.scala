@@ -35,7 +35,7 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
 
         val tokens = Lexer(source).tokenise()
         val importStructEnv = StructEnv()
-        val program = Parser(tokens, importStructEnv).parseProgram()
+        val program = Parser(tokens._1, importStructEnv, tokens._2).parseProgram()
 
 
         val declaredNames = program.collect {

@@ -4,7 +4,10 @@ import org.scalatest.funsuite.AnyFunSuite
 
 class ParserTest extends AnyFunSuite:
 
-  def parse(source: String): List[Program] = Parser(Lexer(source).tokenise(), StructEnv()).parseProgram()
+  def parse(source: String): List[Program] = {
+    val tokens = Lexer(source).tokenise()
+    Parser(tokens._1, StructEnv(), tokens._2).parseProgram()
+  }
 
   // Commands
   test("parse skip") {
