@@ -126,7 +126,17 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
                         case Value.IntVal(_) => SimpType.TypeArr(SimpType.TypeInt)
                         case Value.StrVal(_) => SimpType.TypeArr(SimpType.TypeString)
                         case Value.BoolVal(_) => SimpType.TypeArr(SimpType.TypeBool)
-                        case _ => throw RuntimeException("Nested arrays not supported")
+                        case Value.ArrVal(elements) => {
+                            if elements.isEmpty then SimpType.TypeArr(SimpType.TypeInt)
+                            else elements.head match {
+                                case Value.IntVal(_) => SimpType.TypeArr(SimpType.TypeInt)
+                                case Value.StrVal(_) => SimpType.TypeArr(SimpType.TypeString)
+                                case Value.BoolVal(_) => SimpType.TypeArr(SimpType.TypeBool)
+                                case Value.StructVal(typeName, _) => SimpType.TypeArr(SimpType.TypeStruct(typeName))
+                                case Value.ArrVal(e) => SimpType.TypeArr(getType(e.head))
+                                case _ => throw RuntimeException("Type resolving failed")
+                            }
+                        }
                     }
                 }
             }
