@@ -6,7 +6,7 @@ class Store:
 
     def load(loc: String): Value = memory.getOrElse(loc, throw RuntimeException(s"Unbound location: $loc"))
 
-    def store(loc: String, value: Value): Unit = memory(loc) = value
+    def store(loc: String, value: Value): Unit = if loc != "_" then memory(loc) = value
 
     def dump(): Unit = memory.toSeq.sortBy(_._1).foreach((k, v) => println(s"$k = $v"))
 
