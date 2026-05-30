@@ -224,6 +224,20 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
                             case x => throw RuntimeException(s"Unsupported operation '$x'")
                         }
                     }
+                    case (Value.ArrVal(left), Value.ArrVal(right)) => {
+                        bop match {
+                            case Bop.Eq => left == right 
+                            case Bop.Neq => left != right 
+                            case x => throw RuntimeException(s"Unsupported operation '$x'")
+                        }
+                    }
+                    case (Value.StructVal(t1, f1), Value.StructVal(t2, f2)) => {
+                        bop match {
+                            case Bop.Eq => t1 == t2 && f1 == f2
+                            case Bop.Neq => t1 != t2 || f1 != f2
+                            case x => throw RuntimeException(s"Unsupported operation '$x'")
+                        }
+                    }
                     case _ => throw RuntimeException(s"Type Mismatch")
                 }
             }
