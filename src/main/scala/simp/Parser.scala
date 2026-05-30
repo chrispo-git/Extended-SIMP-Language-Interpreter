@@ -58,8 +58,6 @@ class Parser(tokens: List[Token], structEnv : StructEnv):
             val item = peek() match {
                 case Token.Fn | Token.Pd | Token.Struct | Token.Import => Program.PDecl(parseDecl())
                 case Token.BoolLit(_) | Token.Not => Program.PBool(parseBool())
-                case Token.Variable(_) if peekNext() == Token.OpenSquare =>
-                    Program.PExpr(parsePostfix(parseAtomicExpr()))
                 case Token.LiteralInt(_) | Token.Deref =>
                     val expr = parseExpr()
                     peek() match {
@@ -79,6 +77,25 @@ class Parser(tokens: List[Token], structEnv : StructEnv):
                         case _ => Program.PExpr(expr)
                     }
                 case Token.Variable(_) if peekNext() == Token.OpenBracket => Program.PExpr(parseAtomicExpr())
+                case Token.Variable(_) if peekNext() == Token.OpenSquare => {
+                    val savedPos = pos
+                    advance()
+                    advance()
+                    var depth = 1
+                    while depth > 0 && !isAtEnd() do {
+                        peek() match {
+                            case Token.OpenSquare => {depth += 1; advance()}
+                            case Token.CloseSquare => {depth -= 1; advance()}
+                            case _ => advance()
+                        }
+                    }
+                    val isAssignment = peek() == Token.Assign
+                    pos = savedPos
+                    isAssignment match {
+                        case true => Program.PCmd(parseCmd())
+                        case false => Program.PExpr(parseAtomicExpr())
+                    }
+                }
                 case _ => Program.PCmd(parseCmd())
             }
             items += item

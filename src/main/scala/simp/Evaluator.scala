@@ -126,6 +126,8 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
                         case Value.IntVal(_) => SimpType.TypeArr(SimpType.TypeInt)
                         case Value.StrVal(_) => SimpType.TypeArr(SimpType.TypeString)
                         case Value.BoolVal(_) => SimpType.TypeArr(SimpType.TypeBool)
+                        case Value.StructVal(typeName, _) => SimpType.TypeStruct(typeName)
+                        case Value.RefVal(_, _) => throw RuntimeException("Nested references are not supported")
                         case Value.ArrVal(elements) => {
                             if elements.isEmpty then SimpType.TypeArr(SimpType.TypeInt)
                             else elements.head match {
@@ -148,7 +150,8 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
                     case Value.BoolVal(_) => SimpType.TypeArr(SimpType.TypeBool)
                     case Value.StructVal(typeName, _) => SimpType.TypeArr(SimpType.TypeStruct(typeName))
                     case Value.ArrVal(e) => SimpType.TypeArr(getType(e.head))
-                    case _ => throw RuntimeException("Type resolving failed")
+                    case Value.RefVal(loc, refStore) => SimpType.TypeArr(getType(Value.RefVal(loc, refStore)))
+                    case null => throw RuntimeException("Type resolving failed")
                 }
             }
             case Value.StructVal(typeName, _) => SimpType.TypeStruct(typeName)
