@@ -1,5 +1,6 @@
 package simp
 import java.io.File
+import SimpUtils.*
 
 class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
     private val importedFiles = scala.collection.mutable.Set[String]()
@@ -12,7 +13,7 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
             case Program.PDecl(Decl.ImportDecl(path, alias)) => processImport(path, alias, cwd, store)
             case Program.PDecl(Decl.StructDecl(name, fields)) => structEnv.register(name, StructDef(fields))
             case Program.PCmd(cmd) => execCmd(cmd, store)
-            case Program.PExpr(expr) => println(evalExpr(expr, store))
+            case Program.PExpr(expr) => println(getPrettyPrint(evalExpr(expr, store)))
             case Program.PBool(b) => println(evalBool(b, store))
         })
     }
@@ -102,53 +103,6 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
             }
         })
         localStore
-    }
-    private def isNullable(t: SimpType): Boolean = t match {
-        case SimpType.TypeInt | SimpType.TypeString | SimpType.TypeBool => false
-        case _ => true
-    }
-    private def getType(value: Value): SimpType = value match {
-        case Value.IntVal(_)  => SimpType.TypeInt
-        case Value.FloatVal(_)  => SimpType.TypeFloat
-        case Value.StrVal(_)  => SimpType.TypeString
-        case Value.BoolVal(_) => SimpType.TypeBool
-        case Value.NullVal    => SimpType.TypeNull
-        case Value.StructVal(typeName, _) => SimpType.TypeStruct(typeName)
-        case Value.RefVal(loc, refStore) => 
-            refStore.load(loc) match {
-                case Value.RefVal(_, _) => throw RuntimeException("Nested references are not supported")
-                case v => getType(v)
-            }
-        case Value.ArrVal(elements) =>
-            if elements.isEmpty then SimpType.TypeArr(SimpType.TypeInt)
-            else elements.head match {
-                case Value.RefVal(_, _) => throw RuntimeException("Arrays of references are not supported")
-                case v => SimpType.TypeArr(getType(v))
-            }
-    }
-    private def checkType(value: Value, expected: SimpType, name: String): Unit = {
-        val actual = getType(value);
-        if actual == SimpType.TypeNull then {
-            if !isNullable(expected) then {
-                throw RuntimeException(s"'$name' of type $expected cannot be Null")
-            }
-        } else {
-            value match {
-                case Value.ArrVal(elements) if elements.isEmpty => {
-                    expected match {
-                        case SimpType.TypeArr(_) => return  
-                        case _ => throw RuntimeException(s"Type mismatch for '$name': expected $expected, got []")
-                    }
-                }
-                case _ => {
-                    if actual != expected then {
-                        throw RuntimeException(s"Type mismatch for '$name': expected $expected, got $actual")
-                    }
-                }
-            }
-        }
-
-        
     }
     
         
@@ -279,6 +233,7 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
         expr match {
             case Expr.Num(n) => Value.IntVal(n)
             case Expr.Flt(n) => Value.FloatVal(n)
+            case Expr.TypeLiteral(t) => Value.TypeVal(t)
             case Expr.Deref(loc) => {
                 store.load(loc) match {
                     case Value.RefVal(refLoc, refStore) => refStore.load(refLoc)
@@ -421,25 +376,6 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
         }
     }
 
-    private def getPrettyPrint(value: Value, visited: Set[AnyRef] = Set()): String = {
-        value match {
-            case Value.StrVal(s) => s
-            case Value.IntVal(n) => n.toString
-            case Value.FloatVal(n) => n.toString
-            case Value.BoolVal(b) => b.toString
-            case Value.NullVal => "null"
-            case Value.RefVal(name,_) => s"Ref($name)"
-            case Value.StructVal(typeName, fields) => {
-                if visited.contains(fields) then {
-                    s"$typeName { ... }"
-                } else {
-                    val newVisited = visited + fields
-                    s"$typeName { ${fields.map((k,v) => s"$k: ${getPrettyPrint(v, newVisited)}").mkString(", ")} }"
-                }
-            }
-            case Value.ArrVal(elements) => "[" + elements.map(v => getPrettyPrint(v, visited)).mkString(", ") + "]"
-        }
-    }
 
     private def execCmd(cmd: Cmd, store: Store): Unit = {
         cmd match {

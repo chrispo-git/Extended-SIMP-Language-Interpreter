@@ -408,6 +408,15 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
             }
             t
         }
+        case Token.TypeMap => {
+            advance()
+            expect(Token.OpenBracket)
+            val keyType = parseType()
+            expect(Token.Comma)
+            val valueType = parseType()
+            expect(Token.CloseBracket)
+            SimpType.TypeMap(keyType, valueType)
+        }
         case Token.TypeNull => {advance(); SimpType.TypeNull}
         case Token.Ref => {
             advance();
@@ -586,6 +595,11 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
                     Expr.ArrLiteral(elements.toList)
                 }
             }
+            case Token.TypeInt    => { advance(); Expr.TypeLiteral(SimpType.TypeInt) }
+            case Token.TypeString => { advance(); Expr.TypeLiteral(SimpType.TypeString) }
+            case Token.TypeBool   => { advance(); Expr.TypeLiteral(SimpType.TypeBool) }
+            case Token.TypeFloat  => { advance(); Expr.TypeLiteral(SimpType.TypeFloat) }
+
             case Token.Variable(namespace) if peekNext() == Token.DoubleColon => {
                 advance()
                 advance()
@@ -799,7 +813,25 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
                 expect(Token.CloseBracket)
                 inside
             }
-            case Token.Variable(name) if peekNext() == Token.OpenBracket || peekNext() == Token.OpenSquare => BoolExpr.FromExpr(parsePostfix(parseAtomicExpr()))
+            case Token.Variable(_) if peekNext() == Token.OpenBracket || peekNext() == Token.OpenSquare => {
+                val expr = parsePostfix(parseAtomicExpr())
+                peek() match {
+                    case Token.Gt | Token.Lt | Token.Gte | Token.Lte | Token.Eq | Token.Neq =>
+                        val bop = peek() match {
+                            case Token.Gt  => Bop.Gt
+                            case Token.Lt  => Bop.Lt
+                            case Token.Gte => Bop.Gte
+                            case Token.Lte => Bop.Lte
+                            case Token.Eq  => Bop.Eq
+                            case Token.Neq => Bop.Neq
+                            case _ => throwError("unreachable")
+                        }
+                        advance()
+                        val right = parseExpr()
+                        BoolExpr.Compare(expr, bop, right)
+                    case _ => BoolExpr.FromExpr(expr)
+                }
+            }
             case x => throwError(s"Expected boolean expression, got '$x'")
         }
     }

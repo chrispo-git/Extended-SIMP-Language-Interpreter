@@ -4,56 +4,9 @@ import scala.io.Source._
 
 import scala.math._
 
-object Builtins:
+import SimpUtils.*
 
-    private def getTypeName(value: Value): String = value match {
-        case Value.IntVal(_)  => "Int"
-        case Value.FloatVal(_)  => "Float"
-        case Value.StrVal(_)  => "Str"
-        case Value.BoolVal(_) => "Bool"
-        case Value.StructVal(typeName, _) => typeName
-        case Value.RefVal(loc, refStore)  => s"ref ${getTypeName(refStore.load(loc))}"
-        case Value.ArrVal(elements) =>
-            if elements.isEmpty then "Unknown[]"
-            else s"${getTypeName(elements.head)}[]"
-        case Value.NullVal => "Null"
-    }
-    private def getPrettyPrint(value: Value, visited: Set[AnyRef] = Set()): String = {
-        value match {
-            case Value.StrVal(s) => s
-            case Value.IntVal(n) => n.toString
-            case Value.FloatVal(n) => n.toString
-            case Value.BoolVal(b) => b.toString
-            case Value.NullVal => "null"
-            case Value.RefVal(name,_) => s"Ref($name)"
-            case Value.StructVal(typeName, fields) => {
-                if visited.contains(fields) then {
-                    s"$typeName { ... }"
-                } else {
-                    val newVisited = visited + fields
-                    s"$typeName { ${fields.map((k,v) => s"$k: ${getPrettyPrint(v, newVisited)}").mkString(", ")} }"
-                }
-            }
-            case Value.ArrVal(elements) => "[" + elements.map(v => getPrettyPrint(v, visited)).mkString(", ") + "]"
-        }
-    }
-    private def deepCopyValue(value: Value, visited: Set[AnyRef] = Set()): Value = value match {
-        case Value.IntVal(_)  => value 
-        case Value.FloatVal(_)  => value 
-        case Value.StrVal(_)  => value
-        case Value.BoolVal(_) => value
-        case Value.NullVal    => value
-        case Value.ArrVal(elements) => Value.ArrVal(scala.collection.mutable.ArrayBuffer.from(elements.map(e => deepCopyValue(e, visited))))
-        case Value.StructVal(typeName, fields) => {
-            if visited.contains(fields) then {
-                throw RuntimeException("deepCopy doesn't support Cyclical references")
-            } else {
-                val newVisisted = visited + fields
-                Value.StructVal(typeName, scala.collection.mutable.Map(fields.map((k, v) => k -> deepCopyValue(v, newVisisted)).toSeq*))
-            }  
-        }
-        case Value.RefVal(loc, refStore) => Value.RefVal(loc, refStore)
-    }
+object Builtins:
     def register(fnEnv: FunctionEnv): Unit = {
         // len - Length of a String or Array
         fnEnv.registerBuiltin("len", args => args match {
@@ -475,5 +428,49 @@ object Builtins:
         fnEnv.registerBuiltin("isEmpty", args => args match {
             case List(Value.ArrVal(elements)) => Value.BoolVal(elements.isEmpty)
             case _ => throw RuntimeException("isEmpty expects an array")
+        })
+
+        // Awesome Map Stuff
+        fnEnv.registerBuiltin("newMap", args => args match {
+            case List(Value.TypeVal(keyType), Value.TypeVal(valueType)) =>
+                Value.MapVal(scala.collection.mutable.Map[Value, Value](), keyType, valueType)
+            case _ => throw RuntimeException("newMap expects two type arguments e.g. newMap(Str, Int)")
+        })
+
+        fnEnv.registerBuiltin("get", args => args match {
+            case List(Value.MapVal(entries, keyType, _), key) =>
+                checkType(key, keyType, "map key")
+                entries.getOrElse(key, throw RuntimeException(s"Key not found in map"))
+            case _ => throw RuntimeException("get expects a map and a key")
+        })
+
+        fnEnv.registerBuiltin("set", args => args match {
+            case List(Value.MapVal(entries, keyType, valueType), key, value) =>
+                checkType(key, keyType, "map key")
+                checkType(value, valueType, "map value")
+                entries(key) = value
+                Value.NullVal
+            case _ => throw RuntimeException("set expects a map, a key, and a value")
+        })
+
+        fnEnv.registerBuiltin("hasKey", args => args match {
+            case List(Value.MapVal(entries, keyType, _), key) =>
+                checkType(key, keyType, "map key")
+                Value.BoolVal(entries.contains(key))
+            case _ => throw RuntimeException("hasKey expects a map and a key")
+        })
+
+        fnEnv.registerBuiltin("remove", args => args match {
+            case List(Value.MapVal(entries, keyType, _), key) =>
+                checkType(key, keyType, "map key")
+                entries.remove(key)
+                Value.NullVal
+            case _ => throw RuntimeException("remove expects a map and a key")
+        })
+
+        fnEnv.registerBuiltin("keys", args => args match {
+            case List(Value.MapVal(entries, _, _)) =>
+                Value.ArrVal(scala.collection.mutable.ArrayBuffer(entries.keys.toSeq*))
+            case _ => throw RuntimeException("keys expects a map")
         })
     }

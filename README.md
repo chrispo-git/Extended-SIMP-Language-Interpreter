@@ -5,7 +5,7 @@
 A simple imperative language + interpreter with REPL.
 
 ## What is SIMP?
-SIMP is a simple imperative language covered in the textbook [Programming Languages and Operational Semantics : A Concise Overview](https://link.springer.com/book/10.1007/978-1-4471-6368-8). This repository extends that language with recursive functions & procedures, structs, built-in functions, and other features like compound operators.
+SIMP is a simple imperative language covered in the textbook [Programming Languages and Operational Semantics : A Concise Overview](https://link.springer.com/book/10.1007/978-1-4471-6368-8). This repository extends that language with recursive functions & procedures, structs, built-in functions, and other features like compound operators & maps.
 The full Grammar in BNF is available [here](SYNTAX.md), but here is some example code:
 
 ```
@@ -76,6 +76,7 @@ A VS Code extension for SIMP+ syntax highlighting is available [here](vsCodeExte
 - Arrays & Structs
 - for loops
 - Basic import system
+- Map data structure with typed keys and values
 - if / elif / else conditionals
 - Compound assignment operators
 - Single-line comments

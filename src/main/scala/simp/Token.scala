@@ -62,6 +62,7 @@ enum Token:
     case TypeString
     case TypeFloat
     case TypeNull
+    case TypeMap
     case Arrow
     case Colon
 

@@ -19,8 +19,9 @@ Each of these functions is available by default in SIMP.
 | `isStr` | `isStr(x) -> Bool` | Returns true if the argument is a String |
 | `isBool` | `isBool(x) -> Bool` | Returns true if the argument is a Bool |
 | `isFloat` | `isFloat(x) -> Bool` | Returns true if the argument is a Float |
+| `isNull` | `isNull(x) -> Bool` | Returns true if the argument is Null |
 | `toStr` | `toStr(Var) -> Str` | Converts a Variable into a String |
-| `toFloat` | `toStr(Int) -> Float` | Converts an Int into a String |
+| `toFloat` | `toFloat(Int) -> Float` | Converts an Int into a String |
 | `toInt` | `toInt(Str) -> Int` | Converts a String into an Int |
 | `toBool` | `toBool(Str) -> Bool` | Converts a String into a Bool |
 | `toArr` | `toArr(Str) -> Str[]` | Converts a string into an array of single character strings |
@@ -34,11 +35,25 @@ Each of these functions is available by default in SIMP.
 | `input` | `input(<Str>) -> Str` | Allows the user to input a String |
 | `inputInt` | `inputInt(<Str>) -> Int` | Allows the user to input an Int |
 | `inputBool` | `inputBool(<Str>) -> Bool` | Allows the user to input a Bool (Done in the form y/n, yes/no, 1/0, t/f, or true/false) |
-| `range` | `input(Int, <Int>, <Int>) -> Arr` | Returns an array of the range, 0-end, start-end, or start-end with a step value|
+| `range` | `range(Int, <Int>, <Int>) -> Arr` | Returns an array of the range, 0-end, start-end, or start-end with a step value|
 | `readFile` | `readFile(Str) -> Arr` | Reads text file |
 | `writeFile` | `writeFile(Str, Arr) -> Bool` | Writes to text file, returns true if it succeeds, false if it fails |
-| `typeOf` | `typeOf(Var) -> Str` | returns the type of a variable as a string
-| `deepCopy`| `deepCopy(Var) -> Var`| deep copies a variable
+| `typeOf` | `typeOf(Var) -> Str` | returns the type of a variable as a string |
+| `deepCopy`| `deepCopy(Var) -> Var`| deep copies a variable |
 | `push` | `push(T[], T) -> T[]` | Appends a value to the end of an array and returns it |
+| `ln` | `ln(Int \| Float) -> Float` | Performs log base e on the argument|
+| `log10` | `log10(Int \| Float) -> Float` | Performs log base 10 on the argument|
+| `log` | `ln(Int \| Float, Int \| Float) -> Float` | Performs log of the 1st argument with the base as the 2nd argument|
 | `pi` | `pi() -> Float` | Returns the value of π |
 | `e` | `e() -> Float` | Returns the value of Euler's Number|
+
+## Map Functions
+There are a small set of special functions that allow you to instantiate a Map object.
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| `newMap` | `newMap(T1, T2) -> Map(T1, T2)`| Instantiates a new map of keys type T1 to values T2|
+| `get` | `get(Map(K, V), K) -> V` | Gets a value from a map by key |
+| `set` | `set(Map(K, V), K, V) -> Void` | Sets a value in a map |
+| `hasKey` | `hasKey(Map(K, V), K) -> Bool` | Returns true if the map contains the given key |
+| `remove` | `remove(Map(K, V), K) -> Void` | Removes a key from a map |
+| `keys` | `keys(Map(K, V)) -> K[]` | Returns an array of all keys in the map |

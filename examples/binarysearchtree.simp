@@ -69,6 +69,10 @@ fn treeMax(tree: BST) -> Int {
     return treeMax(tree.right);
 }
 
+// Build the BST
+root := null;
+values := [5, 3, 7, 1, 4, 6, 8, 2];
+
 fn printTree(tree: BST, prefix: Str, isLeft: Bool) -> Void {
     if isNull(tree) then {
         return;
@@ -90,9 +94,6 @@ fn printTree(tree: BST, prefix: Str, isLeft: Bool) -> Void {
     _ := printTree(tree.right, !childPrefix, false);
 }
 
-// Build the BST
-root := null;
-values := [5, 3, 7, 1, 4, 6, 8, 2];
 
 i := 0;
 while !i < len(values) do {
