@@ -9,7 +9,7 @@ Program ::= (Cmd | Decl)*
 
 ### Values
 Expressions produce a value in 4 categories:
-- Primitive type - `Int`, `Str`, `Bool`
+- Primitive type - `Int`, `Str`, `Bool`, `Float`
 - Structs
 - Array Type - `Int[]`, `Str[]`, `Bool[]`, `Struct[]`
 - Null Type - `null` 
@@ -19,7 +19,7 @@ Expressions produce a value in 4 categories:
 | `Int` | `-7`, `42`, `90210` |
 | `Str` | `"hello"`, `"world"` |
 | `Bool` | `true`, `false` |
-| `Int[]`, `Str[]`, `Bool[]` | `[1, 2, 3]`, `["a", "b"]`, `[true, false]`, `[]` |
+| `Int[]`, `Str[]`, `Bool[]` , `Float[]`| `[1, 2, 3]`, `["a", "b"]`, `[true, false]`, `[]` |
 | `StructName` | `Point { x: 1, y: 2 }` |
 | `null` | `null` |
 
