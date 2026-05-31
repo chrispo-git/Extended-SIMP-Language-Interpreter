@@ -111,13 +111,13 @@ class ParserTest extends AnyFunSuite:
   // Structs
   test("parse struct declaration") {
       assert(parse("struct Point { x: Int, y: Int }") == List(Program.PDecl(
-          Decl.StructDecl("Point", List(("x", SimpType.TypeInt), ("y", SimpType.TypeInt)))
+          Decl.StructDecl("Point", List(("x", SimpType.TypeInt, None), ("y", SimpType.TypeInt, None)))
       )))
   }
 
   test("parse struct literal") {
       assert(parse("struct Point { x: Int, y: Int }; p := Point { x: 1, y: 2 }") == List(Program.PDecl(
-          Decl.StructDecl("Point", List(("x", SimpType.TypeInt), ("y", SimpType.TypeInt)))
+          Decl.StructDecl("Point", List(("x", SimpType.TypeInt, None), ("y", SimpType.TypeInt, None)))
       ),Program.PCmd(
           Cmd.Assign("p", Expr.StructLiteral("Point", List(("x", Expr.Num(1)), ("y", Expr.Num(2)))))
       )))
