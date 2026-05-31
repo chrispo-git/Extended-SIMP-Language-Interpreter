@@ -1,0 +1,142 @@
+struct BST {
+    value: Int,
+    left: BST,
+    right: BST
+}
+
+fn makeNode(val: Int) -> BST {
+    return BST { value: !val, left: null, right: null };
+}
+
+fn insert(tree: BST, val: Int) -> BST {
+    if isNull(tree) then {
+        return makeNode(!val);
+    };
+    if !val < tree.value then {
+        tree.left := insert(tree.left, !val);
+    } elif !val > tree.value then {
+        tree.right := insert(tree.right, !val);
+    };
+    return tree;
+}
+
+fn treeContains(tree: BST, val: Int) -> Bool {
+    if isNull(tree) then {
+        return false;
+    };
+    if !val == tree.value then {
+        return true;
+    } elif !val < tree.value then {
+        return treeContains(tree.left, !val);
+    } else {
+        return treeContains(tree.right, !val);
+    };
+}
+
+fn inorder(tree: BST, result: Int[]) -> Void {
+    if isNull(tree) then {
+        return;
+    };
+    _ := inorder(tree.left, result);
+    result := push(result, tree.value);
+    _ := inorder(tree.right, result);
+}
+
+fn height(tree: BST) -> Int {
+    if isNull(tree) then {
+        return 0;
+    };
+    leftHeight := height(tree.left);
+    rightHeight := height(tree.right);
+    if !leftHeight > !rightHeight then {
+        return !leftHeight + 1;
+    } else {
+        return !rightHeight + 1;
+    };
+}
+
+fn treeMin(tree: BST) -> Int {
+    if isNull(tree.left) then {
+        return tree.value;
+    };
+    return treeMin(tree.left);
+}
+
+fn treeMax(tree: BST) -> Int {
+    if isNull(tree.right) then {
+        return tree.value;
+    };
+    return treeMax(tree.right);
+}
+
+fn printTree(tree: BST, prefix: Str, isLeft: Bool) -> Void {
+    if isNull(tree) then {
+        return;
+    };
+    connector := "";
+    if !isLeft then {
+        connector := "├── ";
+    } else {
+        connector := "└── ";
+    };
+    print !prefix + !connector + toStr(tree.value);
+    childPrefix := "";
+    if !isLeft then {
+        childPrefix := !prefix + "│   ";
+    } else {
+        childPrefix := !prefix + "    ";
+    };
+    _ := printTree(tree.left, !childPrefix, true);
+    _ := printTree(tree.right, !childPrefix, false);
+}
+
+// Build the BST
+root := null;
+values := [5, 3, 7, 1, 4, 6, 8, 2];
+
+i := 0;
+while !i < len(values) do {
+    root := insert(root, values[!i]);
+    i += 1;
+};
+
+print "=== Binary Search Tree ===";
+print "Tree structure:";
+print toStr(root.value);
+_ := printTree(root.left, "", true);
+_ := printTree(root.right, "", false);
+
+print "";
+print "=== Inorder Traversal (should be sorted) ===";
+result := [];
+_ := inorder(root, result);
+i := 0;
+output := "";
+while !i < len(result) do {
+    if !i == 0 then {
+        output := toStr(result[!i]);
+    } else {
+        output := !output + " -> " + toStr(result[!i]);
+    };
+    i += 1;
+};
+print !output;
+
+print "";
+print "=== Search ===";
+if treeContains(root, 4) then {
+    print "4 found in tree";
+} else {
+    print "4 not found in tree";
+};
+if treeContains(root, 9) then {
+    print "9 found in tree";
+} else {
+    print "9 not found in tree";
+};
+
+print "";
+print "=== Properties ===";
+print "Height: " + height(root);
+print "Min: " + treeMin(root);
+print "Max: " + treeMax(root);
