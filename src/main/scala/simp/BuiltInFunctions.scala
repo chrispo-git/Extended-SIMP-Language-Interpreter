@@ -154,6 +154,16 @@ object Builtins:
                 case _ => throw RuntimeException("toBool expects 1 string")
             }
         )
+        // toArr - Converts a String into an Array
+        fnEnv.registerBuiltin("toArr", args => args match {
+                case List(Value.StrVal(s)) => {
+                    Value.ArrVal(scala.collection.mutable.ArrayBuffer(
+                        s.map(c => Value.StrVal(c.toString))*
+                    ))
+                }
+                case _ => throw RuntimeException("toArr expects 1 string")
+            }
+        )
         // range
         fnEnv.registerBuiltin("range", args => args match {
             case List(Value.IntVal(end)) =>

@@ -21,6 +21,7 @@ Each of these functions is available by default in SIMP.
 | `toStr` | `toStr(Bool \| Int) -> Str` | Converts a Bool or Int into a String |
 | `toInt` | `toInt(Str) -> Int` | Converts a String into an Int |
 | `toBool` | `toBool(Str) -> Bool` | Converts a String into a Bool |
+| `toArr` | `toArr(Str) -> Str[]` | Converts a string into an array of single character strings |
 | `abs` | `abs(Int) -> Int` | Absolute value of an Int |
 | `max` | `max(Int, Int) -> Int` | Maximum of two Ints |
 | `min` | `min(Int, Int) -> Int` | Minimum of two Ints |
