@@ -142,16 +142,28 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
                 Cmd.Break
             }
             case Token.Variable(l) if peekNext() == Token.Dot => {
-                advance(); 
-                advance(); 
+                advance() 
+                advance() 
                 peek() match {
                     case Token.Variable(field) => {
-                        advance()
-                        expect(Token.Assign)
-                        val value = parseExpr()
-                        Cmd.FieldAssign(l, field, value)
+                        advance() 
+                        peek() match {
+                            case Token.OpenSquare => {
+                                advance()
+                                val index = parseExpr()
+                                expect(Token.CloseSquare)
+                                expect(Token.Assign)
+                                val value = parseExpr()
+                                Cmd.FieldIndexAssign(l, field, index, value)
+                            }
+                            case Token.Assign => {
+                                advance()
+                                Cmd.FieldAssign(l, field, parseExpr())
+                            }
+                            case x => throw RuntimeException(s"[Error] Expected assignment, got '$x'")
+                        }
                     }
-                    case x => throwError(s"Expected field name after '.', got '$x'")
+                    case x => throw RuntimeException(s"[Error] Expected field name after '.', got '$x'")
                 }
             }
             case Token.If => {
@@ -389,7 +401,22 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
             val right = parseTerm()
             left = Expr.BinaryOp(left, op, right)
         }
-        left
+        peek() match {
+            case Token.Gt | Token.Lt | Token.Gte | Token.Lte | Token.Eq | Token.Neq =>
+                val bop = peek() match {
+                    case Token.Gt  => Bop.Gt
+                    case Token.Lt  => Bop.Lt
+                    case Token.Gte => Bop.Gte
+                    case Token.Lte => Bop.Lte
+                    case Token.Eq  => Bop.Eq
+                    case Token.Neq => Bop.Neq
+                    case _ => throw RuntimeException("unreachable")
+                }
+                advance()
+                val right = parseExpr()
+                Expr.BoolLift(BoolExpr.Compare(left, bop, right))
+            case _ => left
+        }
     }
     private def parseTerm(): Expr = {
         var left = parsePostfix(parseAtomicExpr())
@@ -684,6 +711,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
                 expect(Token.CloseBracket)
                 inside
             }
+            case Token.Variable(name) if peekNext() == Token.OpenBracket || peekNext() == Token.OpenSquare => BoolExpr.FromExpr(parsePostfix(parseAtomicExpr()))
             case x => throwError(s"Expected boolean expression, got '$x'")
         }
     }

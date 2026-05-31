@@ -35,3 +35,4 @@ Each of these functions is available by default in SIMP.
 | `writeFile` | `writeFile(Str, Arr) -> Bool` | Writes to text file, returns true if it succeeds, false if it fails |
 | `typeOf` | `typeOf(Var) -> Str` | returns the type of a variable as a string
 | `deepCopy`| `deepCopy(Var) -> Var`| deep copies a variable
+| `push` | `push(T[], T) -> T[]` | Appends a value to the end of an array and returns it |

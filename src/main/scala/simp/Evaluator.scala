@@ -107,56 +107,23 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
         case SimpType.TypeInt | SimpType.TypeString | SimpType.TypeBool => false
         case _ => true
     }
-    private def getType(value: Value): SimpType = {
-        value match {
-            case Value.IntVal(_)  => SimpType.TypeInt
-            case Value.StrVal(_)  => SimpType.TypeString
-            case Value.BoolVal(_) => SimpType.TypeBool
-            case Value.NullVal => SimpType.TypeNull
-            case Value.RefVal(loc, refStore) => refStore.load(loc) match {
-                case Value.IntVal(_)  => SimpType.TypeInt
-                case Value.StrVal(_)  => SimpType.TypeString
-                case Value.BoolVal(_) => SimpType.TypeBool
-                case Value.StructVal(typeName, _) => SimpType.TypeStruct(typeName)
-                case Value.RefVal(_, _) => throw RuntimeException("Nested references are not supported")
-                case Value.ArrVal(elements) => {
-                    if elements.isEmpty then SimpType.TypeArr(SimpType.TypeInt)
-                    else elements.head match {
-                        case Value.NullVal => SimpType.TypeNull
-                        case Value.IntVal(_) => SimpType.TypeArr(SimpType.TypeInt)
-                        case Value.StrVal(_) => SimpType.TypeArr(SimpType.TypeString)
-                        case Value.BoolVal(_) => SimpType.TypeArr(SimpType.TypeBool)
-                        case Value.StructVal(typeName, _) => SimpType.TypeStruct(typeName)
-                        case Value.RefVal(_, _) => throw RuntimeException("Nested references are not supported")
-                        case Value.ArrVal(elements) => {
-                            if elements.isEmpty then SimpType.TypeArr(SimpType.TypeInt)
-                            else elements.head match {
-                                case Value.IntVal(_) => SimpType.TypeArr(SimpType.TypeInt)
-                                case Value.StrVal(_) => SimpType.TypeArr(SimpType.TypeString)
-                                case Value.BoolVal(_) => SimpType.TypeArr(SimpType.TypeBool)
-                                case Value.StructVal(typeName, _) => SimpType.TypeArr(SimpType.TypeStruct(typeName))
-                                case Value.ArrVal(e) => SimpType.TypeArr(getType(e.head))
-                                case _ => throw RuntimeException("Type resolving failed")
-                            }
-                        }
-                    }
-                }
-                case _ => throw RuntimeException("Type resolving failed") 
+    private def getType(value: Value): SimpType = value match {
+        case Value.IntVal(_)  => SimpType.TypeInt
+        case Value.StrVal(_)  => SimpType.TypeString
+        case Value.BoolVal(_) => SimpType.TypeBool
+        case Value.NullVal    => SimpType.TypeNull
+        case Value.StructVal(typeName, _) => SimpType.TypeStruct(typeName)
+        case Value.RefVal(loc, refStore) => 
+            refStore.load(loc) match {
+                case Value.RefVal(_, _) => throw RuntimeException("[Error] Nested references are not supported")
+                case v => getType(v)
             }
-            case Value.ArrVal(elements) => {
-                if elements.isEmpty then SimpType.TypeArr(SimpType.TypeInt)
-                else elements.head match {
-                    case Value.IntVal(_) => SimpType.TypeArr(SimpType.TypeInt)
-                    case Value.StrVal(_) => SimpType.TypeArr(SimpType.TypeString)
-                    case Value.BoolVal(_) => SimpType.TypeArr(SimpType.TypeBool)
-                    case Value.StructVal(typeName, _) => SimpType.TypeArr(SimpType.TypeStruct(typeName))
-                    case Value.ArrVal(e) => SimpType.TypeArr(getType(e.head))
-                    case Value.RefVal(loc, refStore) => SimpType.TypeArr(getType(Value.RefVal(loc, refStore)))
-                    case _ => throw RuntimeException("Type resolving failed")
-                }
+        case Value.ArrVal(elements) =>
+            if elements.isEmpty then SimpType.TypeArr(SimpType.TypeInt)
+            else elements.head match {
+                case Value.RefVal(_, _) => throw RuntimeException("[Error] Arrays of references are not supported")
+                case v => SimpType.TypeArr(getType(v))
             }
-            case Value.StructVal(typeName, _) => SimpType.TypeStruct(typeName)
-        }
     }
     private def checkType(value: Value, expected: SimpType, name: String): Unit = {
         val actual = getType(value);
@@ -165,10 +132,22 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
                 throw RuntimeException(s"'$name' of type $expected cannot be Null")
             }
         } else {
-            if actual != expected then {
-                throw RuntimeException(s"Type mismatch for '$name': expected $expected, got $actual")
+            value match {
+                case Value.ArrVal(elements) if elements.isEmpty => {
+                    expected match {
+                        case SimpType.TypeArr(_) => return  
+                        case _ => throw RuntimeException(s"[Error] Type mismatch for '$name': expected $expected, got []")
+                    }
+                }
+                case _ => {
+                    if actual != expected then {
+                        throw RuntimeException(s"Type mismatch for '$name': expected $expected, got $actual")
+                    }
+                }
             }
         }
+
+        
     }
     
         
@@ -308,22 +287,9 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
                             case Op.Div => Value.IntVal(left / right)
                         }
                     }
-                    case (Value.StrVal(left), Value.StrVal(right)) => {
+                    case (Value.StrVal(left),right) => {
                         op match {
-                            case Op.Add => Value.StrVal(left+right)
-                            case x => throw RuntimeException(s"Unsupported operation '$x'")
-                        }
-                    }
-                    case (Value.StrVal(left), Value.IntVal(right)) => {
-                        op match {
-                            case Op.Add => Value.StrVal(left + (right.toString))
-                            case x => throw RuntimeException(s"Unsupported operation '$x'")
-                        }
-                    }
-                    case (Value.StrVal(left), Value.BoolVal(right)) => {
-                        op match {
-                            case Op.Add if right==true => Value.StrVal(left + "true")
-                            case Op.Add if right==false => Value.StrVal(left + "false")
+                            case Op.Add => Value.StrVal(left + getPrettyPrint(right))
                             case x => throw RuntimeException(s"Unsupported operation '$x'")
                         }
                     }
@@ -441,6 +407,25 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
                         fields(field) = value
                     }
                     case _ => throw RuntimeException(s"'$loc' is not a struct")
+                }
+            }
+            case Cmd.FieldIndexAssign(loc, field, index, valueExpr) => {
+                store.load(loc) match {
+                    case Value.StructVal(_, fields) => {
+                        fields.get(field) match {
+                            case Some(Value.ArrVal(elements)) => {
+                                val idx = evalExpr(index, store) match {
+                                    case Value.IntVal(i) => i
+                                    case _ => throw RuntimeException("[Error] Array index must be an integer")
+                                }
+                                if idx < 0 || idx >= elements.length then
+                                    throw RuntimeException(s"[Error] Index $idx out of bounds")
+                                elements(idx) = evalExpr(valueExpr, store)
+                            }
+                            case _ => throw RuntimeException(s"[Error] '$field' is not an array")
+                        }
+                    }
+                    case _ => throw RuntimeException(s"[Error] '$loc' is not a struct")
                 }
             }
             case Cmd.Seq(fst, snd) => {

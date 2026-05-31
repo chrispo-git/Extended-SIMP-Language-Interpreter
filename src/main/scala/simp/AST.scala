@@ -67,6 +67,7 @@ enum Cmd:
     case Return(expr: Option[Expr] = None)
     case ArrAssign(arr: String, index: Expr, value: Expr)
     case FieldAssign(loc: String, field: String, value: Expr)
+    case FieldIndexAssign(loc: String, field: String, index: Expr, value: Expr)
     case Continue
     case Break
 

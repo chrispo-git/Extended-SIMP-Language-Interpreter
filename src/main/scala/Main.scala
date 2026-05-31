@@ -68,6 +68,7 @@ def startRepl(store: Store, fnEnv: FunctionEnv, structEnv: StructEnv): Unit = {
         }
         val file = java.io.File(filename)
         val currentDir = file.getParentFile.getAbsolutePath
+
         try {
             val tokens = Lexer(source).tokenise()
             val program = Parser(tokens._1, structEnv, tokens._2).parseProgram()

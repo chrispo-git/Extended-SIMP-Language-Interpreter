@@ -2,7 +2,7 @@ scalaVersion := "3.6.4"
 
 name := "simp-interpreter"
 organization := "ch.epfl.scala"
-version := "0.6.0"
+version := "0.6.1"
 
 enablePlugins(JavaAppPackaging, GraalVMNativeImagePlugin)
 

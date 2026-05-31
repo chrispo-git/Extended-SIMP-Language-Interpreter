@@ -348,4 +348,11 @@ object Builtins:
             case List(value) => Value.BoolVal(value == Value.NullVal)
             case _ => throw RuntimeException("isNull expects one argument")
         })
+
+        fnEnv.registerBuiltin("push", args => args match {
+            case List(Value.ArrVal(elements), value) =>
+                elements += value
+                Value.ArrVal(elements)
+            case _ => throw RuntimeException("[Error] push expects an array and a value")
+        })
     }
