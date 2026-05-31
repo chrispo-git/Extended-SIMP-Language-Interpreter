@@ -187,7 +187,7 @@ object Builtins:
                 case _ => throw RuntimeException("toBool expects 1 string")
             }
         )
-        // toArr - Converts a String into an Array
+        // toArr - Converts a String into an Array of individual character strings
         fnEnv.registerBuiltin("toArr", args => args match {
                 case List(Value.StrVal(s)) => {
                     Value.ArrVal(scala.collection.mutable.ArrayBuffer(
@@ -197,6 +197,16 @@ object Builtins:
                 case _ => throw RuntimeException("toArr expects 1 string")
             }
         )
+        // split - Splits a string into an array with a delimiter
+        fnEnv.registerBuiltin("split", args => args match {
+            case List(Value.StrVal(s), Value.StrVal(delimiter)) =>
+                Value.ArrVal(scala.collection.mutable.ArrayBuffer(
+                    s.split(scala.util.matching.Regex.quote(delimiter))
+                    .map(Value.StrVal(_))
+                    .toSeq*
+                ))
+            case _ => throw RuntimeException("split expects a string and a delimiter")
+        })
         // range
         fnEnv.registerBuiltin("range", args => args match {
             case List(Value.IntVal(end)) =>

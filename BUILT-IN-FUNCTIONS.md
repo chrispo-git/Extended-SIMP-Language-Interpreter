@@ -24,6 +24,7 @@ Each of these functions is available by default in SIMP.
 | `toInt` | `toInt(Str) -> Int` | Converts a String into an Int |
 | `toBool` | `toBool(Str) -> Bool` | Converts a String into a Bool |
 | `toArr` | `toArr(Str) -> Str[]` | Converts a string into an array of single character strings |
+| `split` | `split(Str, Str) -> Str[]` | Splits a string by a delimiter|
 | `abs` | `abs(Int \| Float) -> Int\| Float` | Absolute value of a number |
 | `max` | `max(Int \| Float, Int \| Float) -> Int \| Float` | Maximum of two numbers |
 | `min` | `min(Int \| Float, Int \| Float) -> Int \| Float` | Minimum of two numbers |
