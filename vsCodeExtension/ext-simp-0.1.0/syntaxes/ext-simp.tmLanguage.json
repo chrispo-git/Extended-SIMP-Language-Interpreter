@@ -51,12 +51,12 @@
         {
           "comment": "array types like Int[], Str[], Bool[]",
           "name": "storage.type.ext-simp",
-          "match": "\\b(Int|Str|Bool|Void)(?=\\s*\\[\\])"
+          "match": "\\b(Int|Str|Bool|Float|Void)(?=\\s*\\[\\])"
         },
         {
           "comment": "primitive types",
           "name": "storage.type.ext-simp",
-          "match": "\\b(Int|Str|Bool|Void)\\b"
+          "match": "\\b(Int|Str|Bool|Float|Void)\\b"
         },
         {
           "comment": "struct type names - capitalised identifiers in type position after colon or arrow",

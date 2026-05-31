@@ -378,6 +378,16 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
             }
             t
         }
+        case Token.TypeFloat  => { 
+            advance(); 
+            var t: SimpType = SimpType.TypeFloat
+            while peek() == Token.OpenSquare do {
+                expect(Token.OpenSquare)
+                expect(Token.CloseSquare)
+                t = SimpType.TypeArr(t)
+            }
+            t
+        }
         case Token.TypeString  => { 
             advance(); 
             var t: SimpType = SimpType.TypeString
