@@ -72,8 +72,8 @@ A VS Code extension for SIMP+ syntax highlighting is available [here](vsCodeExte
 - Comparison operators
 ### Extensions
 - Built-in Functions (You can see the list of those [here](BUILT-IN-FUNCTIONS.md))
-- String and Boolean variables
-- Arrays
+- String, Float and Boolean variables
+- Arrays & Structs
 - for loops
 - Basic import system
 - if / elif / else conditionals

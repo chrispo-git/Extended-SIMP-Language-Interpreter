@@ -18,15 +18,17 @@ Each of these functions is available by default in SIMP.
 | `isInt` | `isInt(x) -> Bool` | Returns true if the argument is an Int |
 | `isStr` | `isStr(x) -> Bool` | Returns true if the argument is a String |
 | `isBool` | `isBool(x) -> Bool` | Returns true if the argument is a Bool |
-| `toStr` | `toStr(Bool \| Int) -> Str` | Converts a Bool or Int into a String |
+| `isFloat` | `isFloat(x) -> Bool` | Returns true if the argument is a Float |
+| `toStr` | `toStr(Var) -> Str` | Converts a Variable into a String |
+| `toFloat` | `toStr(Int) -> Float` | Converts an Int into a String |
 | `toInt` | `toInt(Str) -> Int` | Converts a String into an Int |
 | `toBool` | `toBool(Str) -> Bool` | Converts a String into a Bool |
 | `toArr` | `toArr(Str) -> Str[]` | Converts a string into an array of single character strings |
-| `abs` | `abs(Int) -> Int` | Absolute value of an Int |
-| `max` | `max(Int, Int) -> Int` | Maximum of two Ints |
-| `min` | `min(Int, Int) -> Int` | Minimum of two Ints |
-| `clamp` | `clamp(Int, Int, Int) -> Int` | Clamps an Int between min and max values |
-| `pow` | `pow(Int, Int) -> Int` | Integer power |
+| `abs` | `abs(Int \| Float) -> Int\| Float` | Absolute value of a number |
+| `max` | `max(Int \| Float, Int \| Float) -> Int \| Float` | Maximum of two numbers |
+| `min` | `min(Int \| Float, Int \| Float) -> Int \| Float` | Minimum of two numbers |
+| `clamp` | `clamp(Int \| Float, Int \| Float, Int \| Float) -> Int \| Float` | Clamps a number between min and max values |
+| `pow` | `pow(Int \| Float, Int \| Float) -> Int \| Float` | Base to the power of an exponent |
 | `assert` | `assert(Bool, <Str>) -> Bool` | If false, throws an error with optional message |
 | `input` | `input(<Str>) -> Str` | Allows the user to input a String |
 | `inputInt` | `inputInt(<Str>) -> Int` | Allows the user to input an Int |
@@ -37,3 +39,5 @@ Each of these functions is available by default in SIMP.
 | `typeOf` | `typeOf(Var) -> Str` | returns the type of a variable as a string
 | `deepCopy`| `deepCopy(Var) -> Var`| deep copies a variable
 | `push` | `push(T[], T) -> T[]` | Appends a value to the end of an array and returns it |
+| `pi` | `pi() -> Float` | Returns the value of π |
+| `e` | `e() -> Float` | Returns the value of Euler's Number|

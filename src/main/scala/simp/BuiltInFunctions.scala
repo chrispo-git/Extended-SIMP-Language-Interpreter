@@ -2,10 +2,13 @@ package simp
 
 import scala.io.Source._
 
+import scala.math._
+
 object Builtins:
 
     private def getTypeName(value: Value): String = value match {
         case Value.IntVal(_)  => "Int"
+        case Value.FloatVal(_)  => "Float"
         case Value.StrVal(_)  => "Str"
         case Value.BoolVal(_) => "Bool"
         case Value.StructVal(typeName, _) => typeName
@@ -15,8 +18,28 @@ object Builtins:
             else s"${getTypeName(elements.head)}[]"
         case Value.NullVal => "Null"
     }
+    private def getPrettyPrint(value: Value, visited: Set[AnyRef] = Set()): String = {
+        value match {
+            case Value.StrVal(s) => s
+            case Value.IntVal(n) => n.toString
+            case Value.FloatVal(n) => n.toString
+            case Value.BoolVal(b) => b.toString
+            case Value.NullVal => "null"
+            case Value.RefVal(name,_) => s"Ref($name)"
+            case Value.StructVal(typeName, fields) => {
+                if visited.contains(fields) then {
+                    s"$typeName { ... }"
+                } else {
+                    val newVisited = visited + fields
+                    s"$typeName { ${fields.map((k,v) => s"$k: ${getPrettyPrint(v, newVisited)}").mkString(", ")} }"
+                }
+            }
+            case Value.ArrVal(elements) => "[" + elements.map(v => getPrettyPrint(v, visited)).mkString(", ") + "]"
+        }
+    }
     private def deepCopyValue(value: Value, visited: Set[AnyRef] = Set()): Value = value match {
         case Value.IntVal(_)  => value 
+        case Value.FloatVal(_)  => value 
         case Value.StrVal(_)  => value
         case Value.BoolVal(_) => value
         case Value.NullVal    => value
@@ -112,39 +135,49 @@ object Builtins:
         // isInt - Returns true if the argument is an integer
         fnEnv.registerBuiltin("isInt", args => args match {
                 case List(Value.IntVal(i)) => Value.BoolVal(true)
-                case List(Value.BoolVal(b)) => Value.BoolVal(false)
-                case List(Value.StrVal(s)) => Value.BoolVal(false)
+                case List(x) => Value.BoolVal(false)
                 case _ => throw RuntimeException("isInt expects 1 argument")
             }
         )
         // isStr - Returns true if the argument is a string
         fnEnv.registerBuiltin("isStr", args => args match {
-                case List(Value.IntVal(i)) => Value.BoolVal(false)
-                case List(Value.BoolVal(b)) => Value.BoolVal(false)
                 case List(Value.StrVal(s)) => Value.BoolVal(true)
+                case List(x) => Value.BoolVal(false)
                 case _ => throw RuntimeException("isStr expects 1 argument")
             }
         )
         // isBool - Returns true if the argument is a boolean
         fnEnv.registerBuiltin("isBool", args => args match {
-                case List(Value.IntVal(i)) => Value.BoolVal(false)
                 case List(Value.BoolVal(b)) => Value.BoolVal(true)
-                case List(Value.StrVal(s)) => Value.BoolVal(false)
+                case List(x) => Value.BoolVal(false)
                 case _ => throw RuntimeException("isBool expects 1 argument")
             }
         )
+        // isFloat - Returns true if the argument is a float
+        fnEnv.registerBuiltin("isFloat", args => args match {
+                case List(Value.FloatVal(i)) => Value.BoolVal(true)
+                case List(x) => Value.BoolVal(false)
+                case _ => throw RuntimeException("isFloat expects 1 argument")
+            }
+        )
 
-        // toStr - Converts a boolean/integer into a String
+        // toStr - Converts a value into a String
         fnEnv.registerBuiltin("toStr", args => args match {
-                case List(Value.IntVal(i)) => Value.StrVal(i.toString)
-                case List(Value.BoolVal(b)) => Value.StrVal(b.toString)
-                case List(Value.StrVal(s)) => Value.StrVal(s)
+                case List(x) => Value.StrVal(getPrettyPrint(x))
                 case _ => throw RuntimeException("toStr expects 1 argument")
             }
         )
-        // toInt - Converts a String into an Int
+        // toInt - Converts a String or a float into an Int
         fnEnv.registerBuiltin("toInt", args => args match {
                 case List(Value.StrVal(s)) => Value.IntVal(s.toInt)
+                case List(Value.FloatVal(s)) => Value.IntVal(s.toInt)
+                case _ => throw RuntimeException("toInt expects 1 string")
+            }
+        )
+        // toFloat - Converts a String or an int into a float
+        fnEnv.registerBuiltin("toFloat", args => args match {
+                case List(Value.StrVal(s)) => Value.FloatVal(s.toDouble)
+                case List(Value.IntVal(s)) => Value.FloatVal(s.toDouble)
                 case _ => throw RuntimeException("toInt expects 1 string")
             }
         )
@@ -177,31 +210,42 @@ object Builtins:
         // abs - Absolute Value
         fnEnv.registerBuiltin("abs", args => args match {
                 case List(Value.IntVal(s)) => Value.IntVal(s.abs)
-                case _ => throw RuntimeException("abs expects 1 integer")
+                case List(Value.FloatVal(s)) => Value.FloatVal(s.abs)
+                case _ => throw RuntimeException("abs expects 1 integer / float")
             }
         )
-        // max - Max of 2 Integers
+        // max - Max of 2 Integers / Floats
         fnEnv.registerBuiltin("max", args => args match {
                 case List(Value.IntVal(s1), Value.IntVal(s2)) => {
-                    if s1 >= s2 then {
-                        Value.IntVal(s1)
-                    } else {
-                        Value.IntVal(s2)
-                    }
+                    if s1 >= s2 then {Value.IntVal(s1)} else {Value.IntVal(s2)}
                 }
-                case _ => throw RuntimeException("max expects 2 integers")
+                case List(Value.FloatVal(s1), Value.FloatVal(s2)) => {
+                    if s1 >= s2 then {Value.FloatVal(s1)} else {Value.FloatVal(s2)}
+                }
+                case List(Value.IntVal(s1), Value.FloatVal(s2)) => {
+                    if s1 >= s2 then {Value.FloatVal(s1)} else {Value.FloatVal(s2)}
+                }
+                case List(Value.FloatVal(s1), Value.IntVal(s2)) => {
+                    if s1 >= s2 then {Value.FloatVal(s1)} else {Value.FloatVal(s2)}
+                }
+                case _ => throw RuntimeException("max expects 2 integers / floats")
             }
         )
         // min - Min of 2 Integers
         fnEnv.registerBuiltin("min", args => args match {
                 case List(Value.IntVal(s1), Value.IntVal(s2)) => {
-                    if s1 >= s2 then {
-                        Value.IntVal(s2)
-                    } else {
-                        Value.IntVal(s1)
-                    }
+                    if s1 >= s2 then {Value.IntVal(s2)} else {Value.IntVal(s1)}
                 }
-                case _ => throw RuntimeException("min expects 2 integers")
+                case List(Value.FloatVal(s1), Value.FloatVal(s2)) => {
+                    if s1 >= s2 then {Value.FloatVal(s2)} else {Value.FloatVal(s1)}
+                }
+                case List(Value.IntVal(s1), Value.FloatVal(s2)) => {
+                    if s1 >= s2 then {Value.FloatVal(s2)} else {Value.FloatVal(s1)}
+                }
+                case List(Value.FloatVal(s1), Value.IntVal(s2)) => {
+                    if s1 >= s2 then {Value.FloatVal(s2)} else {Value.FloatVal(s1)}
+                }
+                case _ => throw RuntimeException("min expects 2 integers / floats")
             }
         )
         // clamp - Clamps Integer between min and max values
@@ -213,33 +257,86 @@ object Builtins:
                         case _ => Value.IntVal(i)
                     }
                 }
-                case _ => throw RuntimeException("clamp expects 3 integers")
-            }
-        )
-
-        // pow - Integer Power
-        fnEnv.registerBuiltin("pow", args => args match {
-                case List(Value.IntVal(s1), Value.IntVal(s2)) => {
-                   if s2 < 1 then {
-                        throw RuntimeException("negative powers not supported")
-                   } else {
-                        var result = 1
-                        var currentBase = s1
-                        var exp = s2
-                        while (exp > 0) {
-                            if (exp % 2 == 1) {
-                                result *= currentBase 
-                            }
-                            currentBase *= currentBase
-                            exp /= 2
-                        }
-                        Value.IntVal(result)
-                   }
+                case List(Value.FloatVal(i), Value.IntVal(min), Value.IntVal(max)) => {
+                    i match {
+                        case x if i < min => Value.FloatVal(min)
+                        case x if i > max => Value.FloatVal(max)
+                        case _ => Value.FloatVal(i)
+                    }
                 }
-                case _ => throw RuntimeException("pow expects 2 integers")
+                case List(Value.FloatVal(i), Value.FloatVal(min), Value.FloatVal(max)) => {
+                    i match {
+                        case x if i < min => Value.FloatVal(min)
+                        case x if i > max => Value.FloatVal(max)
+                        case _ => Value.FloatVal(i)
+                    }
+                }
+                case _ => throw RuntimeException("clamp expects 3 integers / floats")
             }
         )
 
+        // pow - Power
+        fnEnv.registerBuiltin("pow", args => args match {
+            case List(Value.IntVal(base), Value.IntVal(exp)) if exp > 0 => {
+                var result = 1
+                var currentBase = base
+                var e = exp
+                while e > 0 do {
+                    if e % 2 == 1 then result *= currentBase
+                    currentBase *= currentBase
+                    e /= 2
+                }
+                Value.IntVal(result)
+            }
+            case List(Value.IntVal(base), Value.IntVal(exp)) => {
+                Value.FloatVal(pow(base.toDouble, exp.toDouble))
+            }
+            case List(Value.IntVal(base), Value.FloatVal(exp)) => {
+                Value.FloatVal(pow(base.toDouble, exp))
+            }
+            case List(Value.FloatVal(base), Value.IntVal(exp)) => {
+                Value.FloatVal(pow(base, exp.toDouble))
+            }
+            case List(Value.FloatVal(base), Value.FloatVal(exp)) => {
+                Value.FloatVal(pow(base, exp))
+            }
+            case _ => throw RuntimeException("pow expects 2 integers / floats")
+        })
+        // sqrt - Square Root
+        fnEnv.registerBuiltin("sqrt", args => args match {
+            case List(Value.IntVal(i)) => Value.FloatVal(sqrt(i))
+            case List(Value.FloatVal(f)) => Value.FloatVal(sqrt(f))
+            case _ => throw RuntimeException("sqrt expects 1 integer / float")
+        })
+        // ln - natural log
+        fnEnv.registerBuiltin("ln", args => args match {
+            case List(Value.IntVal(a)) => Value.FloatVal(log(a))
+            case List(Value.FloatVal(a)) => Value.FloatVal(log(a))
+            case _ => throw RuntimeException("ln expects 1 integer / float")
+        })
+        // log10 - log base 10
+        fnEnv.registerBuiltin("log10", args => args match {
+            case List(Value.IntVal(a)) => Value.FloatVal(log10(a))
+            case List(Value.FloatVal(a)) => Value.FloatVal(log10(a))
+            case _ => throw RuntimeException("log10 expects 1 integer / float")
+        })
+        // log - log with arbitrary base
+        fnEnv.registerBuiltin("log", args => args match {
+            case List(Value.IntVal(a), Value.IntVal(b)) => Value.FloatVal(log(a) / log(b))
+            case List(Value.IntVal(a), Value.FloatVal(b)) => Value.FloatVal(log(a) / log(b))
+            case List(Value.FloatVal(a), Value.IntVal(b)) => Value.FloatVal(log(a) / log(b))
+            case List(Value.FloatVal(a), Value.FloatVal(b)) => Value.FloatVal(log(a) / log(b))
+            case _ => throw RuntimeException("log expects 2 integers / floats")
+        })
+        fnEnv.registerBuiltin("pi", args => args match {
+            case List() => Value.FloatVal(Pi)
+            case _ => throw RuntimeException("pi takes no arguments")
+        })
+
+        fnEnv.registerBuiltin("e", args => args match {
+            case List() => Value.FloatVal(E)
+            case _ => throw RuntimeException("e takes no arguments")
+        })
         // assert - If false, throws an Error
         fnEnv.registerBuiltin("assert", args => args match {
                 case List(Value.BoolVal(b)) => {
@@ -363,10 +460,10 @@ object Builtins:
             case List(Value.ArrVal(elements), value) =>
                 elements += value
                 Value.ArrVal(elements)
-            case _ => throw RuntimeException("[Error] push expects an array and a value")
+            case _ => throw RuntimeException("push expects an array and a value")
         })
         fnEnv.registerBuiltin("isEmpty", args => args match {
             case List(Value.ArrVal(elements)) => Value.BoolVal(elements.isEmpty)
-            case _ => throw RuntimeException("[Error] isEmpty expects an array")
+            case _ => throw RuntimeException("isEmpty expects an array")
         })
     }

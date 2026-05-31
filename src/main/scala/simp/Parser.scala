@@ -62,7 +62,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
             val item = peek() match {
                 case Token.Fn |  Token.Struct | Token.Import => Program.PDecl(parseDecl())
                 case Token.BoolLit(_) | Token.Not => Program.PBool(parseBool())
-                case Token.LiteralInt(_) | Token.Deref =>
+                case  Token.LiteralFloat(_) |Token.LiteralInt(_) | Token.Deref =>
                     val expr = parseExpr()
                     peek() match {
                         case Token.Gt | Token.Lt | Token.Gte | Token.Lte | Token.Eq | Token.Neq =>
@@ -80,7 +80,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
                             Program.PBool(BoolExpr.Compare(expr, bop, right))
                         case _ => Program.PExpr(expr)
                     }
-                case Token.Variable(_) if peekNext() == Token.OpenBracket => Program.PExpr(parseAtomicExpr())
+                case Token.Variable(_) if peekNext() == Token.OpenBracket => Program.PExpr(parseExpr())
                 case Token.Variable(_) if peekNext() == Token.OpenSquare => {
                     val savedPos = pos
                     advance()
@@ -109,8 +109,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
     }
     private def parseCmd(): Cmd = {
         val left = peek() match {
-            case Token.Fn |  Token.Struct | Token.Import =>
-                throwError("Declarations must be at the top of the file")
+            case Token.Fn |  Token.Struct | Token.Import => return Cmd.Skip
             case _ => parseSingleCmd()
         }
         if peek() == Token.Semicolon then {
@@ -177,7 +176,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
                                         val value = parseExpr()
                                         Cmd.FieldIndexAssign(l, field, index, Expr.BinaryOp(Expr.ArrIndex(Expr.FieldAccess(Expr.Ref(l), field), index), Op.Div, value))
                                     }
-                                    case x => throw RuntimeException(s"[Error] Expected assignment, got '$x'")
+                                    case x => throw RuntimeException(s"Expected assignment, got '$x'")
                                 }
                             }
                             case Token.Assign => {
@@ -204,10 +203,10 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
                                 val value = parseExpr()
                                 Cmd.FieldAssign(l, field, Expr.BinaryOp(Expr.FieldAccess(Expr.Ref(l), field), Op.Div, value))
                             }
-                            case x => throw RuntimeException(s"[Error] Expected assignment, got '$x'")
+                            case x => throw RuntimeException(s"Expected assignment, got '$x'")
                         }
                     }
-                    case x => throw RuntimeException(s"[Error] Expected field name after '.', got '$x'")
+                    case x => throw RuntimeException(s"Expected field name after '.', got '$x'")
                 }
             }
             case Token.If => {
@@ -379,6 +378,16 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
             }
             t
         }
+        case Token.TypeFloat  => { 
+            advance(); 
+            var t: SimpType = SimpType.TypeFloat
+            while peek() == Token.OpenSquare do {
+                expect(Token.OpenSquare)
+                expect(Token.CloseSquare)
+                t = SimpType.TypeArr(t)
+            }
+            t
+        }
         case Token.TypeString  => { 
             advance(); 
             var t: SimpType = SimpType.TypeString
@@ -520,6 +529,26 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
             case Token.LiteralInt(n) => {
                 advance()
                 val left = Expr.Num(n)
+                peek() match {
+                    case Token.Gt | Token.Lt | Token.Gte | Token.Lte | Token.Eq | Token.Neq =>
+                        val bop = peek() match {
+                            case Token.Gt  => Bop.Gt
+                            case Token.Lt  => Bop.Lt
+                            case Token.Gte => Bop.Gte
+                            case Token.Lte => Bop.Lte
+                            case Token.Eq  => Bop.Eq
+                            case Token.Neq => Bop.Neq
+                            case _ => throwError("unreachable")
+                        }
+                        advance()
+                        val right = parseExpr()
+                        Expr.BoolLift(BoolExpr.Compare(left, bop, right))
+                    case _ => left
+                }
+            }
+            case Token.LiteralFloat(n) => {
+                advance()
+                val left = Expr.Flt(n)
                 peek() match {
                     case Token.Gt | Token.Lt | Token.Gte | Token.Lte | Token.Eq | Token.Neq =>
                         val bop = peek() match {
