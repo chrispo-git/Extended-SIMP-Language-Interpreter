@@ -1,6 +1,3 @@
-// Graph implementation using adjacency lists
-// Nodes are structs, edges are arrays of node references
-
 struct Graph {
     nodes: Int[],
     edges: Int[][]
@@ -12,55 +9,56 @@ struct Queue {
     back: Int
 }
 
-// Queue operations
 fn makeQueue() -> Queue {
     return Queue { data: [], front: 0, back: 0 };
 }
 
 fn enqueue(q: Queue, val: Int) -> Queue {
-    q.data[q.back] := val;
+    q.data := push(q.data, !val);
     q.back := q.back + 1;
     return q;
 }
 
 fn dequeue(q: Queue) -> Int {
+    if queueEmpty(q) then {
+        print "[Error] Cannot dequeue from empty queue";
+        return -1;
+    };
     val := q.data[q.front];
     q.front := q.front + 1;
-    return val;
+    return !val;
 }
 
 fn queueEmpty(q: Queue) -> Bool {
     return q.front == q.back;
 }
 
-// Graph operations
 fn makeGraph(size: Int) -> Graph {
     nodes := [];
     edges := [];
     i := 0;
     while !i < size do {
-        nodes[!i] := !i;
-        edges[!i] := [];
+        nodes := push(nodes, !i);
+        edges := push(edges, []);
         i += 1;
     };
     return Graph { nodes: nodes, edges: edges };
 }
 
 fn addEdge(g: Graph, from: Int, to: Int) -> Graph {
-    edges := g.edges;
-    row := edges[!from];
-    row[len(row)] := !to;
-    edges[!from] := row;
-    g.edges := edges;
+    row := g.edges[!from];
+    row := push(row, !to);
+    g.edges[!from] := row;
     return g;
 }
 
 fn bfs(g: Graph, start: Int) -> Void {
     size := len(g.nodes);
     visited := [];
+    order := [];
     i := 0;
     while !i < size do {
-        visited[!i] := false;
+        visited := push(visited, false);
         i += 1;
     };
 
@@ -68,11 +66,9 @@ fn bfs(g: Graph, start: Int) -> Void {
     q := enqueue(q, start);
     visited[start] := true;
 
-    print "BFS traversal from node " + start + ":";
-
     while ¬queueEmpty(q) do {
         node := dequeue(q);
-        print "Visiting node: " + !node;
+        order := push(order, !node);
 
         neighbours := g.edges[!node];
         j := 0;
@@ -85,21 +81,65 @@ fn bfs(g: Graph, start: Int) -> Void {
             j += 1;
         };
     };
+
+    i := 0;
+    result := "";
+    while !i < len(order) do {
+        if !i == 0 then {
+            result := toStr(order[!i]);
+        } else {
+            result := !result + " -> " + toStr(order[!i]);
+        };
+        i += 1;
+    };
+    print "BFS order: " + !result;
 }
 
-fn dfs(g: Graph, node: Int, visited: Bool[]) -> Void {
+fn dfs(g: Graph, node: Int, visited: Bool[], order: Int[], toPrint: Bool) -> Void {
     visited[!node] := true;
-    print "Visiting node: " + !node;
+    order := push(order, !node);
 
     neighbours := g.edges[!node];
     i := 0;
     while !i < len(neighbours) do {
         neighbour := neighbours[!i];
         if ¬visited[!neighbour] then {
-            _ := dfs(g, !neighbour, visited);
+            _ := dfs(g, !neighbour, visited, order, false);
         };
         i += 1;
     };
+
+    i := 0;
+    result := "";
+    while !i < len(order) do {
+        if !i == 0 then {
+            result := toStr(order[!i]);
+        } else {
+            result := !result + " -> " + toStr(order[!i]);
+        };
+        i += 1;
+    };
+    if !toPrint then {
+        print "DFS order: " + !result;
+    }
+}
+
+fn dfsCheck(g: Graph, node: Int, parent: Int, visited: Bool[]) -> Bool {
+    visited[!node] := true;
+    neighbours := g.edges[!node];
+    j := 0;
+    while !j < len(neighbours) do {
+        neighbour := neighbours[!j];
+        if ¬visited[!neighbour] then {
+            if dfsCheck(g, !neighbour, !node, visited) then {
+                return true;
+            };
+        } elif !neighbour != !parent then {
+            return true;
+        };
+        j += 1;
+    };
+    return false;
 }
 
 fn hasCycle(g: Graph) -> Bool {
@@ -107,32 +147,14 @@ fn hasCycle(g: Graph) -> Bool {
     visited := [];
     i := 0;
     while !i < size do {
-        visited[!i] := false;
+        visited := push(visited, false);
         i += 1;
-    };
-
-    fn dfsCheck(node: Int, parent: Int) -> Bool {
-        visited[!node] := true;
-        neighbours := g.edges[!node];
-        j := 0;
-        while !j < len(neighbours) do {
-            neighbour := neighbours[!j];
-            if ¬visited[!neighbour] then {
-                if dfsCheck(!neighbour, !node) then {
-                    return true;
-                };
-            } elif !neighbour != !parent then {
-                return true;
-            };
-            j += 1;
-        };
-        return false;
     };
 
     i := 0;
     while !i < size do {
         if ¬visited[!i] then {
-            if dfsCheck(!i, -1) then {
+            if dfsCheck(g, !i, -1, visited) then {
                 return true;
             };
         };
@@ -140,34 +162,92 @@ fn hasCycle(g: Graph) -> Bool {
     };
     return false;
 }
+fn printTree(g: Graph, node: Int, visited: Bool[], prefix: Str, isLast: Bool) -> Void {
+    visited[!node] := true;
 
-// Build a graph with 5 nodes
-//     0
-//    / \
-//   1   2
-//  / \   \
-// 3   4   (back to 0)
+    connector := "";
+    if !isLast then {
+        connector := "├── ";
+    } else {
+        connector := "└── ";
+    };
+
+    print !prefix + !connector + toStr(!node);
+
+    neighbours := g.edges[!node];
+    unvisitedNeighbours := [];
+    i := 0;
+    while !i < len(neighbours) do {
+        neighbour := neighbours[!i];
+        if ¬visited[!neighbour] then {
+            unvisitedNeighbours := push(unvisitedNeighbours, !neighbour);
+        };
+        i += 1;
+    };
+
+    i := 0;
+    while !i < len(unvisitedNeighbours) do {
+        neighbour := unvisitedNeighbours[!i];
+        childIsLast := !i == len(unvisitedNeighbours) - 1;
+        childPrefix := "";
+        if !isLast then {
+            childPrefix := !prefix + "│   ";
+        } else {
+            childPrefix := !prefix + "    ";
+        };
+        _ := printTree(g, !neighbour, visited, !childPrefix, !childIsLast);
+        i += 1;
+    };
+}
+
+fn printGraphTree(g: Graph, root: Int) -> Void {
+    if hasCycle(g) then {
+        print "Graph contains a cycle, cannot be printed";
+        return;
+    };
+    size := len(g.nodes);
+    visited := [];
+    i := 0;
+    while !i < size do {
+        visited := push(visited, false);
+        i += 1;
+    };
+    print "Tree rooted at node " + root + ":";
+    print toStr(root);
+    neighbours := g.edges[!root];
+    visited[root] := true;
+    i := 0;
+    while !i < len(neighbours) do {
+        neighbour := neighbours[!i];
+        if ¬visited[!neighbour] then {
+            isLast := !i == len(neighbours) - 1;
+            _ := printTree(g, !neighbour, visited, "", !isLast);
+        };
+        i += 1;
+    };
+}
 
 g := makeGraph(5);
 g := addEdge(g, 0, 1);
 g := addEdge(g, 0, 2);
 g := addEdge(g, 1, 3);
 g := addEdge(g, 1, 4);
-g := addEdge(g, 2, 0);  // creates a cycle
 
-print "=== Graph Traversal ===";
+_ := printGraphTree(g, 0);
+print "=== BFS Traversal ===";
 _ := bfs(g, 0);
 
 print "";
 print "=== DFS Traversal ===";
 size := len(g.nodes);
 visited := [];
+order := [];
 i := 0;
 while !i < size do {
-    visited[!i] := false;
+    visited := push(visited, false);
     i += 1;
 };
-_ := dfs(g, 0, visited);
+_ := dfs(g, 0, visited, order, true);
 
 print "";
 print "=== Cycle Detection ===";
@@ -177,13 +257,14 @@ if hasCycle(g) then {
     print "Graph is acyclic";
 };
 
-// Build an acyclic graph
 print "";
 print "=== Acyclic Graph ===";
 g2 := makeGraph(4);
 g2 := addEdge(g2, 0, 1);
 g2 := addEdge(g2, 0, 2);
 g2 := addEdge(g2, 1, 3);
+
+_ := printGraphTree(g2, 0);
 
 if hasCycle(g2) then {
     print "Graph contains a cycle";
