@@ -152,13 +152,57 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
                                 advance()
                                 val index = parseExpr()
                                 expect(Token.CloseSquare)
-                                expect(Token.Assign)
-                                val value = parseExpr()
-                                Cmd.FieldIndexAssign(l, field, index, value)
+                                peek() match {
+                                    case Token.Assign => {
+                                        advance()
+                                        Cmd.FieldIndexAssign(l, field, index, parseExpr())
+                                    }
+                                    case Token.PlusEq => {
+                                        advance()
+                                        val value = parseExpr()
+                                        Cmd.FieldIndexAssign(l, field, index, Expr.BinaryOp(Expr.ArrIndex(Expr.FieldAccess(Expr.Ref(l), field), index), Op.Add, value))
+                                    }
+                                    case Token.MinusEq => {
+                                        advance()
+                                        val value = parseExpr()
+                                        Cmd.FieldIndexAssign(l, field, index, Expr.BinaryOp(Expr.ArrIndex(Expr.FieldAccess(Expr.Ref(l), field), index), Op.Sub, value))
+                                    }
+                                    case Token.MulEq => {
+                                        advance()
+                                        val value = parseExpr()
+                                        Cmd.FieldIndexAssign(l, field, index, Expr.BinaryOp(Expr.ArrIndex(Expr.FieldAccess(Expr.Ref(l), field), index), Op.Mul, value))
+                                    }
+                                    case Token.DivEq => {
+                                        advance()
+                                        val value = parseExpr()
+                                        Cmd.FieldIndexAssign(l, field, index, Expr.BinaryOp(Expr.ArrIndex(Expr.FieldAccess(Expr.Ref(l), field), index), Op.Div, value))
+                                    }
+                                    case x => throw RuntimeException(s"[Error] Expected assignment, got '$x'")
+                                }
                             }
                             case Token.Assign => {
                                 advance()
                                 Cmd.FieldAssign(l, field, parseExpr())
+                            }
+                            case Token.PlusEq => {
+                                advance()
+                                val value = parseExpr()
+                                Cmd.FieldAssign(l, field, Expr.BinaryOp(Expr.FieldAccess(Expr.Ref(l), field), Op.Add, value))
+                            }
+                            case Token.MinusEq => {
+                                advance()
+                                val value = parseExpr()
+                                Cmd.FieldAssign(l, field, Expr.BinaryOp(Expr.FieldAccess(Expr.Ref(l), field), Op.Sub, value))
+                            }
+                            case Token.MulEq => {
+                                advance()
+                                val value = parseExpr()
+                                Cmd.FieldAssign(l, field, Expr.BinaryOp(Expr.FieldAccess(Expr.Ref(l), field), Op.Mul, value))
+                            }
+                            case Token.DivEq => {
+                                advance()
+                                val value = parseExpr()
+                                Cmd.FieldAssign(l, field, Expr.BinaryOp(Expr.FieldAccess(Expr.Ref(l), field), Op.Div, value))
                             }
                             case x => throw RuntimeException(s"[Error] Expected assignment, got '$x'")
                         }
@@ -606,17 +650,32 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
         }
         left
     }
-    private def parseStructFields(): List[(String, SimpType)] = {
+    private def parseStructField(): (String, SimpType, Option[Expr]) = {
+        peek() match {
+            case Token.Variable(name) => {
+                advance()
+                expect(Token.Colon)
+                val t = parseType()
+                val default = if peek() == Token.Assign then {
+                    advance()
+                    Some(parseExpr())
+                } else None
+                (name, t, default)
+            }
+            case x => throwError(s"Expected field name, got '$x'")
+        }
+    }
+    private def parseStructFields(): List[(String, SimpType, Option[Expr])] = {
         expect(Token.OpenBrace)
         if peek() == Token.CloseBrace then {
             advance()
             List()
         } else {
-            val params = scala.collection.mutable.ListBuffer[(String, SimpType)]()
-            params += parseParam()
+            val params = scala.collection.mutable.ListBuffer[(String, SimpType, Option[Expr])]()
+            params += parseStructField()
             while peek() == Token.Comma do {
                 advance()
-                params += parseParam()
+                params += parseStructField()
             }
             expect(Token.CloseBrace)
             params.toList

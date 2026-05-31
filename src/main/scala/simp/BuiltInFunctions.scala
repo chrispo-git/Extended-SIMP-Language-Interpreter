@@ -365,4 +365,8 @@ object Builtins:
                 Value.ArrVal(elements)
             case _ => throw RuntimeException("[Error] push expects an array and a value")
         })
+        fnEnv.registerBuiltin("isEmpty", args => args match {
+            case List(Value.ArrVal(elements)) => Value.BoolVal(elements.isEmpty)
+            case _ => throw RuntimeException("[Error] isEmpty expects an array")
+        })
     }

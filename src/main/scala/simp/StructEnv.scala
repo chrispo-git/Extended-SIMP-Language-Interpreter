@@ -11,4 +11,4 @@ class StructEnv:
 
     def preRegister(name: String): Unit = structs(name) = StructDef(List())
 
-case class StructDef(fields: List[(String, SimpType)])
+case class StructDef(fields: List[(String, SimpType, Option[Expr])])

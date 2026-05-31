@@ -1,0 +1,41 @@
+struct IntStack {
+    stack: Int[] := [],
+    top: Int := -1
+}
+
+fn stackPush(s: IntStack, value: Int) -> Void {
+    _:= push(s.stack, value);
+    s.top += 1;
+}
+fn stackPeek(s: IntStack) -> Int {
+    if isEmpty(s.stack) then {
+        print "ERROR - Empty Stack";
+        return -1;
+    } else {
+        return s.stack[s.top];
+    }
+}
+fn stackPop(s: IntStack) -> Int {
+    if isEmpty(s.stack) then {
+        print "ERROR - Empty Stack";
+        return -1;
+    } else {
+        out := s.stack[s.top];
+        s.stack := slice(s.stack, 0, s.top);
+        s.top -= 1;
+        return !out;
+    }
+}
+
+myStack := IntStack{}
+print "initial stack state: "  + !myStack;
+_:= stackPush(myStack,1);
+_:= stackPush(myStack,5);
+_:= stackPush(myStack,1);
+_:= stackPush(myStack,3);
+print "current stack state: "  + !myStack;
+print "peek " + stackPeek(myStack);
+_:= stackPop(myStack);
+_:= stackPop(myStack);
+print "current stack state: "  + !myStack;
+print "peek " + stackPeek(myStack);

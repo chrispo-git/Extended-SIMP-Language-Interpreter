@@ -299,19 +299,17 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
             case Expr.StructLiteral(typeName, fields) => {
                 val defn = structEnv.lookup(typeName)
                 val fieldMap = scala.collection.mutable.Map[String, Value]()
-
-                defn.fields.foreach((name, expectedType) => {
-                    val fieldExpr = fields.find(_._1 == name).getOrElse(
-                        throw RuntimeException(s"Missing field '$name' in $typeName literal")
-                    )
-                    val value = evalExpr(fieldExpr._2, store)
+                defn.fields.foreach((name, expectedType, default) => {
+                    val fieldExpr = fields.find(_._1 == name)
+                    val value = fieldExpr match {
+                        case Some((_, expr)) => evalExpr(expr, store)
+                        case None => default match {
+                            case Some(expr) => evalExpr(expr, store)
+                            case None => throw RuntimeException(s"[Error] Missing field '$name' in $typeName literal and no default value provided")
+                        }
+                    }
                     checkType(value, expectedType, name)
                     fieldMap(name) = value
-                })
-                fields.foreach((name, _) => {
-                    if !defn.fields.exists(_._1 == name) then {
-                        throw RuntimeException(s"Unknown field '$name' in $typeName literal")
-                    }
                 })
                 Value.StructVal(typeName, fieldMap)
             }

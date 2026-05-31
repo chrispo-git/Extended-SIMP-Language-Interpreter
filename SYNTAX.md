@@ -30,12 +30,13 @@ Declarations come in 3 forms, declaring functions, declaring structs, and import
 
 ```
 Decl ::= fn f(x₀ : t₀, x₁ : t₁, ...) -> t { Cmd }  
-        | struct S { f₀ : t₀, f₁ : t₁, ... } 
+        | struct S { f₀ : t₀ = v₀, f₁ : t₁ = v₁, ... } 
         | import "F"
         | import "F" as A
 where x₀, x₁, ... are parameter names (locations)
 where t, t₀, t₁, ... are parameter types (One of Str, Int, Bool, Int[], Str[], Bool[], Struct, Struct[], or Void)
 where f₀, f₁, ... are field names
+where v₀, v₁, ... are optional default values
 where F is the path of a file, and A is an optional alias
 ```
 
