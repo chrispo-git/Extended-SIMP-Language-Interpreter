@@ -6,4 +6,5 @@ fn factorial(n : Int) -> Int {
     };
 }
 
-print "The Factorial of 5 is " + factorial(5);
+myVal := inputInt("get factorial: ");
+print "The Factorial of " + myVal + " is " + factorial(myVal);

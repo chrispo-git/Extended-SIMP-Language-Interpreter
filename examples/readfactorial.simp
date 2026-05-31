@@ -1,0 +1,7 @@
+lines := readFile("examples/factorial.simp");
+i := 1;
+print "examples/factorial.simp";
+for line in lines {
+    print toStr(!i) + ": " + !line;
+    i += 1;
+};

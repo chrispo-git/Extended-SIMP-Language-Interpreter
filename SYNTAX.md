@@ -8,10 +8,11 @@ Program ::= (Cmd | Decl)*
 ```
 
 ### Values
-Expressions produce a value in 4 categories:
+Expressions produce a value in 5 categories:
 - Primitive type - `Int`, `Str`, `Bool`, `Float`
 - Structs
 - Array Type - `Int[]`, `Str[]`, `Bool[]`, `Struct[]`
+- Map Type - `Map(K, V)`
 - Null Type - `null` 
 
 | Type | Examples |
@@ -22,7 +23,11 @@ Expressions produce a value in 4 categories:
 | `Int[]`, `Str[]`, `Bool[]` , `Float[]`| `[1, 2, 3]`, `["a", "b"]`, `[true, false]`, `[]` |
 | `StructName` | `Point { x: 1, y: 2 }` |
 | `null` | `null` |
+| `Map(K, V)` | `newMap(Str, Int)`, `newMap(Int, Bool)` |
 
+
+Maps are key-value stores with typed keys and values. They are created with `newMap(KeyType, ValueType)` 
+and manipulated exclusively through built-in functions. See [Built-in Functions](BUILT-IN-FUNCTIONS.md).
 ---
 
 ### Declarations
@@ -34,7 +39,7 @@ Decl ::= fn f(x₀ : t₀, x₁ : t₁, ...) -> t { Cmd }
         | import "F"
         | import "F" as A
 where x₀, x₁, ... are parameter names (locations)
-where t, t₀, t₁, ... are parameter types (One of Str, Int, Bool, Int[], Str[], Bool[], Struct, Struct[], or Void)
+where t, t₀, t₁, ... are parameter types (One of Str, Int, Bool, Int[], Str[], Bool[], Struct, Struct[], Map(K, V), or Void)
 where f₀, f₁, ... are field names
 where v₀, v₁, ... are optional default values
 where F is the path of a file, and A is an optional alias
@@ -73,6 +78,7 @@ Cmd ::= skip                                -- no-op
       | print E                            -- print any expression
       | return E                           -- return from function
       | l.f := E                                 -- field assignment (write)
+      | newMap(t, t)                              -- map literal (see built-in functions)
 ```
 
 Where:
@@ -253,4 +259,25 @@ nums := [1, 2, 3, 4, 5];
 print nums;
 _ := reverseArr(nums);
 print nums;
+```
+
+### Maps
+```
+// Word frequency counter
+text := "The FitnessGram Pacer Test is a multistage aerobic capacity test that progressively gets more difficult as it continues";
+words := split(!text, " ");
+counts := newMap(Str, Int);
+
+for word in words {
+    if hasKey(counts, word) then {
+        _ := set(counts, word, get(counts, word) + 1);
+    } else {
+        _ := set(counts, word, 1);
+    };
+};
+
+wordList := keys(counts);
+for word in wordList {
+    print word + ": " + get(counts, word);
+};
 ```
