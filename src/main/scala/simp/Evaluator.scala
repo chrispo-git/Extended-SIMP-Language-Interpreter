@@ -109,19 +109,20 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
     }
     private def getType(value: Value): SimpType = value match {
         case Value.IntVal(_)  => SimpType.TypeInt
+        case Value.FloatVal(_)  => SimpType.TypeFloat
         case Value.StrVal(_)  => SimpType.TypeString
         case Value.BoolVal(_) => SimpType.TypeBool
         case Value.NullVal    => SimpType.TypeNull
         case Value.StructVal(typeName, _) => SimpType.TypeStruct(typeName)
         case Value.RefVal(loc, refStore) => 
             refStore.load(loc) match {
-                case Value.RefVal(_, _) => throw RuntimeException("[Error] Nested references are not supported")
+                case Value.RefVal(_, _) => throw RuntimeException("Nested references are not supported")
                 case v => getType(v)
             }
         case Value.ArrVal(elements) =>
             if elements.isEmpty then SimpType.TypeArr(SimpType.TypeInt)
             else elements.head match {
-                case Value.RefVal(_, _) => throw RuntimeException("[Error] Arrays of references are not supported")
+                case Value.RefVal(_, _) => throw RuntimeException("Arrays of references are not supported")
                 case v => SimpType.TypeArr(getType(v))
             }
     }
@@ -136,7 +137,7 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
                 case Value.ArrVal(elements) if elements.isEmpty => {
                     expected match {
                         case SimpType.TypeArr(_) => return  
-                        case _ => throw RuntimeException(s"[Error] Type mismatch for '$name': expected $expected, got []")
+                        case _ => throw RuntimeException(s"Type mismatch for '$name': expected $expected, got []")
                     }
                 }
                 case _ => {
@@ -180,6 +181,36 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
             case BoolExpr.Compare(l,bop,r) => {
                 (evalExpr(l, store), evalExpr(r, store)) match {
                     case (Value.IntVal(left), Value.IntVal(right)) => {
+                        bop match {
+                            case Bop.Gt => left > right
+                            case Bop.Gte => left >= right 
+                            case Bop.Lt => left < right 
+                            case Bop.Lte => left <= right
+                            case Bop.Eq => left == right 
+                            case Bop.Neq => left != right 
+                        }
+                    }
+                    case (Value.FloatVal(left), Value.FloatVal(right)) => {
+                        bop match {
+                            case Bop.Gt => left > right
+                            case Bop.Gte => left >= right 
+                            case Bop.Lt => left < right 
+                            case Bop.Lte => left <= right
+                            case Bop.Eq => left == right 
+                            case Bop.Neq => left != right 
+                        }
+                    }
+                    case (Value.IntVal(left), Value.FloatVal(right)) => {
+                        bop match {
+                            case Bop.Gt => left > right
+                            case Bop.Gte => left >= right 
+                            case Bop.Lt => left < right 
+                            case Bop.Lte => left <= right
+                            case Bop.Eq => left == right 
+                            case Bop.Neq => left != right 
+                        }
+                    }
+                    case (Value.FloatVal(left), Value.IntVal(right)) => {
                         bop match {
                             case Bop.Gt => left > right
                             case Bop.Gte => left >= right 
@@ -236,6 +267,7 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
 
     private def valuesEqual(v1: Value, v2: Value, visited: Set[(AnyRef, AnyRef)]): Boolean = (v1, v2) match {
         case (Value.IntVal(a), Value.IntVal(b))   => a == b
+        case (Value.FloatVal(a), Value.FloatVal(b))   => a == b
         case (Value.StrVal(a), Value.StrVal(b))   => a == b
         case (Value.BoolVal(a), Value.BoolVal(b)) => a == b
         case (Value.NullVal, Value.NullVal)        => true
@@ -246,6 +278,7 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
     private def evalExpr(expr: Expr, store: Store): Value = {
         expr match {
             case Expr.Num(n) => Value.IntVal(n)
+            case Expr.Flt(n) => Value.FloatVal(n)
             case Expr.Deref(loc) => {
                 store.load(loc) match {
                     case Value.RefVal(refLoc, refStore) => refStore.load(refLoc)
@@ -287,6 +320,36 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
                             case Op.Div => Value.IntVal(left / right)
                         }
                     }
+                    case (Value.IntVal(left), Value.FloatVal(right)) => {
+                        op match {
+                            case Op.Add => Value.FloatVal(left + right)
+                            case Op.Sub => Value.FloatVal(left - right)
+                            case Op.Mul => Value.FloatVal(left * right)
+                            case Op.Div if right == 0 => throw RuntimeException(s"Division by Zero!")
+                            case Op.Div => Value.FloatVal(left / right)
+                            case x => throw RuntimeException(s"Unsupported operation '$x'")
+                        }
+                    }
+                    case (Value.FloatVal(left), Value.IntVal(right)) => {
+                        op match {
+                            case Op.Add => Value.FloatVal(left + right)
+                            case Op.Sub => Value.FloatVal(left - right)
+                            case Op.Mul => Value.FloatVal(left * right)
+                            case Op.Div if right == 0 => throw RuntimeException(s"Division by Zero!")
+                            case Op.Div => Value.FloatVal(left / right)
+                            case x => throw RuntimeException(s"Unsupported operation '$x'")
+                        }
+                    }
+                    case (Value.FloatVal(left), Value.FloatVal(right)) => {
+                        op match {
+                            case Op.Add => Value.FloatVal(left + right)
+                            case Op.Sub => Value.FloatVal(left - right)
+                            case Op.Mul => Value.FloatVal(left * right)
+                            case Op.Div if right == 0 => throw RuntimeException(s"Division by Zero!")
+                            case Op.Div => Value.FloatVal(left / right)
+                            case x => throw RuntimeException(s"Unsupported operation '$x'")
+                        }
+                    }
                     case (Value.StrVal(left),right) => {
                         op match {
                             case Op.Add => Value.StrVal(left + getPrettyPrint(right))
@@ -305,7 +368,7 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
                         case Some((_, expr)) => evalExpr(expr, store)
                         case None => default match {
                             case Some(expr) => evalExpr(expr, store)
-                            case None => throw RuntimeException(s"[Error] Missing field '$name' in $typeName literal and no default value provided")
+                            case None => throw RuntimeException(s"Missing field '$name' in $typeName literal and no default value provided")
                         }
                     }
                     checkType(value, expectedType, name)
@@ -362,6 +425,7 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
         value match {
             case Value.StrVal(s) => s
             case Value.IntVal(n) => n.toString
+            case Value.FloatVal(n) => n.toString
             case Value.BoolVal(b) => b.toString
             case Value.NullVal => "null"
             case Value.RefVal(name,_) => s"Ref($name)"
@@ -414,16 +478,16 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
                             case Some(Value.ArrVal(elements)) => {
                                 val idx = evalExpr(index, store) match {
                                     case Value.IntVal(i) => i
-                                    case _ => throw RuntimeException("[Error] Array index must be an integer")
+                                    case _ => throw RuntimeException("Array index must be an integer")
                                 }
                                 if idx < 0 || idx >= elements.length then
-                                    throw RuntimeException(s"[Error] Index $idx out of bounds")
+                                    throw RuntimeException(s"Index $idx out of bounds")
                                 elements(idx) = evalExpr(valueExpr, store)
                             }
-                            case _ => throw RuntimeException(s"[Error] '$field' is not an array")
+                            case _ => throw RuntimeException(s"'$field' is not an array")
                         }
                     }
-                    case _ => throw RuntimeException(s"[Error] '$loc' is not a struct")
+                    case _ => throw RuntimeException(s"'$loc' is not a struct")
                 }
             }
             case Cmd.Seq(fst, snd) => {

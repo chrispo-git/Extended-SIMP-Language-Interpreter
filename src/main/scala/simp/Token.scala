@@ -3,6 +3,7 @@ package simp
 
 enum Token:
     case LiteralInt(value: Int)
+    case LiteralFloat(value: Double)
     case BoolLit(value: Boolean)
     case Variable(loc: String)
 

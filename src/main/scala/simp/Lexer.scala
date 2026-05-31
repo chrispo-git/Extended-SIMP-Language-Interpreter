@@ -41,6 +41,14 @@ class Lexer(source: String):
 
         source.slice(pos, end)
     }
+    private def getWholeFloat(): String = {
+        val end = source.indexWhere(c => whitespaces.contains(c) || (!c.isLetterOrDigit && !List('_','-','.').contains(c)), pos) match {
+            case -1 => source.length
+            case n  => n
+        }
+
+        source.slice(pos, end)
+    }
     private val escapeSequences = Map(
         'n'  -> '\n',
         't'  -> '\t',
@@ -81,6 +89,16 @@ class Lexer(source: String):
         possibleNumber.nonEmpty && possibleNumber.forall(numbers.contains)
     }
 
+
+    private def isFloat(): Boolean = {
+        val possibleNumber = getWholeFloat()
+        if possibleNumber.isEmpty then return false
+        val parts = possibleNumber.split("\\.")
+        parts.length == 2 &&
+        parts(0).nonEmpty && parts(0).forall(numbers.contains) &&
+        parts(1).nonEmpty && parts(1).forall(numbers.contains)
+    }
+
     private def isNextInteger(): Boolean = {
         pos += 1
         val possibleNumber = getWholeWord()
@@ -88,6 +106,16 @@ class Lexer(source: String):
         pos -= 1
 
         possibleNumber.nonEmpty && possibleNumber.forall(numbers.contains)
+    }
+    private def isNextFloat(): Boolean = {
+        pos += 1
+        val possibleNumber = getWholeFloat()
+        pos -= 1
+        if possibleNumber.isEmpty then return false
+        val parts = possibleNumber.split("\\.")
+        parts.length == 2 &&
+        parts(0).nonEmpty && parts(0).forall(numbers.contains) &&
+        parts(1).nonEmpty && parts(1).forall(numbers.contains)
     }
     private def isIdentifier(word: String): Boolean = {
         word.nonEmpty &&
@@ -141,11 +169,13 @@ class Lexer(source: String):
         }
         val token : Token = peek() match {
             
-            case x if isInteger() => {val word = getWholeWord().toInt; advanceN(getWholeWord().length); Token.LiteralInt(word)}
+            case x if isFloat() => {val word = getWholeFloat(); advanceN(word.length); Token.LiteralFloat(word.toDouble)}
+            case x if isInteger() => {val word = getWholeWord(); advanceN(word.length); Token.LiteralInt(word.toInt)}
             case x if isWordMatch("true") => {advanceUntilNextWord(); Token.BoolLit(true)}
             case x if isWordMatch("false") => {advanceUntilNextWord(); Token.BoolLit(false)}
 
-            case '-' if isNextInteger() => {advance(); val word = getWholeWord().toInt; advanceUntilNextWord(); Token.LiteralInt(word * -1)}
+            case '-' if isNextFloat() => {advance(); val word = getWholeFloat(); advanceN(word.length); Token.LiteralFloat(word.toDouble * -1)}
+            case '-' if isNextInteger() => {advance(); val word = getWholeWord(); advanceN(word.length); Token.LiteralInt(word.toInt * -1)}
 
 
             

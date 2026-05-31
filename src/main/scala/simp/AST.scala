@@ -10,6 +10,7 @@ package simp
 enum Expr:
     case Deref(loc: String)
     case Num(value: Int)
+    case Flt(value: Double)
     case Str(value: String)
     case Bool(value: Boolean)
     case BoolLift(expr: BoolExpr)
@@ -30,6 +31,7 @@ enum Op:
 // Values allowed, including a ref value
 enum Value:
   case IntVal(n: Int)
+  case FloatVal(n: Double)
   case StrVal(s: String)
   case BoolVal(b: Boolean)
   case RefVal(loc: String, store: Store)
@@ -86,6 +88,7 @@ enum Decl:
 enum SimpType:
     case TypeInt
     case TypeString
+    case TypeFloat
     case TypeBool 
     case TypeNull
     case TypeRef(inner: SimpType)
