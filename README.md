@@ -9,21 +9,24 @@ SIMP is a simple imperative language covered in the textbook [Programming Langua
 The full Grammar in BNF is available [here](SYNTAX.md), but here is some example code:
 
 ```
-fn fizzbuzz(n : Int) -> Void {
+fn fizzbuzz(n: Int) -> Void {
     i := 1;
     while !i <= !n do {
-        if !i % 3 == 0 && !i % 5 == 0 then {
-            print "Fizzbuzz!";
-        } elif !i % 3 == 0 then {
-            print "Fizz";
-        } elif !i % 5 == 0 then {
-            print "Buzz";
+        fizz := (!i % 3) == 0;
+        buzz := (!i % 5) == 0;
+        if !fizz && !buzz then {
+            print "fizzbuzz";
+        } elif !fizz then {
+            print "fizz";
+        } elif !buzz then {
+            print "buzz";
         } else {
             print !i;
         };
         i += 1;
     };
 }
+
 _ := fizzbuzz(30);
 ```
 
