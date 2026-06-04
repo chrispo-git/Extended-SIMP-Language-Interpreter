@@ -553,4 +553,12 @@ object Builtins:
             case List(Value.IntVal(o))=> Value.StrVal(o.toChar.toString)
             case _ => throw RuntimeException("chr expects an integer")
         })
+        fnEnv.registerBuiltin("zip", args => args match {
+            case List(Value.ArrVal(a), Value.ArrVal(b)) =>
+                val length = math.min(a.length, b.length)
+                Value.ArrVal(scala.collection.mutable.ArrayBuffer(
+                    (0 until length).map(i => Value.PairVal(a(i), b(i)))*
+                ))
+            case _ => throw RuntimeException("zip expects two arrays")
+        })
     }

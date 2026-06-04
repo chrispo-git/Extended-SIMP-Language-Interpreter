@@ -61,6 +61,7 @@ Each of these functions is available by default in SIMP.
 | `random` | `random(Int, Int) -> Int` | Returns a random integer within the range min-max (inclusive of lower value, exclusive of higher value)|
 | `ord` | `ord(Str) -> Int` | Returns the ordinal value of a character |
 | `chr` | `chr(Int) -> Str` | Returns a character from the ordinal value |
+| `zip` | `zip(A[], B[]) -> (A, B)[]`| Returns an array of pairs from 2 arrays|
 
 ## Map Functions
 There are a small set of special functions that allow you to instantiate a Map object.
