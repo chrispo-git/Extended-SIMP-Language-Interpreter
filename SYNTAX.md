@@ -198,6 +198,16 @@ x := 5; // This is also a comment
 // x += 5; Even this is a comment!
 ```
 
+Multi-line comments are enclosed between `/*` and `*/`:
+```
+/* This 
+really
+is
+a
+comment*/
+x +=/*This too*/ 2
+```
+
 ---
 
 ### Example Programs

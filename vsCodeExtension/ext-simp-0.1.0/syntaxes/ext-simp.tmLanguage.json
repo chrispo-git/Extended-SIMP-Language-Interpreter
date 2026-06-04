@@ -20,8 +20,17 @@
   ],
   "repository": {
     "comments": {
-      "name": "comment.line.double-slash.ext-simp",
-      "match": "//.*$"
+      "patterns": [
+          {
+              "name": "comment.block.ext-simp",
+              "begin": "/\\*",
+              "end": "\\*/"
+          },
+          {
+              "name": "comment.line.double-slash.ext-simp",
+              "match": "//.*$"
+          }
+      ]
     },
 
     "strings": {

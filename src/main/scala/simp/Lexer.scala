@@ -11,6 +11,8 @@ class Lexer(source: String):
     private val numbers : List[Char] = List('0', '1', '2', '3', '4', '5', '6', '7', '8', '9')
     private val valid_symbols : List[Char] = List(';', '(', ')', '&', '|', '¬', '+', '-', '/', '*', '.', ',', '%', '{', '}',':','[',']')
 
+    private var isComment: Boolean = false
+
     private def throwError(msg: String): Nothing = throw RuntimeException(s"on line $line: $msg")
 
     def tokenise(): (List[Token], List[Int]) = {
@@ -164,7 +166,22 @@ class Lexer(source: String):
 
     private def scanToken(): Unit = {
         if peek() == '/' && peekNext() == '/' then {
-            skipToNextLine()
+            skipToNextLine();
+            return
+        }
+        if peek() == '/' && peekNext() == '*' then {
+            advanceN(2);
+            skipWhitespace();
+            isComment = true;
+            return
+        }
+        if peek() == '*' && peekNext() == '/' then {
+            advanceN(2);
+            skipWhitespace();
+            isComment = false;
+        }
+        if isComment then {
+            advance();
             return
         }
         val token : Token = peek() match {
