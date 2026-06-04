@@ -1,0 +1,14 @@
+
+print "press enter to gamble, type exit to quit.";
+while true do {
+    gamble := input();
+    if !gamble == "exit" then {
+        break;
+    } else {
+        if random(0,30) == 0 then {
+            print "I can't stop winning!";
+        } else {
+            print "Aww dangit!";
+        }
+    }
+}

@@ -4,6 +4,8 @@ import scala.io.Source._
 
 import scala.math._
 
+import scala.util.Random
+
 import SimpUtils.*
 
 object Builtins:
@@ -537,5 +539,18 @@ object Builtins:
                 Value.FloatVal(elements.collect { case Value.FloatVal(n) => n }.sum)
             }
             case _ => throw RuntimeException("sum expects Int[] or Float[]")
+        })
+
+        fnEnv.registerBuiltin("random", args => args match {
+            case List(Value.IntVal(min), Value.IntVal(max)) => Value.IntVal(Random.nextInt(max) + min)
+            case _ => throw RuntimeException("random expects 2 integers (min and max)")
+        })
+        fnEnv.registerBuiltin("ord", args => args match {
+            case List(Value.StrVal(str)) if str.length == 1 => Value.IntVal(str.head.toInt)
+            case _ => throw RuntimeException("ord expects a string of length 1")
+        })
+        fnEnv.registerBuiltin("chr", args => args match {
+            case List(Value.IntVal(o))=> Value.StrVal(o.toChar.toString)
+            case _ => throw RuntimeException("chr expects an integer")
         })
     }

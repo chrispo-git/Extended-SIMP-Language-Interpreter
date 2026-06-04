@@ -58,6 +58,9 @@ Each of these functions is available by default in SIMP.
 | `atan` | `atan(Float) -> Float` | Returns the arctangent of the float|
 | `flatten` | `flatten(T[][]) -> T[]` | Flattens an array |
 | `sum` | `sum(Int[] \| Float[]) -> Int[] \| Float[]` | Sums all the values in an array |
+| `random` | `random(Int, Int) -> Int` | Returns a random integer within the range min-max (inclusive of lower value, exclusive of higher value)|
+| `ord` | `ord(Str) -> Int` | Returns the ordinal value of a character |
+| `chr` | `chr(Int) -> Str` | Returns a character from the ordinal value |
 
 ## Map Functions
 There are a small set of special functions that allow you to instantiate a Map object.
