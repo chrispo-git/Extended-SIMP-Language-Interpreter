@@ -47,6 +47,17 @@ Each of these functions is available by default in SIMP.
 | `pi` | `pi() -> Float` | Returns the value of π |
 | `e` | `e() -> Float` | Returns the value of Euler's Number|
 | `toBinary` | `toBinary(Int) -> String` | Returns the binary representation of an integer|
+| `floor` | `floor(Float) -> Float` | Returns the floor of a float|
+| `ceil` | `ceil(Float) -> Float` | Returns the ceiling of a float|
+| `round` | `round(Float) -> Float` | Returns the nearest float that's equal to an integer of the provided float|
+| `cos` | `cos(Float) -> Float` | Returns the cosine of the float|
+| `sin` | `sin(Float) -> Float` | Returns the sine of the float|
+| `tan` | `tan(Float) -> Float` | Returns the tangent of the float|
+| `acos` | `acos(Float) -> Float` | Returns the arccosine of the float|
+| `asin` | `asin(Float) -> Float` | Returns the arcsine of the float|
+| `atan` | `atan(Float) -> Float` | Returns the arctangent of the float|
+| `flatten` | `flatten(T[][]) -> T[]` | Flattens an array |
+| `sum` | `sum(Int[] \| Float[]) -> Int[] \| Float[]` | Sums all the values in an array |
 
 ## Map Functions
 There are a small set of special functions that allow you to instantiate a Map object.

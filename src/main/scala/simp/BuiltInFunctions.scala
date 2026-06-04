@@ -478,4 +478,63 @@ object Builtins:
             case List(Value.IntVal(i)) => Value.StrVal(i.toBinaryString)
             case _ => throw RuntimeException("toBinary expects an integer")
         })
+
+        fnEnv.registerBuiltin("floor", args => args match {
+            case List(Value.FloatVal(f)) => Value.FloatVal(floor(f))
+            case _ => throw RuntimeException("floor expects a float")
+        })
+        fnEnv.registerBuiltin("ceil", args => args match {
+            case List(Value.FloatVal(f)) => Value.FloatVal(ceil(f))
+            case _ => throw RuntimeException("ceil expects a float")
+        })
+        fnEnv.registerBuiltin("round", args => args match {
+            case List(Value.FloatVal(f)) => Value.FloatVal(rint(f))
+            case _ => throw RuntimeException("round expects a float")
+        })
+        fnEnv.registerBuiltin("cos", args => args match {
+            case List(Value.FloatVal(f)) => Value.FloatVal(cos(f))
+            case _ => throw RuntimeException("cos expects a float")
+        })
+        fnEnv.registerBuiltin("sin", args => args match {
+            case List(Value.FloatVal(f)) => Value.FloatVal(sin(f))
+            case _ => throw RuntimeException("sin expects a float")
+        })
+        fnEnv.registerBuiltin("tan", args => args match {
+            case List(Value.FloatVal(f)) if f % 90 == 0 && f % 180 != 0 => throw RuntimeException("tan cannot handle divergent values")
+            case List(Value.FloatVal(f)) => Value.FloatVal(tan(f))
+            case _ => throw RuntimeException("tan expects a float")
+        })
+        fnEnv.registerBuiltin("acos", args => args match {
+            case List(Value.FloatVal(f)) => Value.FloatVal(acos(f))
+            case _ => throw RuntimeException("acos expects a float")
+        })
+        fnEnv.registerBuiltin("asin", args => args match {
+            case List(Value.FloatVal(f)) => Value.FloatVal(asin(f))
+            case _ => throw RuntimeException("sin expects a float")
+        })
+        fnEnv.registerBuiltin("atan", args => args match {
+            case List(Value.FloatVal(f)) => Value.FloatVal(atan(f))
+            case _ => throw RuntimeException("atan expects a float")
+        })
+
+        fnEnv.registerBuiltin("flatten", args => args match {
+            case List(Value.ArrVal(elements)) => {
+                val result = scala.collection.mutable.ArrayBuffer[Value]()
+                elements.foreach {
+                    case Value.ArrVal(inner) => result ++= inner
+                    case _ => throw RuntimeException("flatten expects an array of arrays")
+                }
+                Value.ArrVal(result)
+            }
+            case _ => throw RuntimeException("flatten expects an array")
+        })
+        fnEnv.registerBultin("sum", args => args match {
+            case List(Value.ArrVal(elements)) if getType(Value.ArrVal(elements)) == SimpType.TypeArr(SimpType.TypeInt) => {
+                Value.IntVal(elements.sum)
+            }
+            case List(Value.ArrVal(elements)) if getType(Value.ArrVal(elements)) == SimpType.TypeArr(SimpType.TypeFloat) => {
+                Value.FloatVal(elements.sum)
+            }
+            case _ => throw RuntimeException("sum expects Int[] or Float[]")
+        })
     }
