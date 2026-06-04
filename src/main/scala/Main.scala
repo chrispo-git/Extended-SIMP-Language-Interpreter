@@ -2,21 +2,30 @@ package simp
 
 import scala.io.Source
 import java.io.FileNotFoundException
+import org.jline.reader.{LineReaderBuilder, EndOfFileException, UserInterruptException}
+import org.jline.terminal.TerminalBuilder
 
 val RED = "\u001b[31m"
 val RESET = "\u001b[0m"
 
+
 def startRepl(store: Store, fnEnv: FunctionEnv, structEnv: StructEnv): Unit = {
-    println("SIMP REPL - type 'exit' to quit")
-    val evaluator = Evaluator(fnEnv, structEnv)
+    val terminal = TerminalBuilder.builder().system(true).build()
+    val reader = LineReaderBuilder.builder()
+        .terminal(terminal)
+        .build()
+
+    println("SIMP+ REPL - type 'exit' to quit")
     var input = ""
 
     while true do {
-        if input.isEmpty then print("simp> ")
-        else print("    | ")
+        val prompt = if input.isEmpty then "simp> " else "    | "
+        val line = try reader.readLine(prompt)
+            catch
+                case _: EndOfFileException => sys.exit(0)
+                case _: UserInterruptException => sys.exit(0)
 
-        val line = scala.io.StdIn.readLine()
-        if line == null || line.trim == "exit" then {
+        if line.trim == "exit" then {
             println("Goodbye!")
             sys.exit(0)
         }
@@ -29,20 +38,18 @@ def startRepl(store: Store, fnEnv: FunctionEnv, structEnv: StructEnv): Unit = {
         val isComplete = openBraces == closeBraces && {
             if openBraces > 0 then {
                 val toks = Lexer(input).tokenise()._1
-                val ifCount = toks.count(t => t == Token.If || t == Token.Elif)
-                val elseCount = toks.count(t => t == Token.Else || t == Token.Elif)
-                ifCount == elseCount
+                !(toks.contains(Token.If) && !toks.contains(Token.Else))
             } else true
         }
 
-
         if isComplete then {
             try {
-                val tokens = Lexer(input).tokenise()
-                val programs = Parser(tokens._1, structEnv, tokens._2).parseRepl()
-                evaluator.evalProgram(programs, store)
+                val (tokens, lineNumbers) = Lexer(input).tokenise()
+                val programs = Parser(tokens, structEnv, lineNumbers).parseRepl()
+                Evaluator(fnEnv, structEnv).evalProgram(programs, store)
             } catch {
-                case e: RuntimeException => println(s"[${RED}Error${RESET}]  ${e.getMessage}")
+                case e: RuntimeException =>
+                    println(s"[${RED}Error${RESET}] ${e.getMessage}")
             }
             input = ""
         }

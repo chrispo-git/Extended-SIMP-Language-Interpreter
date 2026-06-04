@@ -10,3 +10,5 @@ libraryDependencies ++= Seq(
   "org.scala-lang.modules" %% "scala-parser-combinators" % "2.3.0",
   "org.scalatest" %% "scalatest" % "3.2.19" % Test
 )
+
+libraryDependencies += "org.jline" % "jline" % "3.25.1"
