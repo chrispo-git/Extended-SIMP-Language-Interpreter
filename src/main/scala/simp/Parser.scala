@@ -368,6 +368,20 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
     }
 
     private def parseType(): SimpType = peek() match {
+        case Token.OpenBracket => {
+            advance()
+            val fst = parseType()
+            expect(Token.Comma)
+            val snd = parseType()
+            expect(Token.CloseBracket)
+            var t: SimpType = SimpType.TypePair(fst, snd)
+            while peek() == Token.OpenSquare do {
+                expect(Token.OpenSquare)
+                expect(Token.CloseSquare)
+                t = SimpType.TypeArr(t)
+            }
+            t
+        }
         case Token.TypeInt  => { 
             advance(); 
             var t: SimpType = SimpType.TypeInt
@@ -711,9 +725,15 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
             case Token.OpenBracket => {
                 advance()
                 val left = parseExpr()
-                expect(Token.CloseBracket)
                 peek() match {
-                    case Token.Gt | Token.Lt | Token.Gte | Token.Lte | Token.Eq | Token.Neq =>
+                    case Token.Comma => {
+                        advance()
+                        val right = parseExpr()
+                        expect(Token.CloseBracket)
+                        Expr.Pair(left, right)
+                    }
+                    case Token.Gt | Token.Lt | Token.Gte | Token.Lte | Token.Eq | Token.Neq => {
+                        expect(Token.CloseBracket);
                         val bop = peek() match {
                             case Token.Gt  => Bop.Gt
                             case Token.Lt  => Bop.Lt
@@ -726,7 +746,8 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
                         advance()
                         val right = parseExpr()
                         Expr.BoolLift(BoolExpr.Compare(left, bop, right))
-                    case _ => left
+                    }
+                    case _ => {expect(Token.CloseBracket); left}
                 }
             }
             case x => throwError(s"Unexpected '$x'")

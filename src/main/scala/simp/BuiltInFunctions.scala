@@ -528,12 +528,13 @@ object Builtins:
             }
             case _ => throw RuntimeException("flatten expects an array")
         })
-        fnEnv.registerBultin("sum", args => args match {
+        fnEnv.registerBuiltin("sum", args => args match {
+            
             case List(Value.ArrVal(elements)) if getType(Value.ArrVal(elements)) == SimpType.TypeArr(SimpType.TypeInt) => {
-                Value.IntVal(elements.sum)
+                Value.IntVal(elements.collect { case Value.IntVal(n) => n }.sum)
             }
             case List(Value.ArrVal(elements)) if getType(Value.ArrVal(elements)) == SimpType.TypeArr(SimpType.TypeFloat) => {
-                Value.FloatVal(elements.sum)
+                Value.FloatVal(elements.collect { case Value.FloatVal(n) => n }.sum)
             }
             case _ => throw RuntimeException("sum expects Int[] or Float[]")
         })

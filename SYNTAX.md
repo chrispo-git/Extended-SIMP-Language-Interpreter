@@ -8,9 +8,10 @@ Program ::= (Cmd | Decl)*
 ```
 
 ### Values
-Expressions produce a value in 5 categories:
+Expressions produce a value in 6 categories:
 - Primitive type - `Int`, `Str`, `Bool`, `Float`
 - Structs
+- Tuple Type - `(Int, Str)`, `(Bool, Float)`, `(Int, Int)`
 - Array Type - `Int[]`, `Str[]`, `Bool[]`, `Struct[]`
 - Map Type - `Map(K, V)`
 - Null Type - `null` 
@@ -25,8 +26,9 @@ Expressions produce a value in 5 categories:
 | `StructName` | `Point { x: 1, y: 2 }` |
 | `null` | `null` |
 | `Map(K, V)` | `newMap(Str, Int)`, `newMap(Int, Bool)` |
+| `(T, U)` | `(1, "hello")`, `(true, 3.14)` |
 
-
+Pairs are immutable two-element tuples. Elements are accessed with `.fst` and `.snd`.
 Maps are key-value stores with typed keys and values. They are created with `newMap(KeyType, ValueType)` 
 and manipulated exclusively through built-in functions. See [Built-in Functions](BUILT-IN-FUNCTIONS.md).
 ---
@@ -40,7 +42,7 @@ Decl ::= fn f(x₀ : t₀, x₁ : t₁, ...) -> t { Cmd }
         | import "F"
         | import "F" as A
 where x₀, x₁, ... are parameter names (locations)
-where t, t₀, t₁, ... are parameter types (One of Str, Int, Bool, Int[], Str[], Bool[], Struct, Struct[], Map(K, V), or Void)
+where t, t₀, t₁, ... are parameter types (One of Str, Int, Bool, Int[], Str[], Bool[], Struct, Struct[], (T,U), Map(K, V), or Void)
 where f₀, f₁, ... are field names
 where v₀, v₁, ... are optional default values
 where F is the path of a file, and A is an optional alias
@@ -103,6 +105,7 @@ E ::= n                                    -- integer literal (n ∈ ℤ)
     | E || E                                -- boolean or (E must be Bool)
     | f(E₀, E₁, ...)                      -- function call
     | (E)                                  -- parenthesised expression
+    | (E, E)                                    -- pair literal
     | [E₀, E₁, ...]                            -- array literal
     | E[E]                                     -- array index (read)
     | S { f₀: E₀, f₁: E₁, ... }              -- struct literal
@@ -304,4 +307,21 @@ wordList := keys(counts);
 for word in wordList {
     print word + ": " + get(counts, word);
 };
+```
+
+### Tuples
+```
+fn minMax(arr: Int[]) -> (Int, Int) {
+    mn := arr[0];
+    mx := arr[0];
+    for x in arr {
+        if x < !mn then { mn := x; };
+        if x > !mx then { mx := x; };
+    };
+    return (!mn, !mx);
+}
+
+result := minMax([3, 1, 4, 1, 5, 9, 2, 6]);
+print "min: " + result.fst;
+print "max: " + result.snd;
 ```

@@ -23,6 +23,7 @@ enum Expr:
     case StructLiteral(typeName: String, fields: List[(String, Expr)]) 
     case FieldAccess(expr: Expr, field: String) 
     case TypeLiteral(t: SimpType) 
+    case Pair(fst: Expr, snd: Expr)
     case Null
 
 // Operators allowed - Add, Sub, Mul, Div, Mod, & Bitwise operations
@@ -40,6 +41,7 @@ enum Value:
   case StructVal(typeName: String, fields: scala.collection.mutable.Map[String, Value])
   case MapVal(entries: scala.collection.mutable.Map[Value, Value], keyType: SimpType, valueType: SimpType)
   case TypeVal(t: SimpType)
+  case PairVal(fst: Value, snd: Value)
   case NullVal
 
 /* Boolean Expressions can either be:
@@ -94,10 +96,12 @@ enum SimpType:
     case TypeFloat
     case TypeBool 
     case TypeNull
+    case TypeType
     case TypeRef(inner: SimpType)
     case TypeArr(inner: SimpType)
     case TypeStruct(name: String)
     case TypeMap(keyType: SimpType, valueType: SimpType)
+    case TypePair(fst: SimpType, snd: SimpType)
 
 case class ReturnException(value: Option[Value] = None) extends Exception
 case class BreakException() extends Exception

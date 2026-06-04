@@ -1,0 +1,51 @@
+fn encode(s: Str) -> (Int, Str)[] {
+    if len(!s) == 0 then {
+        return [];
+    };
+    
+    chars := toArr(!s);
+    result := [];
+    currentChar := chars[0];
+    count := 1;
+    
+    i := 1;
+    while !i < len(chars) do {
+        if chars[!i] == !currentChar then {
+            count += 1;
+        } else {
+            result := push(result, (!count, !currentChar));
+            currentChar := chars[!i];
+            count := 1;
+        };
+        i += 1;
+    };
+    result := push(result, (!count, !currentChar));
+    return result;
+}
+
+fn decode(encoded: (Int, Str)[]) -> Str {
+    result := "";
+    for pair in encoded {
+        i := 0;
+        while !i < pair.fst do {
+            result := !result + pair.snd;
+            i += 1;
+        };
+    };
+    return !result;
+}
+
+fn printEncoded(encoded: (Int, Str)[]) -> Void {
+    out := "";
+    for pair in encoded {
+        out += toStr(pair.fst) + "x" + pair.snd + "  ";
+    };
+    print out;
+}
+
+dna := "AAATTAAATTTCCCCCGGAAAAATTTCCAAATTTCCCCCGGAAAAATTCCCGGAAAAATT";
+print "";
+print "DNA sequence: " + !dna;
+dnaEncoded := encode(!dna);
+print "Encoded:";
+_ := printEncoded(dnaEncoded);

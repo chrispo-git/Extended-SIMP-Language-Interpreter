@@ -13,6 +13,7 @@ def startRepl(store: Store, fnEnv: FunctionEnv, structEnv: StructEnv): Unit = {
     val terminal = TerminalBuilder.builder().system(true).build()
     val reader = LineReaderBuilder.builder()
         .terminal(terminal)
+        .option(org.jline.reader.LineReader.Option.DISABLE_EVENT_EXPANSION, true)
         .build()
 
     println("SIMP+ REPL - type 'exit' to quit")

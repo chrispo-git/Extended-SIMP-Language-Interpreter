@@ -85,6 +85,7 @@ A VS Code extension for SIMP+ syntax highlighting is available [here](vsCodeExte
 - Single-line comments
 - Negative integer literals
 - Curly brace syntax for blocks
+- Pairs
 - String Literals
 - Printing Expressions
 - Inputting Strings, Integers and Booleans

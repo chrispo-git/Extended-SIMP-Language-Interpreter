@@ -13,6 +13,8 @@ object SimpUtils:
         case Value.NullVal    => SimpType.TypeNull
         case Value.StructVal(typeName, _) => SimpType.TypeStruct(typeName)
         case Value.MapVal(_, keyType, valueType) => SimpType.TypeMap(keyType, valueType)
+        case Value.PairVal(fst, snd) => SimpType.TypePair(getType(fst), getType(snd))
+        case Value.TypeVal(_) => SimpType.TypeType
         case Value.RefVal(loc, refStore) => 
             refStore.load(loc) match {
                 case Value.RefVal(_, _) => throw RuntimeException("Nested references are not supported")
@@ -35,6 +37,7 @@ object SimpUtils:
             case Value.RefVal(name,_) => s"Ref($name)"
             case Value.MapVal(_, keyType, valueType) => s"Map(${getSimpTypeName(keyType)} -> ${getSimpTypeName(valueType)})"
             case Value.TypeVal(t) => s"Type.${getSimpTypeName(t)}"
+            case Value.PairVal(fst, snd) => s"(${getPrettyPrint(fst)}, ${getPrettyPrint(snd)})"
             case Value.StructVal(typeName, fields) => {
                 if visited.contains(fields) then {
                     s"$typeName { ... }"
@@ -61,6 +64,7 @@ object SimpUtils:
                 valueType
             )
         }
+        case Value.PairVal(fst, snd) => Value.PairVal(deepCopyValue(fst), deepCopyValue(snd))
         case Value.StructVal(typeName, fields) => {
             if visited.contains(fields) then {
                 throw RuntimeException("deepCopy doesn't support Cyclical references")
@@ -99,10 +103,12 @@ object SimpUtils:
         case SimpType.TypeBool   => "Bool"
         case SimpType.TypeFloat  => "Float"
         case SimpType.TypeNull   => "Void"
+        case SimpType.TypeType   => "Type"
         case SimpType.TypeArr(inner) => s"${getSimpTypeName(inner)}[]"
         case SimpType.TypeStruct(name) => name
         case SimpType.TypeRef(inner) => s"ref ${getSimpTypeName(inner)}"
         case SimpType.TypeMap(k, v) => s"Map(${getSimpTypeName(k)}, ${getSimpTypeName(v)})"
+        case SimpType.TypePair(fst, snd) => s"Pair(${getSimpTypeName(fst)}, ${getSimpTypeName(snd)})"
     }
     def getTypeName(value: Value): String = value match {
         case Value.IntVal(_)  => "Int"
@@ -112,6 +118,7 @@ object SimpUtils:
         case Value.StructVal(typeName, _) => typeName
         case Value.RefVal(loc, refStore)  => s"ref ${getTypeName(refStore.load(loc))}"
         case Value.MapVal(_, keyType, valueType) => s"Map(${getSimpTypeName(keyType)} -> ${getSimpTypeName(valueType)})"
+        case Value.PairVal(fst, snd) => s"Pair(${getTypeName(fst)}, ${getTypeName(snd)})"
         case Value.TypeVal(t) => s"Type.${getSimpTypeName(t)}"
         case Value.ArrVal(elements) =>
             if elements.isEmpty then "Unknown[]"

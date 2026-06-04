@@ -249,6 +249,11 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
                 val evaluated = elements.map(evalExpr(_, store))
                 Value.ArrVal(scala.collection.mutable.ArrayBuffer(evaluated*))
             }
+            case Expr.Pair(l, r) => {
+                val fst = evalExpr(l, store);
+                val snd = evalExpr(r, store);
+                Value.PairVal(fst, snd)
+            }
             case Expr.ArrIndex(arr, idx) => {
                 val arrVal = evalExpr(arr, store)
                 val index = evalExpr(idx, store)
@@ -290,6 +295,7 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
                             case Op.BitLeft => Value.IntVal(left << right)
                             case Op.BitRight => Value.IntVal(left >> right)
                             case Op.BitRightFill => Value.IntVal(left >>> right)
+                            case x => throw RuntimeException(s"Unsupported operation '$x'") 
                         }
                     }
                     case (Value.IntVal(left), Value.FloatVal(right)) => {
@@ -350,10 +356,15 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
             }
             case Expr.FieldAccess(expr, field) => {
                 evalExpr(expr, store) match {
+                    case Value.PairVal(fst, snd) => field match {
+                        case "fst" => fst
+                        case "snd" => snd
+                        case _ => throw RuntimeException(s"Pairs only have 'fst' and 'snd' fields")
+                    }
                     case Value.StructVal(_, fields) => {
                         fields.getOrElse(field, throw RuntimeException(s"Unknown field '$field'"))
                     }
-                    case _ => throw RuntimeException("Field access on non-struct value")
+                    case _ => throw RuntimeException("Field access on non-struct or pair value")
                 }
             }
             case Expr.FnCall(name, args) => {
