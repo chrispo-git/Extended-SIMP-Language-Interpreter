@@ -15,6 +15,7 @@ enum Expr:
     case Bool(value: Boolean)
     case BoolLift(expr: BoolExpr)
     case BinaryOp(l: Expr, op: Op, r: Expr)
+    case UnaryOp(l: Expr, op: Op)
     case FnCall(name: String, args: List[Expr])
     case Ref(loc: String)
     case ArrLiteral(elements: List[Expr]) 
@@ -24,10 +25,9 @@ enum Expr:
     case TypeLiteral(t: SimpType) 
     case Null
 
-// Operators allowed - Add, Sub, Mul, Div, Mod
+// Operators allowed - Add, Sub, Mul, Div, Mod, & Bitwise operations
 enum Op:
-    case Add, Sub, Mul, Div, Mod
-
+    case Add, Sub, Mul, Div, Mod, BitAnd, BitOr, BitXor, BitComplement, BitLeft, BitRight, BitRightFill
 
 // Values allowed, including a ref value
 enum Value:

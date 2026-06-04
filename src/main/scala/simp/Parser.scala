@@ -62,7 +62,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
             val item = peek() match {
                 case Token.Fn |  Token.Struct | Token.Import => Program.PDecl(parseDecl())
                 case Token.BoolLit(_) | Token.Not => Program.PBool(parseBool())
-                case  Token.LiteralFloat(_) |Token.LiteralInt(_) | Token.Deref =>
+                case  Token.LiteralFloat(_) |Token.LiteralInt(_) | Token.Deref | Token.BitComplement =>
                     val expr = parseExpr()
                     peek() match {
                         case Token.Gt | Token.Lt | Token.Gte | Token.Lte | Token.Eq | Token.Neq =>
@@ -452,15 +452,19 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
         }
     }
     private def parseExpr(): Expr = {
-        var left = parseTerm()
-        while List(Token.Add, Token.Sub).contains(peek()) do {
+        var left = parseAddSub()
+        while List(Token.BitAnd, Token.BitOr, Token.BitXor, Token.BitLeft, Token.BitRight, Token.BitRightFill).contains(peek()) do {
             val op: Op  = peek() match {
-                case Token.Add => Op.Add
-                case Token.Sub => Op.Sub
+                case Token.BitAnd => Op.BitAnd
+                case Token.BitOr => Op.BitOr
+                case Token.BitXor => Op.BitXor
+                case Token.BitLeft => Op.BitLeft
+                case Token.BitRight => Op.BitRight
+                case Token.BitRightFill => Op.BitRightFill
                 case _ => throwError("unreachable")
             }
             advance()
-            val right = parseTerm()
+            val right = parseAddSub()
             left = Expr.BinaryOp(left, op, right)
         }
         peek() match {
@@ -479,6 +483,20 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
                 Expr.BoolLift(BoolExpr.Compare(left, bop, right))
             case _ => left
         }
+    }
+    private def parseAddSub(): Expr = {
+        var left = parseTerm()
+        while List(Token.Add, Token.Sub).contains(peek()) do {
+            val op: Op = peek() match {
+                case Token.Add => Op.Add
+                case Token.Sub => Op.Sub
+                case _ => throwError("unreachable")
+            }
+            advance()
+            val right = parseTerm()
+            left = Expr.BinaryOp(left, op, right)
+        }
+        left
     }
     private def parseTerm(): Expr = {
         var left = parsePostfix(parseAtomicExpr())
@@ -535,6 +553,26 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
     }
     private def parseAtomicExpr(): Expr = {
         peek() match {
+            case Token.BitComplement => {
+                advance()
+                val left = Expr.UnaryOp(parseAtomicExpr(), Op.BitComplement)
+                peek() match {
+                    case Token.Gt | Token.Lt | Token.Gte | Token.Lte | Token.Eq | Token.Neq =>
+                        val bop = peek() match {
+                            case Token.Gt  => Bop.Gt
+                            case Token.Lt  => Bop.Lt
+                            case Token.Gte => Bop.Gte
+                            case Token.Lte => Bop.Lte
+                            case Token.Eq  => Bop.Eq
+                            case Token.Neq => Bop.Neq
+                            case _ => throwError("unreachable")
+                        }
+                        advance()
+                        val right = parseExpr()
+                        Expr.BoolLift(BoolExpr.Compare(left, bop, right))
+                    case _ => left
+                }
+            }
             case Token.LiteralInt(n) => {
                 advance()
                 val left = Expr.Num(n)
@@ -672,9 +710,24 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
             }
             case Token.OpenBracket => {
                 advance()
-                val inside = parseExpr()
+                val left = parseExpr()
                 expect(Token.CloseBracket)
-                inside
+                peek() match {
+                    case Token.Gt | Token.Lt | Token.Gte | Token.Lte | Token.Eq | Token.Neq =>
+                        val bop = peek() match {
+                            case Token.Gt  => Bop.Gt
+                            case Token.Lt  => Bop.Lt
+                            case Token.Gte => Bop.Gte
+                            case Token.Lte => Bop.Lte
+                            case Token.Eq  => Bop.Eq
+                            case Token.Neq => Bop.Neq
+                            case _ => throwError("unreachable")
+                        }
+                        advance()
+                        val right = parseExpr()
+                        Expr.BoolLift(BoolExpr.Compare(left, bop, right))
+                    case _ => left
+                }
             }
             case x => throwError(s"Unexpected '$x'")
         }

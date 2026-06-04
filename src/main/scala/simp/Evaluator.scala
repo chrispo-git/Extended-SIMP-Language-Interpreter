@@ -263,6 +263,17 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
                     case _ => throw RuntimeException("Expected array and integer index")
                 }
             }
+            case Expr.UnaryOp(l, op) => {
+                evalExpr(l, store) match {
+                    case Value.IntVal(left) => {
+                        op match {
+                            case Op.BitComplement => Value.IntVal(~left)
+                            case x => throw RuntimeException(s"Unsupported operation '$x'")
+                        }
+                    }
+                    case _ => throw RuntimeException(s"Type mismatch in unary operation")
+                }
+            }
             case Expr.BinaryOp(l, op, r) => {
                 (evalExpr(l, store), evalExpr(r, store)) match {
                     case (Value.IntVal(left), Value.IntVal(right)) => {
@@ -273,6 +284,12 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
                             case Op.Mod => Value.IntVal(left % right)
                             case Op.Div if right == 0 => throw RuntimeException(s"Division by Zero!")
                             case Op.Div => Value.IntVal(left / right)
+                            case Op.BitAnd => Value.IntVal(left & right)
+                            case Op.BitOr => Value.IntVal(left | right)
+                            case Op.BitXor => Value.IntVal(left ^ right)
+                            case Op.BitLeft => Value.IntVal(left << right)
+                            case Op.BitRight => Value.IntVal(left >> right)
+                            case Op.BitRightFill => Value.IntVal(left >>> right)
                         }
                     }
                     case (Value.IntVal(left), Value.FloatVal(right)) => {

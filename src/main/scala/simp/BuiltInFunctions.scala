@@ -473,4 +473,9 @@ object Builtins:
                 Value.ArrVal(scala.collection.mutable.ArrayBuffer(entries.keys.toSeq*))
             case _ => throw RuntimeException("keys expects a map")
         })
+
+        fnEnv.registerBuiltin("toBinary", args => args match {
+            case List(Value.IntVal(i)) => Value.StrVal(i.toBinaryString)
+            case _ => throw RuntimeException("toBinary expects an integer")
+        })
     }

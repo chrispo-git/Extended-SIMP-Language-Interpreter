@@ -18,6 +18,7 @@ Expressions produce a value in 5 categories:
 | Type | Examples |
 |------|---------|
 | `Int` | `-7`, `42`, `90210` |
+| `Float` | `20.05`, `6.7`, `3.142` |
 | `Str` | `"hello"`, `"world"` |
 | `Bool` | `true`, `false` |
 | `Int[]`, `Str[]`, `Bool[]` , `Float[]`| `[1, 2, 3]`, `["a", "b"]`, `[true, false]`, `[]` |
@@ -78,7 +79,6 @@ Cmd ::= skip                                -- no-op
       | print E                            -- print any expression
       | return E                           -- return from function
       | l.f := E                                 -- field assignment (write)
-      | newMap(t, t)                              -- map literal (see built-in functions)
 ```
 
 Where:
@@ -89,7 +89,7 @@ Where:
 
 ### Expressions
 
-Expressions produce a value of type `Int`, `Str`, or `Bool`.
+Expressions produce a value of type `Int`, `Float`, `Struct`, `Str`, `Array`, or `Bool`.
 
 ```
 E ::= n                                    -- integer literal (n ∈ ℤ)
@@ -111,18 +111,32 @@ E ::= n                                    -- integer literal (n ∈ ℤ)
 ```
 
 #### Arithmetic Operators
-Only valid on `Int` operands, produce `Int`:
 
-```
-op ::= + | - | * | / | %
-```
+Here are all the operators
+
+| Operator | Description | Available Types |
+|----------|-------------|-------------|
+| `+` | Addition | `Int`, `Str`, `Float`|
+| `-` | Subtraction |`Int`, `Float`|
+| `*` | Multiplication |`Int`, `Float`|
+| `/` | Division |`Int`, `Float`|
+| `%` | Modulo |`Int`|
+| `<<` | Left shift |`Int`|
+| `>>` | Right shift |`Int`|
+| `>>>` | Unsigned right shift |`Int`|
+| `&` | Bitwise AND |`Int`|
+| `\|` | Bitwise OR |`Int`|
+| `^` | Bitwise XOR |`Int`|
+| `~` | Bitwise complement (unary) |`Int`|
 
 Operator precedence (highest to lowest):
 
 | Precedence | Operators |
 |------------|-----------|
+| Highest | `~` |
 | High | `*`, `/`, `%` |
-| Low | `+`, `-` |
+| Medium | `+`, `-` |
+| Lowest | `<<`, `>>`, `>>>`, `&`, `\|`, `^` |
 
 All arithmetic operators are left-associative.
 

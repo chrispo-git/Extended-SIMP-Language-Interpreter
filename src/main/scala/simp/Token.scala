@@ -85,3 +85,11 @@ enum Token:
     case DoubleColon
 
     case Null
+
+    case BitAnd
+    case BitOr
+    case BitXor
+    case BitComplement
+    case BitLeft
+    case BitRight
+    case BitRightFill

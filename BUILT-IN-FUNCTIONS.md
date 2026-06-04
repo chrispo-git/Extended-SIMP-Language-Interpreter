@@ -46,6 +46,7 @@ Each of these functions is available by default in SIMP.
 | `log` | `ln(Int \| Float, Int \| Float) -> Float` | Performs log of the 1st argument with the base as the 2nd argument|
 | `pi` | `pi() -> Float` | Returns the value of π |
 | `e` | `e() -> Float` | Returns the value of Euler's Number|
+| `toBinary` | `toBinary(Int) -> String` | Returns the binary representation of an integer|
 
 ## Map Functions
 There are a small set of special functions that allow you to instantiate a Map object.

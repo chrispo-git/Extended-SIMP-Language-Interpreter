@@ -186,13 +186,6 @@ class Lexer(source: String):
             case '&' if peekNext() == '&' => {advanceN(2);Token.And} 
             case '|' if peekNext() == '|' => {advanceN(2);Token.Or} 
 
-            case '>' if peekNext() == '=' => {advanceN(2);Token.Gte} 
-            case '>' => {advance();Token.Gt} 
-            case '<' if peekNext() == '=' => {advanceN(2);Token.Lte} 
-            case '<' => {advance();Token.Lt}
-            case '=' if peekNext() == '=' => {advanceN(2);Token.Eq} 
-            case '!' if peekNext() == '=' => {advanceN(2);Token.Neq} 
-
 
             case '+' if peekNext() == '=' => {advanceN(2);Token.PlusEq} 
             case '-' if peekNext() == '=' => {advanceN(2);Token.MinusEq} 
@@ -201,6 +194,21 @@ class Lexer(source: String):
 
 
             case '-' if peekNext() == '>' => {advanceN(2);Token.Arrow} 
+
+            case '&' => {advance();Token.BitAnd} 
+            case '|' => {advance();Token.BitOr} 
+            case '^' => {advance();Token.BitXor}
+            case '~' => {advance();Token.BitComplement}
+            case '<' if peekNext() == '<' => {advanceN(2);Token.BitLeft}
+            case '>' if peekNext() == '>' && peekN(2) == '>' => {advanceN(3);Token.BitRightFill}
+            case '>' if peekNext() == '>' => {advanceN(2);Token.BitRight}
+
+            case '>' if peekNext() == '=' => {advanceN(2);Token.Gte} 
+            case '>' => {advance();Token.Gt} 
+            case '<' if peekNext() == '=' => {advanceN(2);Token.Lte} 
+            case '<' => {advance();Token.Lt}
+            case '=' if peekNext() == '=' => {advanceN(2);Token.Eq} 
+            case '!' if peekNext() == '=' => {advanceN(2);Token.Neq} 
 
             case '+' => {advance();Token.Add}
             case '-' => {advance();Token.Sub}

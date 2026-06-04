@@ -451,18 +451,6 @@ class LexerTest extends AnyFunSuite with Matchers {
     ex.getMessage should include ("Unexpected character")
   }
 
-  test("throw exception on single ampersand") {
-    intercept[RuntimeException] {
-      lex("&")
-    }
-  }
-
-  test("throw exception on single pipe") {
-    intercept[RuntimeException] {
-      lex("|")
-    }
-  }
-
 
   
   // Edge cases
