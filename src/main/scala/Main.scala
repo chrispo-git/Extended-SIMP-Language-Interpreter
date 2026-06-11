@@ -80,6 +80,7 @@ def startRepl(store: Store, fnEnv: FunctionEnv, structEnv: StructEnv): Unit = {
         try {
             val tokens = Lexer(source).tokenise()
             val program = Parser(tokens._1, structEnv, tokens._2).parseProgram()
+            //program.foreach(p => println(p))
             Evaluator(fnEnv, structEnv, currentDir).evalProgram(program, store)
         } catch {
             case e: RuntimeException => println(s"[${RED}Error${RESET}] ${e.getMessage}")

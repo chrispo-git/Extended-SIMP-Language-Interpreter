@@ -85,8 +85,10 @@ enum Cmd:
     case Print(value: Expr)
     case Return(expr: Option[Expr] = None)
     case ArrAssign(arr: String, index: Expr, value: Expr)
+    case ArrAssignNested(loc: String, indices: List[Expr], value: Expr)
     case FieldAssign(loc: String, field: String, value: Expr)
     case FieldIndexAssign(loc: String, field: String, index: Expr, value: Expr)
+    case FieldIndexAssignNested(loc: String, field: String, indices: List[Expr], value: Expr)
     case Continue
     case Break
 

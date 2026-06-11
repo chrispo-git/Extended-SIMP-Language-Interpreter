@@ -9,7 +9,14 @@ import scala.util.Random
 import SimpUtils.*
 
 object Builtins:
+    private val gameTerminal = org.jline.terminal.TerminalBuilder.builder().system(true).build()
+    private val gameReader = {
+        gameTerminal.enterRawMode()
+        gameTerminal.reader()
+    }
     def register(fnEnv: FunctionEnv): Unit = {
+
+        
         // len - Length of a String or Array
         fnEnv.registerBuiltin("len", args => args match {
                 case List(Value.StrVal(s)) => Value.IntVal(s.length)
@@ -560,5 +567,53 @@ object Builtins:
                     (0 until length).map(i => Value.PairVal(a(i), b(i)))*
                 ))
             case _ => throw RuntimeException("zip expects two arrays")
+        })
+
+        fnEnv.registerBuiltin("clearScreen", args => args match {
+            case List() => {
+                print("\u001b[3J\u001b[H")
+                Value.NullVal
+            }
+            case _ => throw RuntimeException("clearScreen takes no arguments")
+        })
+
+        fnEnv.registerBuiltin("moveCursor", args => args match {
+            case List(Value.IntVal(row), Value.IntVal(col)) =>
+                print(s"\u001b[${row};${col}H")
+                Console.flush()
+                Value.NullVal
+            case _ => throw RuntimeException("moveCursor expects row and col")
+        })
+
+        fnEnv.registerBuiltin("hideCursor", args => args match {
+            case List() =>
+                print("\u001b[?25l")
+                Console.flush()
+                Value.NullVal
+            case _ => throw RuntimeException("hideCursor takes no arguments")
+        })
+
+        fnEnv.registerBuiltin("showCursor", args => args match {
+            case List() =>
+                print("\u001b[?25h")
+                Console.flush()
+                Value.NullVal
+            case _ => throw RuntimeException("[Error] showCursor takes no arguments")
+        })
+
+        fnEnv.registerBuiltin("sleep", args => args match {
+            case List(Value.IntVal(ms)) => {
+                Thread.sleep(ms)
+                Value.NullVal
+            }
+            case _ => throw RuntimeException("sleep expects an integer (milliseconds)")
+        })
+
+        fnEnv.registerBuiltin("readKey", args => args match {
+            case List() => {
+                val ch = gameReader.read(17L)
+                Value.StrVal(if ch <= 0 || ch == 65534 then "" else ch.toChar.toString)
+            }
+            case _ => throw RuntimeException("readKey takes no arguments")
         })
     }

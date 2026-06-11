@@ -1,0 +1,194 @@
+// Awesome Snake Game! Yes Snake! I think it's pretty awesome that the language has the power to run basic games.
+
+struct Game {
+    snakeX: Int[],
+    snakeY: Int[],
+    dirX: Int,
+    dirY: Int,
+    foodX: Int,
+    foodY: Int,
+    width: Int,
+    height: Int,
+    score: Int,
+    alive: Bool
+}
+
+fn makeGame() -> Game {
+    snakeX := [10, 9, 8];
+    snakeY := [5, 5, 5];
+    g := Game {
+        snakeX: snakeX,
+        snakeY: snakeY,
+        dirX: 1,
+        dirY: 0,
+        foodX: 15,
+        foodY: 5,
+        width: 20,
+        height: 10,
+        score: 0,
+        alive: true
+    };
+    return spawnFood(g);
+}
+fn collidesWithSelf(g: Game, x: Int, y: Int) -> Bool {
+    i := 0;
+    while !i < len(g.snakeX) do {
+        sameX := g.snakeX[!i] == !x;
+        sameY := g.snakeY[!i] == !y;
+        if !sameX && !sameY then {
+            return true;
+        };
+        i += 1;
+    };
+    return false;
+}
+
+fn spawnFood(g: Game) -> Game {
+    fx := random(1, g.width - 1);
+    fy := random(1, g.height - 1);
+    while collidesWithSelf(g, !fx, !fy) do {
+        fx := random(1, g.width - 1);
+        fy := random(1, g.height - 1);
+    };
+    g.foodX := !fx;
+    g.foodY := !fy;
+    return g;
+}
+
+fn changeDir(g: Game, key: Str) -> Game {
+    if !key == "w" && g.dirY != 1 then {
+        g.dirX := 0;
+        g.dirY := -1;
+    } elif !key == "s" && g.dirY != -1 then {
+        g.dirX := 0;
+        g.dirY := 1;
+    } elif !key == "a" && g.dirX != 1 then {
+        g.dirX := -1;
+        g.dirY := 0;
+    } elif !key == "d" && g.dirX != -1 then {
+        g.dirX := 1;
+        g.dirY := 0;
+    };
+    return g;
+}
+
+fn update(g: Game, key: Str) -> Game {
+    g := changeDir(g, !key);
+
+    // calculate new head position
+    newX := g.snakeX[0] + g.dirX;
+    newY := g.snakeY[0] + g.dirY;
+
+    // check wall collision
+    if !newX <= 0 || !newX >= g.width - 1 || !newY <= 0 || !newY >= g.height - 1 then {
+        g.alive := false;
+        return g;
+    };
+
+    // check self collision (ignore tail since it will move)
+    i := 0;
+    while !i < len(g.snakeX) - 1 do {
+        if g.snakeX[!i] == !newX && g.snakeY[!i] == !newY then {
+            g.alive := false;
+            return g;
+        };
+        i += 1;
+    };
+
+    // check food
+    ateFood := !newX == g.foodX && !newY == g.foodY;
+
+    // move snake - add new head
+    newSnakeX := [!newX];
+    newSnakeY := [!newY];
+
+    // copy existing snake body
+    i := 0;
+    limit := len(g.snakeX);
+    if ¬!ateFood then {
+        limit := len(g.snakeX) - 1;
+    };
+    while !i < !limit do {
+        newSnakeX := push(newSnakeX, g.snakeX[!i]);
+        newSnakeY := push(newSnakeY, g.snakeY[!i]);
+        i += 1;
+    };
+
+    g.snakeX := newSnakeX;
+    g.snakeY := newSnakeY;
+
+    if !ateFood then {
+        g.score := g.score + 1;
+        g := spawnFood(g);
+    };
+
+    return g;
+}
+
+fn getCell(g: Game, x: Int, y: Int) -> Str {
+    // check walls
+    if !x == 0 || !x == g.width - 1 || !y == 0 || !y == g.height - 1 then {
+        return "#";
+    };
+
+    // check food
+    if !x == g.foodX && !y == g.foodY then {
+        return "*";
+    };
+
+    // check snake head
+    if g.snakeX[0] == !x && g.snakeY[0] == !y then {
+        return "O";
+    };
+
+    // check snake body
+    i := 1;
+    while !i < len(g.snakeX) do {
+        if g.snakeX[!i] == !x && g.snakeY[!i] == !y then {
+            return "o";
+        };
+        i += 1;
+    };
+
+    return " ";
+}
+
+fn render(g: Game) -> Void {
+    _ := clearScreen();
+    print "SNAKE - Score: " + g.score + " | WASD to move | q to quit";
+    print "";
+    y := 0;
+    while !y < g.height do {
+        row := "";
+        x := 0;
+        while !x < g.width do {
+            row := !row + getCell(g, !x, !y);
+            x += 1;
+        };
+        print !row;
+        y += 1;
+    };
+}
+
+// main game loop
+game := makeGame();
+_ := render(game);
+
+running := true;
+while !running && game.alive do {
+    key := readKey();
+    if !key == "q" then {
+        running := false;
+    } else {
+        game := update(game, !key);
+        _ := render(game);
+        _ := sleep(100);
+    };
+};
+
+print "";
+if ¬game.alive then {
+    print "Game Over! Final score: " + game.score;
+} else {
+    print "Thanks for playing! Final score: " + game.score;
+};

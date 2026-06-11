@@ -127,7 +127,8 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
                 left || right
             }
             case BoolExpr.FromExpr(expr) => {
-                evalExpr(expr, store) match {
+                val v = evalExpr(expr, store)
+                v match {
                     case Value.BoolVal(b) => b
                     case x => throw RuntimeException(s"Expected boolean value, got '$x'")
                 }
@@ -324,7 +325,9 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
             case Expr.Str(s) => Value.StrVal(s)
             case Expr.Bool(b) => Value.BoolVal(b)
             case Expr.BoolLift(b) => Value.BoolVal(evalBool(b, store))
-            case Expr.Ref(loc) => store.load(loc)
+            case Expr.Ref(loc) => {
+                store.load(loc)
+            }
             case Expr.ArrLiteral(elements) => {
                 val evaluated = elements.map(evalExpr(_, store))
                 Value.ArrVal(scala.collection.mutable.ArrayBuffer(evaluated*))
@@ -605,6 +608,58 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
                     }
                     case _ => throw RuntimeException("Expected array and integer index")
                 }
+            }
+            case Cmd.ArrAssignNested(loc, indices, value) => {
+                val v = evalExpr(value, store)
+                var current = store.load(loc) match {
+                    case Value.ArrVal(elements) => elements
+                    case _ => throw RuntimeException(s"'$loc' is not an array")
+                }
+                var i = 0
+                while i < indices.length - 1 do {
+                    val idx = evalExpr(indices(i), store) match {
+                        case Value.IntVal(n) => n
+                        case _ => throw RuntimeException("Array index must be an integer")
+                    }
+                    current = current(idx) match {
+                        case Value.ArrVal(elements) => elements
+                        case _ => throw RuntimeException(s"Not an array at index $idx")
+                    }
+                    i += 1
+                }
+                val lastIdx = evalExpr(indices.last, store) match {
+                    case Value.IntVal(n) => n
+                    case _ => throw RuntimeException("Array index must be an integer")
+                }
+                current(lastIdx) = v
+            }
+            case Cmd.FieldIndexAssignNested(loc, field, indices, value) => {
+                val v = evalExpr(value, store)
+                val struct = store.load(loc) match {
+                    case Value.StructVal(_, fields) => fields
+                    case _ => throw RuntimeException(s"[Error] '$loc' is not a struct")
+                }
+                var current = struct(field) match {
+                    case Value.ArrVal(elements) => elements
+                    case _ => throw RuntimeException(s"[Error] '$loc.$field' is not an array")
+                }
+                var i = 0
+                while i < indices.length - 1 do {
+                    val idx = evalExpr(indices(i), store) match {
+                        case Value.IntVal(n) => n
+                        case _ => throw RuntimeException("[Error] Array index must be an integer")
+                    }
+                    current = current(idx) match {
+                        case Value.ArrVal(elements) => elements
+                        case _ => throw RuntimeException(s"[Error] Not an array at index $idx")
+                    }
+                    i += 1
+                }
+                val lastIdx = evalExpr(indices.last, store) match {
+                    case Value.IntVal(n) => n
+                    case _ => throw RuntimeException("[Error] Array index must be an integer")
+                }
+                current(lastIdx) = v
             }
         }
     }

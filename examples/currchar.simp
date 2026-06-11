@@ -1,0 +1,6 @@
+while true do {
+    key := readKey();
+    if !key != "" then {
+        print "key pressed: '" + !key + "'";
+    }
+}
