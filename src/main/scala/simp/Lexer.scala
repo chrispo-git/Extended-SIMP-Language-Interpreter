@@ -194,7 +194,9 @@ class Lexer(source: String):
             case '-' if isNextFloat() => {advance(); val word = getWholeFloat(); advanceN(word.length); Token.LiteralFloat(word.toDouble * -1)}
             case '-' if isNextInteger() => {advance(); val word = getWholeWord(); advanceN(word.length); Token.LiteralInt(word.toInt * -1)}
 
-
+            case x if isWordMatch("match") => { advanceUntilNextWord(); Token.Match }
+            case x if isWordMatch("case")  => { advanceUntilNextWord(); Token.Case }
+            case '=' if peekNext() == '>'  => { advanceN(2); Token.FatArrow }
             
             case ':' if peekNext() == '=' => {advanceN(2);Token.Assign} 
 

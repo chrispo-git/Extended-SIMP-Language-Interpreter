@@ -93,3 +93,7 @@ enum Token:
     case BitLeft
     case BitRight
     case BitRightFill
+
+    case Match 
+    case Case 
+    case FatArrow

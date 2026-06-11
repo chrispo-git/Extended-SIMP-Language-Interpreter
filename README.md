@@ -80,6 +80,7 @@ A VS Code extension for SIMP+ syntax highlighting is available [here](vsCodeExte
 - for loops
 - Basic import system
 - Map data structure with typed keys and values
+- Pattern Matching
 - if / elif / else conditionals
 - Compound assignment operators
 - Single-line comments
