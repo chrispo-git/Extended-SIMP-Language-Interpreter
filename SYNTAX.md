@@ -111,7 +111,12 @@ E ::= n                                    -- integer literal (n ∈ ℤ)
     | S { f₀: E₀, f₁: E₁, ... }              -- struct literal
     | E.f                                      -- field access (read)
     | null                                      -- null value for non-primitive types
+    | match E { case P => E; ... }              -- pattern match expression
+    | { Cmd; ... E }                            -- block expression (evaluates commands, returns E)
 ```
+
+Note: Block expressions execute a sequence of commands and return the value of the final expression.
+The final expression can't have a trailing semicolon.
 
 #### Arithmetic Operators
 
@@ -176,6 +181,39 @@ B ::= true | false                         -- boolean literals
     | B || B                                -- disjunction (or)
     | (B)                                  -- parenthesised boolean
     | f(E₀, E₁, ...)                      -- function call returning Bool
+```
+
+---
+
+### Patterns
+
+Patterns are used in `match` expressions to destructure and bind values.
+
+```
+P ::= _                                    -- wildcard (matches anything)
+    | n                                    -- integer literal
+    | f                                    -- float literal
+    | "s"                                  -- string literal
+    | true | false                         -- boolean literals
+    | null                                 -- null
+    | x                                    -- variable binding (binds matched value to x)
+    | (P, P)                               -- pair destructuring
+    | S { f₀: P, f₀: P, ... }             -- struct destructuring
+```
+Patterns are tried in order, the first matching arm is executed. If no arm matches a runtime error is thrown.
+
+#### Guards
+A guard can be added to any pattern with `if` like so:
+```
+case x if !x > 9000 => "It's over 9000!"
+```
+
+The guard is evaluated iff the pattern matches. If the guard fails the next arm is tried.
+
+#### Variable Binding
+Variables bound in a pattern are available in the arm body and guard:
+```
+case Point { x: px, y: py } => print !px + ", " + !py;
 ```
 
 ---
@@ -324,4 +362,20 @@ fn minMax(arr: Int[]) -> (Int, Int) {
 result := minMax([3, 1, 4, 1, 5, 9, 2, 6]);
 print "min: " + result.fst;
 print "max: " + result.snd;
+```
+
+### Pattern Matching
+```
+struct Shape { kind: Str, size: Int }
+
+fn describe(s: Shape) -> Str {
+    return match s {
+        case Shape { kind: "circle", size: r } => "circle with radius " + !r;
+        case Shape { kind: "square", size: w } => "square with width " + !w;
+        case Shape { kind: k } => "unknown shape: " + !k;
+    };
+}
+
+print describe(Shape { kind: "circle", size: 5 });
+print describe(Shape { kind: "square", size: 3 });
 ```

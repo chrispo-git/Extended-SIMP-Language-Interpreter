@@ -229,6 +229,54 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
         case (Value.StructVal(t1, f1), Value.StructVal(t2, f2)) => t1 == t2 && structsEqual(f1, f2, visited)
         case _ => false
     }
+    private def matchPattern(pattern: Pattern, value: Value, store: Store): Option[Map[String, Value]] = {
+        pattern match {
+            case Pattern.PWild => Some(Map())
+
+            case Pattern.PLit(expr) => {
+                val lit = evalExpr(expr, store)
+                if lit == value then {
+                    Some(Map())
+                } else {
+                    None
+                }
+            }
+
+            case Pattern.PVar(name) => Some(Map(name -> value))
+
+            case Pattern.PPair(fstPat, sndPat) => {
+                value match {
+                    case Value.PairVal(fst, snd) => {
+                        for
+                            fstBindings <- matchPattern(fstPat, fst, store)
+                            sndBindings <- matchPattern(sndPat, snd, store)
+                        yield fstBindings ++ sndBindings
+                    }
+                    case _ => None
+                }
+            }
+
+            case Pattern.PStruct(typeName, fieldPats) => {
+                value match {
+                    case Value.StructVal(vTypeName, fields) if vTypeName == typeName => {
+                        val bindings = scala.collection.mutable.Map[String, Value]()
+                        val allMatch = fieldPats.forall((fieldName, fieldPat) =>
+                            fields.get(fieldName) match {
+                                case None => false
+                                case Some(fieldVal) =>
+                                    matchPattern(fieldPat, fieldVal, store) match {
+                                        case None => false
+                                        case Some(b) => bindings ++= b; true
+                                    }
+                            }
+                        )
+                        if allMatch then Some(bindings.toMap) else None
+                    }
+                    case _ => None
+                }
+            }
+        }
+    }
     private def evalExpr(expr: Expr, store: Store): Value = {
         expr match {
             case Expr.Num(n) => Value.IntVal(n)
@@ -238,6 +286,38 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
                 store.load(loc) match {
                     case Value.RefVal(refLoc, refStore) => refStore.load(refLoc)
                     case v => v
+                }
+            }
+            case Expr.Block(cmds, result) => {
+                cmds.foreach(cmd => execCmd(cmd, store))
+                evalExpr(result, store)
+            }
+            case Expr.Match(expr, arms) => {
+                val value = evalExpr(expr, store)
+                val matched = arms.find(arm =>
+                    matchPattern(arm.pattern, value, store) match {
+                        case Some(bindings) => {
+                            arm.guard match {
+                                case None => true
+                                case Some(guard) => {
+                                    val guardStore = Store()
+                                    store.entries().foreach((k,v) => guardStore.store(k,v))
+                                    bindings.foreach((k,v) => guardStore.store(k,v))
+                                    evalBool(BoolExpr.FromExpr(guard), guardStore)
+                                }
+                            }
+                        }
+                        case None => false
+                    }
+                )
+                matched match {
+                    case None => throw RuntimeException("No matching pattern found, pattern non-exhaustive!")
+                    case Some(arm) => {
+                        val matchStore = Store()
+                        store.entries().foreach((k, v) => matchStore.store(k, v))
+                        matchPattern(arm.pattern, value, store).get.foreach((k, v) => matchStore.store(k, v))
+                        evalExpr(arm.body, matchStore)
+                    }
                 }
             }
             case Expr.Null => Value.NullVal

@@ -24,7 +24,19 @@ enum Expr:
     case FieldAccess(expr: Expr, field: String) 
     case TypeLiteral(t: SimpType) 
     case Pair(fst: Expr, snd: Expr)
+    case Match(expr: Expr, arms: List[MatchArm])
+    case Block(cmds: List[Cmd], result: Expr)
     case Null
+
+case class MatchArm(pattern: Pattern, guard: Option[Expr], body: Expr)
+
+enum Pattern:
+    case PWild
+    case PLit(value: Expr)
+    case PVar(name: String)
+    case PStruct(typeName: String, fields: List[(String, Pattern)])
+    case PPair(fst: Pattern, snd: Pattern)
+
 
 // Operators allowed - Add, Sub, Mul, Div, Mod, & Bitwise operations
 enum Op:

@@ -1,0 +1,131 @@
+// Lexer, Parser, Evaluator for simple integer expressions! Really cool, it's like inception.
+
+struct Token {
+    kind: Str,
+    value: Int
+}
+
+struct Expr {
+    kind: Str,
+    value: Int,
+    left: Expr,
+    right: Expr
+}
+
+fn makeToken(kind: Str, value: Int) -> Token {
+    return Token { kind: !kind, value: !value };
+}
+
+fn makeNum(n: Int) -> Expr {
+    return Expr { kind: "num", value: !n, left: null, right: null };
+}
+
+fn makeBinOp(op: Str, left: Expr, right: Expr) -> Expr {
+    return Expr { kind: !op, value: 0, left: !left, right: !right };
+}
+
+fn isDigit(c: Str) -> Bool {
+    return contains("0123456789", !c);
+}
+
+fn tokenise(input: Str) -> Token[] {
+    chars := toArr(!input);
+    tokens := [];
+    i := 0;
+    while !i < len(chars) do {
+        c := chars[!i];
+        if !c == " " then {
+            i += 1;
+        } elif isDigit(!c) then {
+            num := 0;
+            while !i < len(chars) && isDigit(chars[!i]) do {
+                num := !num * 10 + toInt(chars[!i]);
+                i += 1;
+            };
+            tokens := push(tokens, makeToken("num", !num));
+        } else {
+            tokens := push(tokens, makeToken(!c, 0));
+            i += 1;
+        };
+    };
+    tokens := push(tokens, makeToken("eof", 0));
+    return tokens;
+}
+
+fn parseFactor(tokens: Token[], pos: Int) -> (Expr, Int) {
+    t := tokens[!pos];
+    return match t.kind {
+        case "num" => (makeNum(t.value), !pos + 1);
+        case "(" => {
+            inner := parseExprP(tokens, !pos + 1);
+            expr := inner.fst;
+            newPos := inner.snd + 1;
+            (!expr, !newPos)
+        };
+        case _ => (makeNum(0), !pos + 1);
+    };
+}
+
+fn parseTerm(tokens: Token[], pos: Int) -> (Expr, Int) {
+    result := parseFactor(tokens, !pos);
+    left := result.fst;
+    pos := result.snd;
+    while tokens[!pos].kind == "*" || tokens[!pos].kind == "/" do {
+        op := tokens[!pos].kind;
+        pos := !pos + 1;
+        result := parseFactor(tokens, !pos);
+        right := result.fst;
+        pos := result.snd;
+        left := makeBinOp(!op, left, right);
+    };
+    return (left, !pos);
+}
+
+fn parseExprP(tokens: Token[], pos: Int) -> (Expr, Int) {
+    result := parseTerm(tokens, !pos);
+    left := result.fst;
+    pos := result.snd;
+    while tokens[!pos].kind == "+" || tokens[!pos].kind == "-" do {
+        op := tokens[!pos].kind;
+        pos := !pos + 1;
+        result := parseTerm(tokens, !pos);
+        right := result.fst;
+        pos := result.snd;
+        left := makeBinOp(!op, left, right);
+    };
+    return (left, !pos);
+}
+
+// Evaluator
+fn evaluate(expr: Expr) -> Int {
+    return match expr.kind {
+        case "num" => expr.value;
+        case "+" => evaluate(expr.left) + evaluate(expr.right);
+        case "-" => evaluate(expr.left) - evaluate(expr.right);
+        case "*" => evaluate(expr.left) * evaluate(expr.right);
+        case "/" => evaluate(expr.left) / evaluate(expr.right);
+        case _ => 0;
+    };
+}
+
+fn prettyPrint(expr: Expr) -> Str {
+    return match expr.kind {
+        case "num" => toStr(expr.value);
+        case k => "(" + prettyPrint(expr.left) + " " + !k + " " + prettyPrint(expr.right) + ")";
+    };
+}
+
+fn calc(input: Str) -> Void {
+    tokens := tokenise(!input);
+    result := parseExprP(tokens, 0);
+    expr := result.fst;
+    print evaluate(expr);
+}
+print "type exit to exit!";
+while true do {
+    val := input();
+    if !val == "exit" then {
+        break;
+    };
+    _:= calc(!val);
+}
