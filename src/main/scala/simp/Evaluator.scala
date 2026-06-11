@@ -127,7 +127,8 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
                 left || right
             }
             case BoolExpr.FromExpr(expr) => {
-                evalExpr(expr, store) match {
+                val v = evalExpr(expr, store)
+                v match {
                     case Value.BoolVal(b) => b
                     case x => throw RuntimeException(s"Expected boolean value, got '$x'")
                 }
@@ -244,7 +245,9 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
             case Expr.Str(s) => Value.StrVal(s)
             case Expr.Bool(b) => Value.BoolVal(b)
             case Expr.BoolLift(b) => Value.BoolVal(evalBool(b, store))
-            case Expr.Ref(loc) => store.load(loc)
+            case Expr.Ref(loc) => {
+                store.load(loc)
+            }
             case Expr.ArrLiteral(elements) => {
                 val evaluated = elements.map(evalExpr(_, store))
                 Value.ArrVal(scala.collection.mutable.ArrayBuffer(evaluated*))

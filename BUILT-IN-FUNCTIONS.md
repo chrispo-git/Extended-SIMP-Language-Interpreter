@@ -5,12 +5,21 @@ Each of these functions is available by default in SIMP+.
 | Function | Signature | Description |
 |----------|-----------|-------------|
 | `assert` | `assert(Bool, <Str>) -> Bool` | If false, throws an error with optional message |
+| `deepCopy` | `deepCopy(x) -> x` | Returns a deep copy of a value |
+
+---
+
+## I/O
+| Function | Signature | Description |
+|----------|-----------|-------------|
 | `input` | `input(<Str>) -> Str` | Reads a String from stdin with optional prompt |
 | `inputInt` | `inputInt(<Str>) -> Int` | Reads an Int from stdin with optional prompt |
 | `inputBool` | `inputBool(<Str>) -> Bool` | Reads a Bool from stdin (y/n, yes/no, 1/0, t/f, true/false) |
 | `readFile` | `readFile(Str) -> Str[]` | Reads a text file and returns lines as an array |
 | `writeFile` | `writeFile(Str, Str[]) -> Bool` | Writes lines to a text file, returns true on success |
-| `deepCopy` | `deepCopy(x) -> x` | Returns a deep copy of a value |
+| `clearScreen` | `clearScreen() -> Void` | Clears the screen |
+| `sleep` | `sleep(Int) -> Void` | Pauses execution for x milliseconds |
+| `readKey`| `readKey() -> Str` | Reads the key currently being pressed |
 
 ---
 

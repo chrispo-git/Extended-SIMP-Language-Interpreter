@@ -482,7 +482,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
             left = Expr.BinaryOp(left, op, right)
         }
         peek() match {
-            case Token.Gt | Token.Lt | Token.Gte | Token.Lte | Token.Eq | Token.Neq =>
+            case Token.Gt | Token.Lt | Token.Gte | Token.Lte | Token.Eq | Token.Neq => {
                 val bop = peek() match {
                     case Token.Gt  => Bop.Gt
                     case Token.Lt  => Bop.Lt
@@ -495,8 +495,10 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
                 advance()
                 val right = parseExpr()
                 Expr.BoolLift(BoolExpr.Compare(left, bop, right))
+            }
             case _ => left
         }
+        left
     }
     private def parseAddSub(): Expr = {
         var left = parseTerm()
@@ -888,6 +890,25 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
                 inside
             }
             case Token.Variable(_) if peekNext() == Token.OpenBracket || peekNext() == Token.OpenSquare => {
+                val expr = parsePostfix(parseAtomicExpr())
+                peek() match {
+                    case Token.Gt | Token.Lt | Token.Gte | Token.Lte | Token.Eq | Token.Neq =>
+                        val bop = peek() match {
+                            case Token.Gt  => Bop.Gt
+                            case Token.Lt  => Bop.Lt
+                            case Token.Gte => Bop.Gte
+                            case Token.Lte => Bop.Lte
+                            case Token.Eq  => Bop.Eq
+                            case Token.Neq => Bop.Neq
+                            case _ => throwError("unreachable")
+                        }
+                        advance()
+                        val right = parseExpr()
+                        BoolExpr.Compare(expr, bop, right)
+                    case _ => BoolExpr.FromExpr(expr)
+                }
+            }
+            case Token.Variable(_) if peekNext() == Token.Dot => {
                 val expr = parsePostfix(parseAtomicExpr())
                 peek() match {
                     case Token.Gt | Token.Lt | Token.Gte | Token.Lte | Token.Eq | Token.Neq =>

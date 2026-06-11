@@ -561,4 +561,40 @@ object Builtins:
                 ))
             case _ => throw RuntimeException("zip expects two arrays")
         })
+
+        fnEnv.registerBuiltin("clearScreen", args => args match {
+            case List() => {
+                print("\u001b[2J\u001b[H")
+                Value.NullVal
+            }
+            case _ => throw RuntimeException("clearScreen takes no arguments")
+        })
+
+        fnEnv.registerBuiltin("sleep", args => args match {
+            case List(Value.IntVal(ms)) => {
+                Thread.sleep(ms)
+                Value.NullVal
+            }
+            case _ => throw RuntimeException("sleep expects an integer (milliseconds)")
+        })
+
+        fnEnv.registerBuiltin("readKey", args => args match {
+            case List()  => {
+                val terminal = org.jline.terminal.TerminalBuilder.builder().system(true).build()
+                terminal.enterRawMode()
+                val reader = terminal.reader()
+                val start = System.currentTimeMillis()
+                var result = ""
+                while result.isEmpty && System.currentTimeMillis() - start < 17 do {
+                    if reader.ready() then {
+                        result = reader.read().toChar.toString
+                    } else {
+                        Thread.sleep(1)
+                    }
+                }
+                terminal.close()
+                Value.StrVal(result)
+            }
+            case _ => throw RuntimeException("readKey takes no arguments")
+        })
     }
