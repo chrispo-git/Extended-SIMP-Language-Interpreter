@@ -124,220 +124,180 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
             left
         }
     }
+    private def parseFieldIndexAssign(l: String, field: String): Cmd = {
+        advance()
+        val index = parseExpr()
+        expect(Token.CloseSquare)
+        peek() match {
+            case Token.Assign => { advance(); Cmd.FieldIndexAssign(l, field, index, parseExpr()) }
+            case Token.PlusEq => { advance(); Cmd.FieldIndexAssign(l, field, index, Expr.BinaryOp(Expr.ArrIndex(Expr.FieldAccess(Expr.Ref(l), field), index), Op.Add, parseExpr())) }
+            case Token.MinusEq => { advance(); Cmd.FieldIndexAssign(l, field, index, Expr.BinaryOp(Expr.ArrIndex(Expr.FieldAccess(Expr.Ref(l), field), index), Op.Sub, parseExpr())) }
+            case Token.MulEq => { advance(); Cmd.FieldIndexAssign(l, field, index, Expr.BinaryOp(Expr.ArrIndex(Expr.FieldAccess(Expr.Ref(l), field), index), Op.Mul, parseExpr())) }
+            case Token.DivEq => { advance(); Cmd.FieldIndexAssign(l, field, index, Expr.BinaryOp(Expr.ArrIndex(Expr.FieldAccess(Expr.Ref(l), field), index), Op.Div, parseExpr())) }
+            case x => throw RuntimeException(s"[Error] Expected assignment, got '$x'")
+        }
+    }
 
-    private def parseSingleCmd(): Cmd = {
-        val current_token = peek()
-        current_token match {
-            case Token.Skip => {
-                advance(); 
-                Cmd.Skip
-            }
-            case Token.Continue => {
-                advance(); 
-                Cmd.Continue
-            }
-            case Token.Break => {
-                advance(); 
-                Cmd.Break
-            }
-            case Token.Variable(l) if peekNext() == Token.Dot => {
-                advance() 
-                advance() 
+    private def parseFieldAssign(l: String, field: String): Cmd = {
+        peek() match {
+            case Token.Assign => { advance(); Cmd.FieldAssign(l, field, parseExpr()) }
+            case Token.PlusEq => { advance(); Cmd.FieldAssign(l, field, Expr.BinaryOp(Expr.FieldAccess(Expr.Ref(l), field), Op.Add, parseExpr())) }
+            case Token.MinusEq => { advance(); Cmd.FieldAssign(l, field, Expr.BinaryOp(Expr.FieldAccess(Expr.Ref(l), field), Op.Sub, parseExpr())) }
+            case Token.MulEq => { advance(); Cmd.FieldAssign(l, field, Expr.BinaryOp(Expr.FieldAccess(Expr.Ref(l), field), Op.Mul, parseExpr())) }
+            case Token.DivEq => { advance(); Cmd.FieldAssign(l, field, Expr.BinaryOp(Expr.FieldAccess(Expr.Ref(l), field), Op.Div, parseExpr())) }
+            case x => throw RuntimeException(s"[Error] Expected assignment, got '$x'")
+        }
+    }
+
+    private def parseFieldOrIndexAssign(l: String): Cmd = {
+        advance()
+        peek() match {
+            case Token.Variable(field) => {
+                advance()
                 peek() match {
-                    case Token.Variable(field) => {
-                        advance() 
-                        peek() match {
-                            case Token.OpenSquare => {
-                                advance()
-                                val index = parseExpr()
-                                expect(Token.CloseSquare)
-                                peek() match {
-                                    case Token.Assign => {
-                                        advance()
-                                        Cmd.FieldIndexAssign(l, field, index, parseExpr())
-                                    }
-                                    case Token.PlusEq => {
-                                        advance()
-                                        val value = parseExpr()
-                                        Cmd.FieldIndexAssign(l, field, index, Expr.BinaryOp(Expr.ArrIndex(Expr.FieldAccess(Expr.Ref(l), field), index), Op.Add, value))
-                                    }
-                                    case Token.MinusEq => {
-                                        advance()
-                                        val value = parseExpr()
-                                        Cmd.FieldIndexAssign(l, field, index, Expr.BinaryOp(Expr.ArrIndex(Expr.FieldAccess(Expr.Ref(l), field), index), Op.Sub, value))
-                                    }
-                                    case Token.MulEq => {
-                                        advance()
-                                        val value = parseExpr()
-                                        Cmd.FieldIndexAssign(l, field, index, Expr.BinaryOp(Expr.ArrIndex(Expr.FieldAccess(Expr.Ref(l), field), index), Op.Mul, value))
-                                    }
-                                    case Token.DivEq => {
-                                        advance()
-                                        val value = parseExpr()
-                                        Cmd.FieldIndexAssign(l, field, index, Expr.BinaryOp(Expr.ArrIndex(Expr.FieldAccess(Expr.Ref(l), field), index), Op.Div, value))
-                                    }
-                                    case x => throw RuntimeException(s"Expected assignment, got '$x'")
-                                }
-                            }
-                            case Token.Assign => {
-                                advance()
-                                Cmd.FieldAssign(l, field, parseExpr())
-                            }
-                            case Token.PlusEq => {
-                                advance()
-                                val value = parseExpr()
-                                Cmd.FieldAssign(l, field, Expr.BinaryOp(Expr.FieldAccess(Expr.Ref(l), field), Op.Add, value))
-                            }
-                            case Token.MinusEq => {
-                                advance()
-                                val value = parseExpr()
-                                Cmd.FieldAssign(l, field, Expr.BinaryOp(Expr.FieldAccess(Expr.Ref(l), field), Op.Sub, value))
-                            }
-                            case Token.MulEq => {
-                                advance()
-                                val value = parseExpr()
-                                Cmd.FieldAssign(l, field, Expr.BinaryOp(Expr.FieldAccess(Expr.Ref(l), field), Op.Mul, value))
-                            }
-                            case Token.DivEq => {
-                                advance()
-                                val value = parseExpr()
-                                Cmd.FieldAssign(l, field, Expr.BinaryOp(Expr.FieldAccess(Expr.Ref(l), field), Op.Div, value))
-                            }
-                            case x => throw RuntimeException(s"Expected assignment, got '$x'")
-                        }
-                    }
-                    case x => throw RuntimeException(s"Expected field name after '.', got '$x'")
+                    case Token.OpenSquare => parseFieldIndexAssign(l, field)
+                    case _ => parseFieldAssign(l, field)
                 }
             }
-            case Token.If => {
+            case x => throw RuntimeException(s"[Error] Expected field name after '.', got '$x'")
+        }
+    }
+
+    private def parseVarAssign(l: String): Cmd = {
+        peek() match {
+            case Token.OpenSquare => {
                 advance()
-                val cond = parseBool()
-                expect(Token.Then)
+                val index = parseExpr()
+                expect(Token.CloseSquare)
+                expect(Token.Assign)
+                Cmd.ArrAssign(l, index, parseExpr())
+            }
+            case Token.Assign => { advance(); Cmd.Assign(l, parseExpr()) }
+            case Token.PlusEq => { advance(); Cmd.Assign(l, Expr.BinaryOp(Expr.Deref(l), Op.Add, parseExpr())) }
+            case Token.MinusEq => { advance(); Cmd.Assign(l, Expr.BinaryOp(Expr.Deref(l), Op.Sub, parseExpr())) }
+            case Token.MulEq => { advance(); Cmd.Assign(l, Expr.BinaryOp(Expr.Deref(l), Op.Mul, parseExpr())) }
+            case Token.DivEq => { advance(); Cmd.Assign(l, Expr.BinaryOp(Expr.Deref(l), Op.Div, parseExpr())) }
+            case x => throwError(s"Expected assignment, got '$x'")
+        }
+    }
+
+    private def parseIfBody(): (Cmd, Cmd) = {
+        expect(Token.OpenBrace)
+        val thenBranch = parseCmd()
+        expect(Token.CloseBrace)
+        val elseBranch = peek() match {
+            case Token.Elif => parseSingleCmd()
+            case Token.Else => {
+                advance()
                 expect(Token.OpenBrace)
-                val thenBranch = parseCmd()
+                val e = parseCmd()
                 expect(Token.CloseBrace)
-                val elseBranch = peek() match {
-                    case Token.Elif => {
-                        parseSingleCmd()
-                    }
-                    case Token.Else => {
-                        advance()
-                        expect(Token.OpenBrace)
-                        val e = parseCmd()
-                        expect(Token.CloseBrace)
-                        e
-                    }
-                    case _ => Cmd.Skip
-                }
-                Cmd.If(cond, thenBranch, elseBranch)
+                e
             }
-            case Token.Elif => {
+            case _ => Cmd.Skip
+        }
+        (thenBranch, elseBranch)
+    }
+
+    private def parseIfCmd(): Cmd = {
+        advance()
+        val cond = parseBool()
+        expect(Token.Then)
+        val (thenBranch, elseBranch) = parseIfBody()
+        Cmd.If(cond, thenBranch, elseBranch)
+    }
+
+    private def parseElifCmd(): Cmd = {
+        advance()
+        val cond = parseBool()
+        expect(Token.Then)
+        val (thenBranch, elseBranch) = parseIfBody()
+        Cmd.If(cond, thenBranch, elseBranch)
+    }
+
+    private def parseWhileCmd(): Cmd = {
+        advance()
+        val cond = parseBool()
+        expect(Token.Do)
+        expect(Token.OpenBrace)
+        val body = parseCmd()
+        expect(Token.CloseBrace)
+        Cmd.While(cond, body)
+    }
+
+    private def parseForCmd(): Cmd = {
+        advance()
+        peek() match {
+            case Token.Variable(name) => {
                 advance()
-                val cond = parseBool()
-                expect(Token.Then)
-                expect(Token.OpenBrace)
-                val thenBranch = parseCmd()
-                expect(Token.CloseBrace)
-                val elseBranch = peek() match {
-                    case Token.Elif => {
-                        parseSingleCmd()
-                    }
-                    case Token.Else => {
-                        advance()
-                        expect(Token.OpenBrace)
-                        val e = parseCmd()
-                        expect(Token.CloseBrace)
-                        e
-                    }
-                    case _ => Cmd.Skip
-                }
-                Cmd.If(cond, thenBranch, elseBranch)
-            }
-            case Token.While => {
-                advance()
-                val cond = parseBool()
-                expect(Token.Do)
+                expect(Token.In)
+                val iterable = parseExpr()
                 expect(Token.OpenBrace)
                 val body = parseCmd()
                 expect(Token.CloseBrace)
-                Cmd.While(cond, body)
+                Cmd.For(name, iterable, body)
             }
-            case Token.For => {
-                advance()
-                peek() match {
-                    case Token.Variable(name) => {
-                        advance()
-                        expect(Token.In)
-                        val iterable = parseExpr()
-                        expect(Token.OpenBrace)
-                        val body = parseCmd()
-                        expect(Token.CloseBrace)
-                        Cmd.For(name, iterable, body)
-                    }
-                    case x => throwError(s"Expected loop variable, got '$x'")
+            case x => throwError(s"Expected loop variable, got '$x'")
+        }
+    }
+
+    private def parseOpenBracketCmd(): Cmd = {
+        val savedPos = pos
+        advance()
+        try {
+            val expr = parseExpr()
+            peek() match {
+                case Token.Comma => {
+                    advance()
+                    val right = parseExpr()
+                    expect(Token.CloseBracket)
+                    Cmd.Assign("_", Expr.Pair(expr, right))
+                }
+                case Token.CloseBracket => {
+                    advance()
+                    Cmd.Assign("_", expr)
+                }
+                case _ => {
+                    pos = savedPos
+                    advance()
+                    val cmd = parseCmd()
+                    expect(Token.CloseBracket)
+                    cmd
                 }
             }
-            case Token.Variable(l) => {
-                val loc = l
-                advance()
-                peek() match {
-                    case Token.OpenSquare => {
-                        advance()
-                        val index = parseExpr()
-                        expect(Token.CloseSquare)
-                        expect(Token.Assign)
-                        val value = parseExpr()
-                        Cmd.ArrAssign(l, index, value)
-                    }
-                    case Token.Assign => {
-                        advance()
-                        val value = parseExpr()
-                        Cmd.Assign(loc, value)
-                    }
-                    case Token.PlusEq => {
-                        advance()
-                        val value = parseExpr()
-                        Cmd.Assign(loc, Expr.BinaryOp(Expr.Deref(loc), Op.Add, value))
-                    }
-                    case Token.MinusEq => {
-                        advance()
-                        val value = parseExpr()
-                        Cmd.Assign(loc, Expr.BinaryOp(Expr.Deref(loc), Op.Sub, value))
-                    }
-                    case Token.MulEq => {
-                        advance()
-                        val value = parseExpr()
-                        Cmd.Assign(loc, Expr.BinaryOp(Expr.Deref(loc), Op.Mul, value))
-                    }
-                    case Token.DivEq => {
-                        advance()
-                        val value = parseExpr()
-                        Cmd.Assign(loc, Expr.BinaryOp(Expr.Deref(loc), Op.Div, value))
-                    }
-                    case x => throwError(s"Expected assignment, got '$x'")
-                }
-                
-            }
-            case Token.Print => {
-                advance()
-                Cmd.Print(parseExpr())
-            }
-            case Token.OpenBracket => {
+        } catch {
+            case _: Exception => {
+                pos = savedPos
                 advance()
                 val cmd = parseCmd()
                 expect(Token.CloseBracket)
                 cmd
             }
-            case Token.Return => {
-                advance()
-                peek() match {
-                    case Token.Semicolon | Token.CloseBrace | Token.EOF => Cmd.Return(None)
-                    case _ => Cmd.Return(Some(parseExpr()))
-                }
-            }
-            
-            case x => throwError(s"Unexpected '$x'")
         }
+    }
+
+    private def parseReturnCmd(): Cmd = {
+        advance()
+        peek() match {
+            case Token.Semicolon | Token.CloseBrace | Token.EOF => Cmd.Return(None)
+            case _ => Cmd.Return(Some(parseExpr()))
+        }
+    }
+
+    private def parseSingleCmd(): Cmd = peek() match {
+        case Token.Skip     => { advance(); Cmd.Skip }
+        case Token.Continue => { advance(); Cmd.Continue }
+        case Token.Break    => { advance(); Cmd.Break }
+        case Token.Variable(l) if peekNext() == Token.Dot => { advance(); parseFieldOrIndexAssign(l) }
+        case Token.If       => parseIfCmd()
+        case Token.Elif     => parseElifCmd()
+        case Token.While    => parseWhileCmd()
+        case Token.For      => parseForCmd()
+        case Token.Variable(l) => { advance(); parseVarAssign(l) }
+        case Token.Print    => { advance(); Cmd.Print(parseExpr()) }
+        case Token.OpenBracket => parseOpenBracketCmd()
+        case Token.Return   => parseReturnCmd()
+        case x => throwError(s"Unexpected '$x'")
     }
     private def parseArgs(): List[Expr] = {
         expect(Token.OpenBracket)
@@ -567,6 +527,67 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
             case _ => expr
         }
     }
+    private def parseMatch(): Expr = {
+        expect(Token.Match)
+        val expr = parseExpr()
+        expect(Token.OpenBrace)
+        val arms = scala.collection.mutable.ListBuffer[MatchArm]()
+        while peek() != Token.CloseBrace do {
+            expect(Token.Case)
+            val pattern = parsePattern()
+            val guard = if peek() == Token.If then {
+                advance()
+                Some(parseExpr())
+            } else None
+            expect(Token.FatArrow)
+            val body = parseExpr()
+            expect(Token.Semicolon)
+            arms += MatchArm(pattern, guard, body)
+        }
+        expect(Token.CloseBrace)
+        Expr.Match(expr, arms.toList)
+    }
+
+    private def parsePattern(): Pattern = peek() match {
+        case Token.Variable("_") => { advance(); Pattern.PWild }
+        case Token.LiteralInt(_) | Token.LiteralFloat(_) | Token.StringLit(_) | Token.BoolLit(_) | Token.Null =>
+            Pattern.PLit(parseAtomicExpr())
+        case Token.OpenBracket => {
+            advance()
+            val fst = parsePattern()
+            expect(Token.Comma)
+            val snd = parsePattern()
+            expect(Token.CloseBracket)
+            Pattern.PPair(fst, snd)
+        }
+        case Token.Variable(name) if peekNext() == Token.OpenBrace => {
+            advance()
+            advance()
+            val fields = parsePatternFields()
+            expect(Token.CloseBrace)
+            Pattern.PStruct(name, fields)
+        }
+        case Token.Variable(name) => { advance(); Pattern.PVar(name) }
+        case x => throwError(s"Expected pattern, got '$x'")
+    }
+
+    private def parsePatternFields(): List[(String, Pattern)] = {
+        val fields = scala.collection.mutable.ListBuffer[(String, Pattern)]()
+        while peek() != Token.CloseBrace do {
+            peek() match {
+                case Token.Variable(name) => {
+                    advance()
+                    expect(Token.Colon)
+                    val pattern = parsePattern()
+                    fields += ((name, pattern))
+                    if peek() == Token.Comma then advance()
+                }
+                case x => throwError(s"Expected field name, got '$x'")
+            }
+        }
+        fields.toList
+    }
+
     private def parseAtomicExpr(): Expr = {
         peek() match {
             case Token.BitComplement => {
@@ -589,6 +610,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
                     case _ => left
                 }
             }
+            case Token.Match => parseMatch()
             case Token.LiteralInt(n) => {
                 advance()
                 val left = Expr.Num(n)
@@ -723,6 +745,24 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
             case Token.Variable(name) => {
                 advance()
                 Expr.Ref(name)
+            }
+            case Token.OpenBrace => {
+                advance()
+                val cmds = scala.collection.mutable.ListBuffer[Cmd]()
+                while peek() != Token.CloseBrace do {
+                    val savedPos = pos
+                    val cmd = parseSingleCmd()
+                    if peek() == Token.Semicolon then {
+                        advance()
+                        cmds += cmd
+                    } else {
+                        pos = savedPos
+                        val result = parseExpr()
+                        expect(Token.CloseBrace)
+                        return Expr.Block(cmds.toList, result)
+                    }
+                }
+                throwError("Block expression must end with a value expression")
             }
             case Token.OpenBracket => {
                 advance()
