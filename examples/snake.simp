@@ -1,3 +1,5 @@
+// Awesome Snake Game! Yes Snake! I think it's pretty awesome that the language has the power to run basic games.
+
 struct Game {
     snakeX: Int[],
     snakeY: Int[],
@@ -12,11 +14,8 @@ struct Game {
 }
 
 fn makeGame() -> Game {
-    print "makeGame called";
     snakeX := [10, 9, 8];
-    print "snakeX created";
     snakeY := [5, 5, 5];
-    print "snakeY created";
     g := Game {
         snakeX: snakeX,
         snakeY: snakeY,
@@ -45,11 +44,8 @@ fn collidesWithSelf(g: Game, x: Int, y: Int) -> Bool {
 }
 
 fn spawnFood(g: Game) -> Game {
-    print "spawnFood called";
     fx := random(1, g.width - 1);
-    print "fx=" + !fx;
     fy := random(1, g.height - 1);
-    print "fy=" + !fy;
     while collidesWithSelf(g, !fx, !fy) do {
         fx := random(1, g.width - 1);
         fy := random(1, g.height - 1);
@@ -77,7 +73,6 @@ fn changeDir(g: Game, key: Str) -> Game {
 }
 
 fn update(g: Game, key: Str) -> Game {
-    print "update called";
     g := changeDir(g, !key);
 
     // calculate new head position

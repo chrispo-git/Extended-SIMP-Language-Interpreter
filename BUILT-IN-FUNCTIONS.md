@@ -18,6 +18,9 @@ Each of these functions is available by default in SIMP+.
 | `readFile` | `readFile(Str) -> Str[]` | Reads a text file and returns lines as an array |
 | `writeFile` | `writeFile(Str, Str[]) -> Bool` | Writes lines to a text file, returns true on success |
 | `clearScreen` | `clearScreen() -> Void` | Clears the screen |
+| `hideCursor` | `hideCursor() -> Void` | Hides the cursor |
+| `showCursor` | `showCursor() -> Void` | Shows the cursor |
+| `moveCursor` | `moveCursor(Int, Int) -> Void` | Moves the terminal cursor to a position (row, col) |
 | `sleep` | `sleep(Int) -> Void` | Pauses execution for x milliseconds |
 | `readKey`| `readKey() -> Str` | Reads the key currently being pressed |
 
