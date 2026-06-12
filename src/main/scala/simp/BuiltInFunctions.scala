@@ -9,8 +9,8 @@ import scala.util.Random
 import SimpUtils.*
 
 object Builtins:
-    private val gameTerminal = org.jline.terminal.TerminalBuilder.builder().system(true).build()
-    private val gameReader = {
+    private lazy val gameTerminal = org.jline.terminal.TerminalBuilder.builder().system(true).build()
+    private lazy val gameReader = {
         gameTerminal.enterRawMode()
         gameTerminal.reader()
     }

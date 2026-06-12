@@ -63,6 +63,7 @@ where F is the path of a file, and A is an optional alias
 
 ```
 Cmd ::= skip                                -- no-op
+      | const l := E                             -- constant assignment
       | l := E                             -- assignment
       | l[E] := E                                -- array index assignment
       | l += E                             -- compound add (just sugar for l := !l + E)
@@ -75,6 +76,7 @@ Cmd ::= skip                                -- no-op
         elif B then { Cmd }                -- (chained, just sugar for nested if/else)
         else { Cmd }
       | while B do { Cmd }                 -- loop
+      | { Cmd }                            -- anonymous scope block
       | for l in E { Cmd }                 -- foreach loop (E must be an array type, l is read-only)
       | break                            -- breaks loop
       | continue                            -- continues loop
@@ -86,6 +88,8 @@ Cmd ::= skip                                -- no-op
 Where:
 - `l ∈ L = {l₀, l₁, ...}`  locations (variable names)
 - `E, E₀, E₁, ...`  expressions of any type
+
+Note: blocks within if-then-else statements, while do statements, and for statements have their own scope, variables created in that block are scoped to that block.
 
 ---
 

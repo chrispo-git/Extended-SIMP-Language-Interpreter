@@ -290,8 +290,9 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
                 }
             }
             case Expr.Block(cmds, result) => {
-                cmds.foreach(cmd => execCmd(cmd, store))
-                evalExpr(result, store)
+                val childStore = store.child()
+                cmds.foreach(cmd => execCmd(cmd, childStore))
+                evalExpr(result, childStore)
             }
             case Expr.Match(expr, arms) => {
                 val value = evalExpr(expr, store)
@@ -491,6 +492,7 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
     private def execCmd(cmd: Cmd, store: Store): Unit = {
         cmd match {
             case Cmd.Skip => 
+            case Cmd.Scope(body) => execCmd(body, store.child())
             case Cmd.Assign(loc, expr) => {
                 val value = evalExpr(expr, store)
                 try {
@@ -503,6 +505,10 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
                 } catch {
                     case _: RuntimeException => store.store(loc, value)
                 }
+            }
+            case Cmd.ConstAssign(loc, valueExpr) => {
+                val value = evalExpr(valueExpr, store)
+                store.declareConst(loc, value)
             }
             case Cmd.FieldAssign(loc, field, valueExpr) => {
                 store.load(loc) match {
@@ -544,9 +550,9 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
             case Cmd.If(cond, t, e) => {
                 val condition = evalBool(cond, store)
                 if condition then {
-                    execCmd(t, store)
+                    execCmd(t, store.child())
                 } else {
-                    execCmd(e, store)
+                    execCmd(e, store.child())
                 }
             }
             case Cmd.While(cond, body) => {
@@ -554,7 +560,7 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
 
                 while running && evalBool(cond, store) do {
                     try {
-                        execCmd(body, store)
+                        execCmd(body, store.child())
                     } catch {
                         case _: BreakException => running = false
                         case _: ContinueException =>
@@ -562,26 +568,21 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
                 }
             }
             case Cmd.For(variable, iterable, body) => {
-                val arr = evalExpr(iterable, store)
-                arr match {
+                evalExpr(iterable, store) match {
                     case Value.ArrVal(elements) => {
-                        elements.foreach(elem => {
-                            val loopStore = Store()
-                            store.entries().foreach((k, v) => loopStore.store(k, v))
-                            loopStore.store(variable, elem)
-                            var toBreak = false
+                        var i = 0
+                        var running = true
+                        while running && i < elements.length do {
+                            val childStore = store.child()
+                            childStore.declareConst(variable, elements(i))
                             try {
-                                execCmd(body, loopStore)
-                            }catch {
-                                case _: BreakException => toBreak = true
+                                execCmd(body, childStore)
+                            } catch {
+                                case _: BreakException => running = false
                                 case _: ContinueException =>
                             }
-                            if toBreak != true then {
-                                loopStore.entries().foreach((k, v) =>
-                                    if k != variable then store.store(k, v)
-                                )
-                            }
-                        })
+                            i += 1
+                        }
                     }
                     case _ => throw RuntimeException("for loop expects an array")
                 }

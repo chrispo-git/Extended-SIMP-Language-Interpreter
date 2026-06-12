@@ -78,8 +78,10 @@ enum Bop:
 enum Cmd:
     case Skip
     case Assign(loc: String, expr: Expr)
+    case ConstAssign(loc: String, expr: Expr)
     case Seq(fst: Cmd, snd: Cmd)
     case If(cond: BoolExpr, thenBranch: Cmd, elseBranch: Cmd)
+    case Scope(body: Cmd)
     case While(cond: BoolExpr, body: Cmd)
     case For(variable: String, iterable: Expr, body: Cmd)
     case Print(value: Expr)
