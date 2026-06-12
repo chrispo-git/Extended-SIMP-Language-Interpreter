@@ -1,5 +1,6 @@
 package simp
 
+import SimpUtils.*
 
 class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
     private var pos: Int = 0
@@ -217,6 +218,49 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
             }
         }
         left
+    }
+    private def foldBinary(left: Expr, op: Op, right: Expr): Expr = (left, op, right) match {
+
+        // Just Ints...
+        case (Expr.Num(l),Op.Add, Expr.Num(r)) => Expr.Num(l + r)
+        case (Expr.Num(l),Op.Sub, Expr.Num(r)) => Expr.Num(l - r)
+        case (Expr.Num(l),Op.Mul, Expr.Num(r)) => Expr.Num(l * r)
+        case (Expr.Num(l),Op.Div, Expr.Num(r)) if r != 0 => Expr.Num(l / r)
+        case (Expr.Num(l),Op.Mod, Expr.Num(r)) if r != 0 => Expr.Num(l % r)
+
+        // Just Floats...
+        case (Expr.Flt(l),Op.Add, Expr.Flt(r)) => Expr.Flt(l + r)
+        case (Expr.Flt(l),Op.Sub, Expr.Flt(r)) => Expr.Flt(l - r)
+        case (Expr.Flt(l),Op.Mul, Expr.Flt(r)) => Expr.Flt(l * r)
+        case (Expr.Flt(l),Op.Div, Expr.Flt(r)) if r != 0 => Expr.Flt(l / r)
+
+        // Float + Int Mixed
+        case (Expr.Num(l),Op.Add, Expr.Flt(r)) => Expr.Flt(l + r)
+        case (Expr.Num(l),Op.Sub, Expr.Flt(r)) => Expr.Flt(l - r)
+        case (Expr.Num(l),Op.Mul, Expr.Flt(r)) => Expr.Flt(l * r)
+        case (Expr.Num(l),Op.Div, Expr.Flt(r)) if r != 0 => Expr.Flt(l / r)
+        case (Expr.Flt(l),Op.Add, Expr.Num(r)) => Expr.Flt(l + r)
+        case (Expr.Flt(l),Op.Sub, Expr.Num(r)) => Expr.Flt(l - r)
+        case (Expr.Flt(l),Op.Mul, Expr.Num(r)) => Expr.Flt(l * r)
+        case (Expr.Flt(l),Op.Div, Expr.Num(r)) if r != 0 => Expr.Flt(l / r)
+
+        // Concatenation of literals
+        case (Expr.Str(l), Op.Add, Expr.Str(r)) => Expr.Str(l + r)
+
+        // Bitwise shit
+        case (Expr.Num(l), Op.BitAnd,      Expr.Num(r)) => Expr.Num(l & r)
+        case (Expr.Num(l), Op.BitOr,       Expr.Num(r)) => Expr.Num(l | r)
+        case (Expr.Num(l), Op.BitXor,      Expr.Num(r)) => Expr.Num(l ^ r)
+        case (Expr.Num(l), Op.BitLeft,     Expr.Num(r)) => Expr.Num(l << r)
+        case (Expr.Num(l), Op.BitRight,    Expr.Num(r)) => Expr.Num(l >> r)
+        case (Expr.Num(l), Op.BitRightFill, Expr.Num(r)) => Expr.Num(l >>> r)
+        
+        case _ => Expr.BinaryOp(left, op, right)
+    }
+
+    private def foldUnary(expr: Expr, op: Op): Expr = (expr, op) match {
+        case (Expr.Num(n), Op.BitComplement) => Expr.Num(~n)
+        case _ => Expr.UnaryOp(expr, op)
     }
     private def parseIfBody(): (Cmd, Cmd) = {
         expect(Token.OpenBrace)
@@ -499,7 +543,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
             }
             advance()
             val right = parseAddSub()
-            left = Expr.BinaryOp(left, op, right)
+            left = foldBinary(left, op, right)
         }
         peek() match {
             case Token.Gt | Token.Lt | Token.Gte | Token.Lte | Token.Eq | Token.Neq => {
@@ -529,7 +573,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
             }
             advance()
             val right = parseTerm()
-            left = Expr.BinaryOp(left, op, right)
+            left = foldBinary(left, op, right)
         }
         left
     }
@@ -544,7 +588,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
             }
             advance()
             val right = parseAtomicExpr()
-            left = Expr.BinaryOp(left, op, right)
+            left = foldBinary(left, op, right)
         }
         left
     }
@@ -651,7 +695,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
         peek() match {
             case Token.BitComplement => {
                 advance()
-                val left = Expr.UnaryOp(parseAtomicExpr(), Op.BitComplement)
+                val left = foldUnary(parseAtomicExpr(), Op.BitComplement)
                 peek() match {
                     case Token.Gt | Token.Lt | Token.Gte | Token.Lte | Token.Eq | Token.Neq =>
                         val bop = peek() match {

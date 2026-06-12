@@ -36,7 +36,7 @@ class Lexer(source: String):
     private def peekN(n: Int): Char = if pos + n >= source.length() then '\u0000' else source.charAt(pos + n)
 
     private def getWholeWord(): String = {
-        val end = source.indexWhere(c => whitespaces.contains(c) || (!c.isLetterOrDigit && !List('_','-').contains(c)), pos) match {
+        val end = source.indexWhere(c => whitespaces.contains(c) || (!c.isLetterOrDigit && c != '_'), pos) match {
             case -1 => source.length
             case n  => n
         }
@@ -44,13 +44,23 @@ class Lexer(source: String):
         source.slice(pos, end)
     }
     private def getWholeFloat(): String = {
-        val end = source.indexWhere(c => whitespaces.contains(c) || (!c.isLetterOrDigit && !List('_','-','.').contains(c)), pos) match {
+        val end = source.indexWhere(c => whitespaces.contains(c) || (!c.isLetterOrDigit && c != '_' && c != '.'), pos) match {
             case -1 => source.length
             case n  => n
         }
 
         source.slice(pos, end)
     }
+
+    // Used to disambiguate '-' as a negative-literal prefix vs a binary subtraction operator.
+    // If the previous token could itself end an expression, '-' here is binary subtraction.
+    private def canBeBinaryContext(): Boolean = tokens.lastOption match {
+        case Some(Token.LiteralInt(_)) | Some(Token.LiteralFloat(_)) | Some(Token.StringLit(_)) |
+             Some(Token.BoolLit(_)) | Some(Token.Variable(_)) | Some(Token.Null) |
+             Some(Token.CloseBracket) | Some(Token.CloseSquare) | Some(Token.CloseBrace) => true
+        case _ => false
+    }
+
     private val escapeSequences = Map(
         'n'  -> '\n',
         't'  -> '\t',
@@ -191,8 +201,8 @@ class Lexer(source: String):
             case x if isWordMatch("true") => {advanceUntilNextWord(); Token.BoolLit(true)}
             case x if isWordMatch("false") => {advanceUntilNextWord(); Token.BoolLit(false)}
 
-            case '-' if isNextFloat() => {advance(); val word = getWholeFloat(); advanceN(word.length); Token.LiteralFloat(word.toDouble * -1)}
-            case '-' if isNextInteger() => {advance(); val word = getWholeWord(); advanceN(word.length); Token.LiteralInt(word.toInt * -1)}
+            case '-' if isNextFloat() && !canBeBinaryContext() => {advance(); val word = getWholeFloat(); advanceN(word.length); Token.LiteralFloat(word.toDouble * -1)}
+            case '-' if isNextInteger() && !canBeBinaryContext() => {advance(); val word = getWholeWord(); advanceN(word.length); Token.LiteralInt(word.toInt * -1)}
 
             case x if isWordMatch("match") => { advanceUntilNextWord(); Token.Match }
             case x if isWordMatch("case")  => { advanceUntilNextWord(); Token.Case }
