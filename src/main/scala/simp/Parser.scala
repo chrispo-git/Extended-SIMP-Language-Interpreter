@@ -211,8 +211,8 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
             advance()
             val right = parseExpr()
             left = op match {
-                case Token.And => Expr.BoolLift(BoolExpr.And(BoolExpr.FromExpr(left), BoolExpr.FromExpr(right)))
-                case Token.Or  => Expr.BoolLift(BoolExpr.Or(BoolExpr.FromExpr(left), BoolExpr.FromExpr(right)))
+                case Token.And => Expr.BoolLift(BoolExpr.And(makeFromExpr(left), makeFromExpr(right)))
+                case Token.Or  => Expr.BoolLift(BoolExpr.Or(makeFromExpr(left), makeFromExpr(right)))
                 case _ => throwError("unreachable")
             }
         }
@@ -951,6 +951,10 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
         }
         case x => throwError(s"Expected declaration, got '$x'")
     }
+    private def makeFromExpr(expr: Expr): BoolExpr = expr match {
+        case Expr.BoolLift(inner) => inner
+        case _ => BoolExpr.FromExpr(expr)
+    }
     private def parseAtomicBool(): BoolExpr = {
         peek() match {
             case Token.BoolLit(b) => {
@@ -979,7 +983,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
                         val right = parseExpr()
                         BoolExpr.Compare(left, bop, right)
                     }
-                    case _ => BoolExpr.FromExpr(left)
+                    case _ => makeFromExpr(left)
                 }
             }
             case Token.OpenBracket => {
@@ -1004,7 +1008,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
                         advance()
                         val right = parseExpr()
                         BoolExpr.Compare(expr, bop, right)
-                    case _ => BoolExpr.FromExpr(expr)
+                    case _ => makeFromExpr(expr)
                 }
             }
             case Token.Variable(_) if peekNext() == Token.Dot => {
@@ -1023,7 +1027,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
                         advance()
                         val right = parseExpr()
                         BoolExpr.Compare(expr, bop, right)
-                    case _ => BoolExpr.FromExpr(expr)
+                    case _ => makeFromExpr(expr)
                 }
             }
             case x => throwError(s"Expected boolean expression, got '$x'")
