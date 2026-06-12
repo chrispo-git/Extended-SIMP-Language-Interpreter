@@ -278,6 +278,8 @@ class Lexer(source: String):
             case x if isWordMatch("Void") => {advanceUntilNextWord(); Token.TypeNull}
             case x if isWordMatch("Map") => { advanceUntilNextWord(); Token.TypeMap }
 
+            case x if isWordMatch("const") => {advanceUntilNextWord(); Token.Const}
+
             case x if isWordMatch("null") => { advanceUntilNextWord(); Token.Null }
 
 

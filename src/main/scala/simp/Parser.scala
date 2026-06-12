@@ -320,12 +320,32 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
             case _ => Cmd.Return(Some(parseBoolExpr()))
         }
     }
-
+    private def parseConstAssign(): Cmd = {
+        peek() match {
+            case Token.Variable(l) => {
+                advance();
+                expect(Token.Assign)
+                Cmd.ConstAssign(l, parseBoolExpr())
+            }
+            case x => throwError(s"Expected variable name after const, got '$x'")
+        }
+    }
+    private def parseScope(): Cmd = {
+        if peek() == Token.CloseBrace then {
+            advance();
+            Cmd.Scope(Cmd.Skip)
+        } else {
+            val body = parseCmd()
+            expect(Token.CloseBrace)
+            Cmd.Scope(body)
+        }
+    }
     private def parseSingleCmd(): Cmd = {
         peek() match {
             case Token.Skip     => { advance(); Cmd.Skip }
             case Token.Continue => { advance(); Cmd.Continue }
             case Token.Break    => { advance(); Cmd.Break }
+            case Token.Const => {advance(); parseConstAssign() }
             case Token.Variable(l) if peekNext() == Token.Dot => { advance(); parseFieldOrIndexAssign(l) }
             case Token.If       => parseIfCmd()
             case Token.Elif     => parseElifCmd()
@@ -335,6 +355,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
             case Token.Print    => { advance(); Cmd.Print(parseExpr()) }
             case Token.OpenBracket => parseOpenBracketCmd()
             case Token.Return   => parseReturnCmd()
+            case Token.OpenBrace => {advance(); parseScope()}
             case x => throwError(s"Unexpected '$x'")
         }
     }

@@ -97,3 +97,5 @@ enum Token:
     case Match 
     case Case 
     case FatArrow
+
+    case Const

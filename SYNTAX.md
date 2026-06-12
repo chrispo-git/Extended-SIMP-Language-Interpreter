@@ -63,6 +63,7 @@ where F is the path of a file, and A is an optional alias
 
 ```
 Cmd ::= skip                                -- no-op
+      | const l := E                             -- constant assignment
       | l := E                             -- assignment
       | l[E] := E                                -- array index assignment
       | l += E                             -- compound add (just sugar for l := !l + E)
@@ -86,6 +87,8 @@ Cmd ::= skip                                -- no-op
 Where:
 - `l ∈ L = {l₀, l₁, ...}`  locations (variable names)
 - `E, E₀, E₁, ...`  expressions of any type
+
+Note: blocks within if-then-else statements, while do statements, and for statements have their own scope, variables created in that block are scoped to that block.
 
 ---
 
