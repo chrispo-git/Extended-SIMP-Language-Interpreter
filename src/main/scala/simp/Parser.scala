@@ -78,7 +78,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
                             }
                             advance()
                             val right = parseExpr()
-                            Program.PBool(BoolExpr.Compare(expr, bop, right))
+                            Program.PBool(foldCompare(expr, bop, right))
                         case _ => Program.PExpr(expr)
                     }
                 case Token.Variable(_) if peekNext() == Token.OpenBracket => Program.PExpr(parseExpr())
@@ -219,6 +219,35 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
         }
         left
     }
+    private def foldIf(cond: BoolExpr, t: Cmd, e: Cmd): Cmd = cond match {
+        case BoolExpr.Literal(true)  => t
+        case BoolExpr.Literal(false) => e
+        case _ => Cmd.If(cond, t, e)
+    }
+    private def foldWhile(cond: BoolExpr, body: Cmd): Cmd = cond match {
+        case BoolExpr.Literal(false) => Cmd.Skip
+        case _ => Cmd.While(cond, body)
+    }
+    private def evalLitCompare(l: Double, bop: Bop, r: Double): Boolean = bop match {
+        case Bop.Gt  => l > r
+        case Bop.Lt  => l < r
+        case Bop.Gte => l >= r
+        case Bop.Lte => l <= r
+        case Bop.Eq  => l == r
+        case Bop.Neq => l != r
+    }
+    
+    private def foldCompare(left: Expr, bop: Bop, right: Expr): BoolExpr = (left, right) match {
+        case (Expr.Num(l), Expr.Num(r)) => BoolExpr.Literal(evalLitCompare(l.toDouble, bop, r.toDouble))
+        case (Expr.Flt(l), Expr.Flt(r)) => BoolExpr.Literal(evalLitCompare(l, bop, r))
+        case (Expr.Num(l), Expr.Flt(r)) => BoolExpr.Literal(evalLitCompare(l.toDouble, bop, r))
+        case (Expr.Flt(l), Expr.Num(r)) => BoolExpr.Literal(evalLitCompare(l, bop, r.toDouble))
+        case (Expr.Str(l), Expr.Str(r)) if bop == Bop.Eq || bop == Bop.Neq =>
+            BoolExpr.Literal(if bop == Bop.Eq then l == r else l != r)
+        case (Expr.Bool(l), Expr.Bool(r)) if bop == Bop.Eq || bop == Bop.Neq =>
+            BoolExpr.Literal(if bop == Bop.Eq then l == r else l != r)
+        case _ => BoolExpr.Compare(left, bop, right)
+    }
     private def foldBinary(left: Expr, op: Op, right: Expr): Expr = (left, op, right) match {
 
         // Just Ints...
@@ -285,7 +314,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
         val cond = parseBool()
         expect(Token.Then)
         val (thenBranch, elseBranch) = parseIfBody()
-        Cmd.If(cond, thenBranch, elseBranch)
+        foldIf(cond, thenBranch, elseBranch)
     }
 
     private def parseElifCmd(): Cmd = {
@@ -293,7 +322,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
         val cond = parseBool()
         expect(Token.Then)
         val (thenBranch, elseBranch) = parseIfBody()
-        Cmd.If(cond, thenBranch, elseBranch)
+        foldIf(cond, thenBranch, elseBranch)
     }
 
     private def parseWhileCmd(): Cmd = {
@@ -303,7 +332,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
         expect(Token.OpenBrace)
         val body = parseCmd()
         expect(Token.CloseBrace)
-        Cmd.While(cond, body)
+        foldWhile(cond, body)
     }
 
     private def parseForCmd(): Cmd = {
@@ -558,7 +587,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
                 }
                 advance()
                 val right = parseExpr()
-                Expr.BoolLift(BoolExpr.Compare(left, bop, right))
+                Expr.BoolLift(foldCompare(left, bop, right))
             }
             case _ => left
         }
@@ -696,63 +725,18 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
             case Token.BitComplement => {
                 advance()
                 val left = foldUnary(parseAtomicExpr(), Op.BitComplement)
-                peek() match {
-                    case Token.Gt | Token.Lt | Token.Gte | Token.Lte | Token.Eq | Token.Neq =>
-                        val bop = peek() match {
-                            case Token.Gt  => Bop.Gt
-                            case Token.Lt  => Bop.Lt
-                            case Token.Gte => Bop.Gte
-                            case Token.Lte => Bop.Lte
-                            case Token.Eq  => Bop.Eq
-                            case Token.Neq => Bop.Neq
-                            case _ => throwError("unreachable")
-                        }
-                        advance()
-                        val right = parseExpr()
-                        Expr.BoolLift(BoolExpr.Compare(left, bop, right))
-                    case _ => left
-                }
+                left
             }
             case Token.Match => parseMatch()
             case Token.LiteralInt(n) => {
                 advance()
                 val left = Expr.Num(n)
-                peek() match {
-                    case Token.Gt | Token.Lt | Token.Gte | Token.Lte | Token.Eq | Token.Neq =>
-                        val bop = peek() match {
-                            case Token.Gt  => Bop.Gt
-                            case Token.Lt  => Bop.Lt
-                            case Token.Gte => Bop.Gte
-                            case Token.Lte => Bop.Lte
-                            case Token.Eq  => Bop.Eq
-                            case Token.Neq => Bop.Neq
-                            case _ => throwError("unreachable")
-                        }
-                        advance()
-                        val right = parseExpr()
-                        Expr.BoolLift(BoolExpr.Compare(left, bop, right))
-                    case _ => left
-                }
+                left
             }
             case Token.LiteralFloat(n) => {
                 advance()
                 val left = Expr.Flt(n)
-                peek() match {
-                    case Token.Gt | Token.Lt | Token.Gte | Token.Lte | Token.Eq | Token.Neq =>
-                        val bop = peek() match {
-                            case Token.Gt  => Bop.Gt
-                            case Token.Lt  => Bop.Lt
-                            case Token.Gte => Bop.Gte
-                            case Token.Lte => Bop.Lte
-                            case Token.Eq  => Bop.Eq
-                            case Token.Neq => Bop.Neq
-                            case _ => throwError("unreachable")
-                        }
-                        advance()
-                        val right = parseExpr()
-                        Expr.BoolLift(BoolExpr.Compare(left, bop, right))
-                    case _ => left
-                }
+                left
             }
             case Token.StringLit(s) => {
                 advance()
@@ -815,22 +799,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
                     }
                     case x => throwError(s"Expected variable after '!', got '$x'")
                 }
-                peek() match {
-                    case Token.Gt | Token.Lt | Token.Gte | Token.Lte | Token.Eq | Token.Neq =>
-                        val bop = peek() match {
-                            case Token.Gt  => Bop.Gt
-                            case Token.Lt  => Bop.Lt
-                            case Token.Gte => Bop.Gte
-                            case Token.Lte => Bop.Lte
-                            case Token.Eq  => Bop.Eq
-                            case Token.Neq => Bop.Neq
-                            case _ => throwError("unreachable")
-                        }
-                        advance()
-                        val right = parseExpr()
-                        Expr.BoolLift(BoolExpr.Compare(left, bop, right))
-                    case _ => left
-                }
+                left
             }
             case Token.Not => {
                 Expr.BoolLift(parseBool())
@@ -890,7 +859,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
                         }
                         advance()
                         val right = parseExpr()
-                        Expr.BoolLift(BoolExpr.Compare(left, bop, right))
+                        Expr.BoolLift(foldCompare(left, bop, right))
                     }
                     case _ => {expect(Token.CloseBracket); left}
                 }
@@ -997,20 +966,34 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
     }
     private def makeFromExpr(expr: Expr): BoolExpr = expr match {
         case Expr.BoolLift(inner) => inner
+        case Expr.Bool(b) => BoolExpr.Literal(b)
         case _ => BoolExpr.FromExpr(expr)
     }
     private def parseAtomicBool(): BoolExpr = {
         peek() match {
             case Token.BoolLit(b) => {
                 advance()
-                BoolExpr.Literal(b)
+                val left = Expr.Bool(b)
+                peek() match {
+                    case Token.Eq | Token.Neq => {
+                        val bop = peek() match {
+                            case Token.Eq  => Bop.Eq
+                            case Token.Neq => Bop.Neq
+                            case x => throwError(s"Expected boolean operator, got '${x}'")
+                        }
+                        advance()
+                        val right = parseExpr()
+                        foldCompare(left, bop, right)
+                    }
+                    case _ => BoolExpr.Literal(b)
+                }
             }
             case Token.Not => {
                 advance()
                 val inside = parseBool()
                 BoolExpr.Not(inside)
             }
-            case Token.Deref | Token.LiteralInt(_)  => {
+            case Token.Deref | Token.LiteralInt(_) | Token.LiteralFloat(_) |  Token.StringLit(_)  => {
                 val left = parseExpr()
                 peek() match {
                     case Token.Gt | Token.Lt | Token.Gte | Token.Lte | Token.Eq | Token.Neq => {
@@ -1025,7 +1008,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
                         }
                         advance()
                         val right = parseExpr()
-                        BoolExpr.Compare(left, bop, right)
+                        foldCompare(left, bop, right)
                     }
                     case _ => makeFromExpr(left)
                 }
@@ -1051,7 +1034,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
                         }
                         advance()
                         val right = parseExpr()
-                        BoolExpr.Compare(expr, bop, right)
+                        foldCompare(expr, bop, right)
                     case _ => makeFromExpr(expr)
                 }
             }
@@ -1070,7 +1053,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
                         }
                         advance()
                         val right = parseExpr()
-                        BoolExpr.Compare(expr, bop, right)
+                        foldCompare(expr, bop, right)
                     case _ => makeFromExpr(expr)
                 }
             }
