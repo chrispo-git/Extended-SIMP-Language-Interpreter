@@ -104,22 +104,22 @@ class EvaluatorTest extends AnyFunSuite:
 
   // If
   test("if true executes then branch") {
-    val store2 = run("if true then {x := 1} else {x := 2}")
+    val store2 = run("x := 99; if true then {x := 1} else {x := 2}")
     assert(store2.load("x") == Value.IntVal(1))
   }
 
   test("if false executes else branch") {
-    val store = run("if false then {x := 1} else {x := 2}")
+    val store = run("x := 99; if false then {x := 1} else {x := 2}")
     assert(store.load("x") == Value.IntVal(2))
   }
 
   test("if with comparison true") {
-    val store = run("x := 5 ; if !x > 3 then {y := 1} else {y := 0}")
+    val store = run("y := 99; x := 5 ; if !x > 3 then {y := 1} else {y := 0}")
     assert(store.load("y") == Value.IntVal(1))
   }
 
   test("if with comparison false") {
-    val store = run("x := 1 ; if !x > 3 then {y := 1} else {y := 0}")
+    val store = run("y := 99; x := 1 ; if !x > 3 then {y := 1} else {y := 0}")
     assert(store.load("y") == Value.IntVal(0))
   }
 
@@ -142,58 +142,58 @@ class EvaluatorTest extends AnyFunSuite:
 
   // Boolean logic
   test("not true is false") {
-    val store = run("if ¬true then {x := 1} else {x := 0}")
+    val store = run("x := 99; if ¬true then {x := 1} else {x := 0}")
     assert(store.load("x") == Value.IntVal(0))
   }
 
   test("not false is true") {
-    val store = run("if ¬false then {x := 1} else {x := 0}")
+    val store = run("x := 99; if ¬false then {x := 1} else {x := 0}")
     assert(store.load("x") == Value.IntVal(1))
   }
 
   test("and both true") {
-    val store = run("if true && true then {x := 1} else {x := 0}")
+    val store = run("x := 99; if true && true then {x := 1} else {x := 0}")
     assert(store.load("x") == Value.IntVal(1))
   }
 
   test("and one false") {
-    val store = run("if true && false then {x := 1} else {x := 0}")
+    val store = run("x := 99; if true && false then {x := 1} else {x := 0}")
     assert(store.load("x") == Value.IntVal(0))
   }
 
   test("or one true") {
-    val store = run("if false  || true then {x := 1} else {x := 0}")
+    val store = run("x := 99; if false  || true then {x := 1} else {x := 0}")
     assert(store.load("x") == Value.IntVal(1))
   }
 
   test("or both false") {
-    val store = run("if false  || false then {x := 1} else {x := 0}")
+    val store = run("x := 99; if false  || false then {x := 1} else {x := 0}")
     assert(store.load("x") == Value.IntVal(0))
   }
 
   // Comparators
   test("greater than") {
-    val store = run("x := 5 ; if !x > 3  then {y := 1} else {y := 0}")
+    val store = run("x := 5 ; y:= 99; if !x > 3  then {y := 1} else {y := 0}")
     assert(store.load("y") == Value.IntVal(1))
   }
 
   test("less than") {
-    val store = run("x := 2 ; if !x < 3 then {y := 1} else {y := 0}")
+    val store = run("x := 2 ; y:= 99; if !x < 3 then {y := 1} else {y := 0}")
     assert(store.load("y") == Value.IntVal(1))
   }
 
   test("equal") {
-    val store = run("x := 3 ; if !x == 3 then {y := 1} else {y := 0}")
+    val store = run("x := 3 ; y:= 99; if !x == 3 then {y := 1} else {y := 0}")
     assert(store.load("y") == Value.IntVal(1))
   }
 
   test("greater than or equal") {
-    val store = run("x := 3 ; if !x >= 3 then {y := 1} else {y := 0}")
+    val store = run("x := 3 ; y:= 99; if !x >= 3 then {y := 1} else {y := 0}")
     assert(store.load("y") == Value.IntVal(1))
   }
 
   test("less than or equal") {
-    val store = run("x := 3 ; if !x <= 3 then {y := 1}  else {y := 0} ")
+    val store = run("x := 3 ; y:= 99;  if !x <= 3 then {y := 1}  else {y := 0} ")
     assert(store.load("y") == Value.IntVal(1))
   }
 
@@ -267,21 +267,21 @@ class EvaluatorTest extends AnyFunSuite:
   // elif
   test("elif takes second branch") {
     val store = run(
-      "x := 2 ; if !x == 1 then { y := 1 } elif !x == 2 then { y := 2 } else { y := 3 }"
+      "x := 2; y:= 0; if !x == 1 then { y := 1 } elif !x == 2 then { y := 2 } else { y := 3 }"
     )
     assert(store.load("y") == Value.IntVal(2))
   }
 
   test("elif falls to else") {
     val store = run(
-      "x := 3 ; if !x == 1 then { y := 1 } elif !x == 2 then { y := 2 } else { y := 3 }"
+      "x := 3 ; y:= 0; if !x == 1 then { y := 1 } elif !x == 2 then { y := 2 } else { y := 3 }"
     )
     assert(store.load("y") == Value.IntVal(3))
   }
 
   test("chained elif") {
     val store = run(
-      "x := 3 ; if !x == 1 then { y := 1 } elif !x == 2 then { y := 2 } elif !x == 3 then { y := 3 } else { y := 4 }"
+      "x := 3 ; y:= 0; if !x == 1 then { y := 1 } elif !x == 2 then { y := 2 } elif !x == 3 then { y := 3 } else { y := 4 }"
     )
     assert(store.load("y") == Value.IntVal(3))
   }
