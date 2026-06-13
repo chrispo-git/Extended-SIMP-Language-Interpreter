@@ -47,7 +47,7 @@
 
     "keywords-control": {
       "name": "keyword.control.ext-simp",
-      "match": "\\b(if|elif|else|then|while|do|for|in|skip|break|continue|return|call|import|as)\\b"
+      "match": "\\b(if|elif|else|then|while|do|for|in|skip|break|continue|return|call|import|as|print)\\b"
     },
 
     "keywords-declaration": {
