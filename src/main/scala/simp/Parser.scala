@@ -47,6 +47,24 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
         while !isAtEnd() && peek() != Token.EOF do {
             peek() match {
                 case Token.Fn  | Token.Struct | Token.Import => items += Program.PDecl(parseDecl())
+                case Token.Impl => {
+                    advance()
+                    val structName = peek() match {
+                        case Token.Variable(name) => { advance(); name }
+                        case x => throwError(s"Expected struct name after 'impl', got '$x'")
+                    }
+                    expect(Token.OpenBrace)
+                    val methods = scala.collection.mutable.ListBuffer[Decl.FnDecl]()
+                    while peek() != Token.CloseBrace do {
+                        val out = parseDecl() match {
+                            case f: Decl.FnDecl => f
+                            case x => throwError(s"Expected function, got $x")
+                        }
+                        methods += out
+                    }
+                    expect(Token.CloseBrace)
+                    items += Program.PImpl(structName, methods.toList)
+                }
                 case _ => items += Program.PCmd(parseCmd())
             }
             while peek() == Token.Semicolon do {
@@ -170,6 +188,11 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
                 advance()
                 peek() match {
                     case Token.OpenSquare => parseFieldIndexAssign(l, field)
+                    case Token.OpenBracket => {
+                        val args = parseArgs()
+                        val expr = parsePostfix(Expr.MethodCall(Expr.Ref(l), field, args))
+                        Cmd.Assign("_", expr)
+                    }
                     case _ => parseFieldAssign(l, field)
                 }
             }
@@ -414,6 +437,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
         }
     }
     private def parseSingleCmd(): Cmd = {
+        //println(s"parseSingleCmd: peek=${peek()}, peekNext=${peekNext()}")
         peek() match {
             case Token.Skip     => { advance(); Cmd.Skip }
             case Token.Continue => { advance(); Cmd.Continue }
@@ -616,7 +640,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
                 case _ => throwError("unreachable")
             }
             advance()
-            val right = parseAtomicExpr()
+            val right = parsePostfix(parseAtomicExpr())
             left = foldBinary(left, op, right)
         }
         left
@@ -624,6 +648,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
     private def parseStructLiteralFields(): List[(String, Expr)] = {
         val fields = scala.collection.mutable.ListBuffer[(String, Expr)]()
         while peek() != Token.CloseBrace do {
+            //println(s"parseStructLiteralFields: peek=${peek()}")
             peek() match {
                 case Token.Variable(name) => {
                     advance()
@@ -648,12 +673,15 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
             }
             case Token.Dot => {
                 advance()
-                peek() match {
-                    case Token.Variable(field) => {
-                        advance()
-                        parsePostfix(Expr.FieldAccess(expr, field))
-                    }
+                val name = peek() match {
+                    case Token.Variable(n) => { advance(); n }
                     case x => throwError(s"Expected field name after '.', got '$x'")
+                }
+                if peek() == Token.OpenBracket then {
+                    val args = parseArgs()
+                    parsePostfix(Expr.MethodCall(expr, name, args))
+                } else {
+                    parsePostfix(Expr.FieldAccess(expr, name))
                 }
             }
             case _ => expr
@@ -919,10 +947,14 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
                 case Token.Variable(name) => {
                     advance()
                     val params = parseParams()
+                    //println(s"parseDecl: fn $name params=$params, peek=${peek()}")
                     expect(Token.Arrow)
                     val returnType = parseType()
+                    //println(s"parseDecl: fn $name returnType=$returnType, peek=${peek()}")
                     expect(Token.OpenBrace)
+                    //println(s"parseDecl: fn $name body starting, peek=${peek()}")
                     val body = parseCmd()
+                    //println(s"parseDecl: fn $name body done, peek=${peek()}")
                     expect(Token.CloseBrace)
                     Decl.FnDecl(name, params, body, returnType)
                 }

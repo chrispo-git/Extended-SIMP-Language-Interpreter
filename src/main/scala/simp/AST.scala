@@ -26,6 +26,7 @@ enum Expr:
     case Pair(fst: Expr, snd: Expr)
     case Match(expr: Expr, arms: List[MatchArm])
     case Block(cmds: List[Cmd], result: Expr)
+    case MethodCall(receiver: Expr, methodName: String, args: List[Expr])
     case Null
 
 case class MatchArm(pattern: Pattern, guard: Option[Expr], body: Expr)
@@ -98,6 +99,7 @@ enum Cmd:
 enum Program:
     case PCmd(cmd: Cmd)
     case PDecl(decl: Decl)
+    case PImpl(structName: String, methods: List[Decl.FnDecl])
     case PExpr(expr: Expr)
     case PBool(boolExpr: BoolExpr)
 

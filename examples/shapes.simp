@@ -1,0 +1,54 @@
+// Shapes - showccases impl blocks, along with some polymorphism!
+
+struct Circle    { radius: Float }
+struct Rectangle { width: Float, height: Float }
+struct Triangle  { base: Float, height: Float, sideA: Float, sideB: Float }
+
+impl Circle {
+    fn area(self: Circle) -> Float {
+        return pi() * self.radius * self.radius;
+    }
+    fn perimeter(self: Circle) -> Float {
+        return 2.0 * pi() * self.radius;
+    }
+    fn name(self: Circle) -> Str {
+        return "Circle";
+    }
+}
+
+impl Rectangle {
+    fn area(self: Rectangle) -> Float {
+        return self.width * self.height;
+    }
+    fn perimeter(self: Rectangle) -> Float {
+        return 2.0 * (self.width + self.height);
+    }
+    fn name(self: Rectangle) -> Str {
+        return "Rectangle";
+    }
+}
+
+impl Triangle {
+    fn area(self: Triangle) -> Float {
+        return 0.5 * self.base * self.height;
+    }
+    fn perimeter(self: Triangle) -> Float {
+        return self.base + self.sideA + self.sideB;
+    }
+    fn name(self: Triangle) -> Str {
+        return "Triangle";
+    }
+}
+
+shapes := [
+    Circle    { radius: 2.0 },
+    Rectangle { width: 3.0, height: 4.0 },
+    Triangle  { base: 6.0, height: 2.0, sideA: 5.0, sideB: 5.0 }
+];
+
+totalArea := 0.0;
+for s in shapes {
+    print s.name() + ": area = " + s.area() + ", perimeter = " + s.perimeter();
+    totalArea := totalArea + s.area();
+}
+print "Total area: " + totalArea;

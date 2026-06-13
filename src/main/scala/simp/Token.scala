@@ -99,3 +99,5 @@ enum Token:
     case FatArrow
 
     case Const
+
+    case Impl

@@ -52,7 +52,7 @@
 
     "keywords-declaration": {
       "name": "storage.modifier.ext-simp",
-      "match": "\\b(fn|struct)\\b"
+      "match": "\\b(fn|struct|impl)\\b"
     },
 
     "types": {
