@@ -77,6 +77,7 @@ A VS Code extension for SIMP+ syntax highlighting is available [here](vsCodeExte
 - Built-in Functions (You can see the list of those [here](BUILT-IN-FUNCTIONS.md))
 - String, Float and Boolean variables
 - Arrays & Structs
+- Struct Impl methods
 - for loops
 - Basic import system
 - Map data structure with typed keys and values

@@ -34,21 +34,22 @@ and manipulated exclusively through built-in functions. See [Built-in Functions]
 ---
 
 ### Declarations
-Declarations come in 3 forms, declaring functions, declaring structs, and imports.
+Declarations come in 4 forms, declaring functions, declaring structs, declaring impls, and imports.
 
 ```
 Decl ::= fn f(x₀ : t₀, x₁ : t₁, ...) -> t { Cmd }  
         | struct S { f₀ : t₀ = v₀, f₁ : t₁ = v₁, ... } 
+        | impl S {fn₀, fn₁}
         | import "F"
         | import "F" as A
 where x₀, x₁, ... are parameter names (locations)
 where t, t₀, t₁, ... are parameter types (One of Str, Int, Bool, Int[], Str[], Bool[], Struct, Struct[], (T,U), Map(K, V), or Void)
 where f₀, f₁, ... are field names
+where fn₀, fn₁, ... are function declarations
 where v₀, v₁, ... are optional default values
 where F is the path of a file, and A is an optional alias
 ```
 
-- Functions `fn` return a value and are treated as expressions
 - primitives for functions are passed by value, arrays and structs are passed by reference
 - Scoping is lexical, functions cannot see the caller's variables
 - Declarations from imported files are accessible via `A::name` syntax
@@ -221,6 +222,89 @@ case Point { x: px, y: py } => print !px + ", " + !py;
 ```
 
 ---
+
+### Block Scoping
+
+Each `if`/`elif`/`else` branch, `while` body, `for` body, and `{ }` 
+block introduces a new scope. Bindings (`:=` or `const`) created 
+inside a block do not exist outside it:
+```
+x := 1;
+if true then {
+    x := 2;        // updates the outer x (mutable bare `:=`)
+    const y := 10;  // y is local to this block
+};
+print x;            // 2
+// y does not exist here
+```
+
+A `for` loop's variable is implicitly `const` and scoped to each 
+iteration — it cannot be reassigned inside the loop body, and does 
+not exist after the loop ends.
+
+#### Anonymous Scope Blocks
+
+A bare `{ }` can be used as a statement to introduce a scope without 
+any surrounding control flow:
+```
+{
+    const limit := 100;
+    i := 0;
+    while i < limit do { i += 1; };
+    print i;     // 100
+};
+// limit does not exist here
+```
+This is distinct from a block expression `{ Cmd...; E }`, which 
+produces a value (the final expression `E`) and is used in expression 
+position — e.g. on the right-hand side of `:=`.
+
+### impl Blocks (Methods)
+
+An `impl StructName { ... }` block defines methods associated with a 
+struct. Each method's first parameter must be named `self` and typed 
+as the struct it belongs to:
+```
+struct Point { x: Int, y: Int }
+
+impl Point {
+    fn distance(self: Point, other: Point) -> Float {
+        dx := self.x - other.x;
+        dy := self.y - other.y;
+        return sqrt(dx * dx + dy * dy);
+    }
+
+    fn translate(self: Point, dx: Int, dy: Int) -> Void {
+        self.x := self.x + dx;
+        self.y := self.y + dy;
+    }
+}
+```
+Methods are called with dot syntax: `p.distance(q)`, `p.translate(1, 0)`.
+Field mutation through `self` (e.g. `self.x := ...`) works the same as 
+any struct passed to a function, structs are reference types, so 
+mutations are visible to the caller.
+
+#### Polymorphism
+
+Dispatch is based on each value's *runtime* struct type. If two 
+different structs each implement a method with the same name, calling 
+that method on a value of either type calls the correct implementation, no shared interface or inheritance declaration is needed:
+```
+struct Cat { name: Str }
+struct Dog { name: Str }
+
+impl Cat { fn speak(self: Cat) -> Str { return self.name + " says Meow"; } }
+impl Dog { fn speak(self: Dog) -> Str { return self.name + " says Woof"; } }
+
+animals := [Cat { name: "Whiskers" }, Dog { name: "Rex" }];
+for a in animals {
+    print a.speak();   // dispatches per-element based on runtime type
+}
+```
+ExtSimp doesn't support inheritance, each struct's `impl` block is 
+independent. Shared behaviour across types is achieved by giving each 
+type its own implementation of the same method names, shown above.
 
 ### Syntactic Sugar
 These constructs don't appear in the AST, but are desugared by the parser.
