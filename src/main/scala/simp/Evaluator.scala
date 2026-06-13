@@ -6,6 +6,7 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
     private val importedFiles = scala.collection.mutable.Set[String]()
     private val completedImports = scala.collection.mutable.Map[String, Set[String]]()
 
+    private val methodTable = scala.collection.mutable.Map[(String, String), Decl.FnDecl]()
 
     def evalProgram(program: List[Program], store: Store): Unit = {
         program.foreach(p => p match {
@@ -15,6 +16,7 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
             case Program.PCmd(cmd) => execCmd(cmd, store)
             case Program.PExpr(expr) => println(getPrettyPrint(evalExpr(expr, store)))
             case Program.PBool(b) => println(evalBool(b, store))
+            case Program.PImpl(structName, methods) => methods.foreach(m => methodTable((structName, m.name)) = m)
         })
     }
 
@@ -105,6 +107,24 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
         localStore
     }
     
+
+    private def populateStoreFromValues(params: List[(String, SimpType)], argVals: List[Value], callerStore: Store): Store = {
+        if params.length != argVals.length then
+            throw RuntimeException(s"Expected ${params.length} arguments, got ${argVals.length}")
+        val localStore = Store()
+        params.zip(argVals).foreach((param, value) => {
+            val (name, expectedType) = param
+            expectedType match {
+                case SimpType.TypeRef(_) =>
+                    throw RuntimeException(s"[Error] Method parameter '$name' cannot be a reference type")
+                case _ => {
+                    checkType(value, expectedType, name)
+                    localStore.store(name, value)
+                }
+            }
+        })
+        localStore
+    }
         
 
     private def evalBool(boolExpr: BoolExpr, store: Store): Boolean = {
@@ -451,44 +471,83 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
                     case _ => throw RuntimeException("Field access on non-struct or pair value")
                 }
             }
+            case Expr.MethodCall(receiver, methodName, args) => {
+                val receiverVal = evalExpr(receiver, store)
+                val typeName = receiverVal match {
+                    case Value.StructVal(name, _) => name
+                    case _ => throw RuntimeException(s"Can't call method '$methodName' on a non-struct value")
+                }
+                val fnDecl = methodTable.getOrElse((typeName, methodName), throw RuntimeException(s"No method '$methodName' found for struct '$typeName'"))
+                val argVals = receiverVal :: args.map(evalExpr(_, store))
+                callFunctionWithValues(methodName, fnDecl, argVals, store)
+            }
             case Expr.FnCall(name, args) => {
                 val evaluatedArgs = args.map(evalExpr(_, store))
                 fnEnv.lookupBuiltin(name) match {
                     case Some(fn) => fn(evaluatedArgs)
                     case None => {
                         val function = fnEnv.lookupFn(name)
-                        val localStore = populateStore(function.params, args, store)
-                        try {
-                            execCmd(function.body, localStore)
-                            if function.returnType != SimpType.TypeNull then {
-                                throw RuntimeException(s"Function '$name' has no return statement")
-                            } else {
-                                Value.NullVal
-                            }
-                        } catch {
-                            case ReturnException(Some(value)) => {
-                                if function.returnType != SimpType.TypeNull then {
-                                    checkType(value, function.returnType, s"return value of '$name'")
-                                    value
-                                } else {
-                                    throw RuntimeException(s"Function '$name' has invalid return statement")
-                                }
-                            }
-                            case ReturnException(None) => {
-                                if function.returnType == SimpType.TypeNull then {
-                                    Value.NullVal
-                                } else {
-                                    throw RuntimeException(s"Function '$name' has invalid return statement")
-                                }
-                            }
-                        }
+                        callFunction(name, function, args, store)
                     }
                 }
             }
         }
     }
 
-
+    private def callFunction(name: String, function: Decl.FnDecl, args: List[Expr], store: Store): Value = {
+        val localStore = populateStore(function.params, args, store)
+        try {
+            execCmd(function.body, localStore)
+            if function.returnType != SimpType.TypeNull then {
+                throw RuntimeException(s"Function '$name' has no return statement")
+            } else {
+                Value.NullVal
+            }
+        } catch {
+            case ReturnException(Some(value)) => {
+                if function.returnType != SimpType.TypeNull then {
+                    checkType(value, function.returnType, s"return value of '$name'")
+                    value
+                } else {
+                    throw RuntimeException(s"Function '$name' has invalid return statement")
+                }
+            }
+            case ReturnException(None) => {
+                if function.returnType == SimpType.TypeNull then {
+                    Value.NullVal
+                } else {
+                    throw RuntimeException(s"Function '$name' has invalid return statement")
+                }
+            }
+        }
+    }
+    private def callFunctionWithValues(name: String, function: Decl.FnDecl, argVals: List[Value], store: Store): Value = {
+        val localStore = populateStoreFromValues(function.params, argVals, store)
+        try {
+            execCmd(function.body, localStore)
+            if function.returnType != SimpType.TypeNull then {
+                throw RuntimeException(s"Function '$name' has no return statement")
+            } else {
+                Value.NullVal
+            }
+        } catch {
+            case ReturnException(Some(value)) => {
+                if function.returnType != SimpType.TypeNull then {
+                    checkType(value, function.returnType, s"return value of '$name'")
+                    value
+                } else {
+                    throw RuntimeException(s"Function '$name' has invalid return statement")
+                }
+            }
+            case ReturnException(None) => {
+                if function.returnType == SimpType.TypeNull then {
+                    Value.NullVal
+                } else {
+                    throw RuntimeException(s"Function '$name' has invalid return statement")
+                }
+            }
+        }
+    }
     private def execCmd(cmd: Cmd, store: Store): Unit = {
         cmd match {
             case Cmd.Skip => 
