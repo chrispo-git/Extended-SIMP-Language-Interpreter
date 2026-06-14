@@ -9,9 +9,10 @@ class EvaluatorTest extends AnyFunSuite:
     val fnEnv = FunctionEnv()
     val structEnv = StructEnv()
     Builtins.register(fnEnv)
-    val tokens = Lexer(source).tokenise()
-    val program = Parser(tokens._1, StructEnv(), tokens._2).parseProgram()
-    Evaluator(fnEnv, structEnv).evalProgram(program, store)
+    val sourceLines = source.split('\n').toList
+    val tokens = Lexer(source, sourceLines).tokenise()
+    val program = Parser(tokens._1, StructEnv(), tokens._2, sourceLines).parseProgram()
+    Evaluator(fnEnv, structEnv, sourceLines).evalProgram(program, store)
     store
 
   def storeOf(pairs: (String, Int)*): Map[String, Int] = pairs.toMap

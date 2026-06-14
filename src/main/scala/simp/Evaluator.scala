@@ -2,11 +2,14 @@ package simp
 import java.io.File
 import SimpUtils.*
 
-class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
+class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, sourceLines: List[String], cwd: String = "."):
     private val importedFiles = scala.collection.mutable.Set[String]()
     private val completedImports = scala.collection.mutable.Map[String, Set[String]]()
 
-    private val methodTable = scala.collection.mutable.Map[(String, String), Decl.FnDecl]()
+
+    private var pos: Int = 0
+
+    private def currentLine(): Int = pos
 
     def evalProgram(program: List[Program], store: Store): Unit = {
         program.foreach(p => p match {
@@ -16,15 +19,19 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
             case Program.PCmd(cmd) => execCmd(cmd, store)
             case Program.PExpr(expr) => println(getPrettyPrint(evalExpr(expr, store)))
             case Program.PBool(b) => println(evalBool(b, store))
-            case Program.PImpl(structName, methods) => methods.foreach(m => methodTable((structName, m.name)) = m)
+            case Program.PImpl(structName, methods) => methods.foreach(m => fnEnv.methodTable((structName, m.name)) = m)
         })
+    }
+    private def currentLineSource(): String = sourceLines(currentLine()-1).trim
+    private def throwError(msg: String): Nothing = {
+        throw RuntimeException(s"on line ${currentLine()}\n${currentLineSource()}\n\u001b[31m$msg\u001b[0m")
     }
 
     private def processImport(path: String, alias: String, currentDir: String, store: Store ):  Unit = {
         val fullPath = java.io.File(s"$currentDir/$path").getCanonicalPath
 
 
-        if importedFiles.contains(fullPath) then throw RuntimeException(s"Circular import detected: $path")
+        if importedFiles.contains(fullPath) then throwError(s"Circular import detected: $path")
 
 
         val existingAliases = completedImports.getOrElse(fullPath, Set())
@@ -34,11 +41,12 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
 
         val source = try {
             scala.io.Source.fromFile(fullPath).mkString
-        } catch case _ => throw RuntimeException(s"Could not find import $path")
+        } catch case _ => throwError(s"Could not find import $path")
 
-        val tokens = Lexer(source).tokenise()
+        val newSource = source.split('\n').toList
+        val tokens = Lexer(source, newSource).tokenise()
         val importStructEnv = StructEnv()
-        val program = Parser(tokens._1, importStructEnv, tokens._2).parseProgram()
+        val program = Parser(tokens._1, importStructEnv, tokens._2, newSource).parseProgram()
 
 
         val declaredNames = program.collect {
@@ -55,7 +63,7 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
                 processImport(path, alias, importDir, store)
             }
             case Program.PDecl(Decl.StructDecl(name, fields)) => structEnv.register(s"$alias::$name", StructDef(fields))
-            case _ => throw RuntimeException(s"Imports can only contain declarations")
+            case _ => throwError(s"Imports can only contain declarations")
         })
 
         importedFiles -= fullPath 
@@ -65,10 +73,10 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
 
     private def qualifyBody(cmd: Cmd, alias: String, declaredNames: Set[String]): Cmd = cmd match {
         case Cmd.Seq(a, b) => Cmd.Seq(qualifyBody(a, alias, declaredNames), qualifyBody(b, alias, declaredNames))
-        case Cmd.If(cond, t, e) => Cmd.If(cond, qualifyBody(t, alias, declaredNames), qualifyBody(e, alias, declaredNames))
-        case Cmd.While(cond, body) => Cmd.While(cond, qualifyBody(body, alias, declaredNames))
-        case Cmd.Return(Some(expr)) => Cmd.Return(Some(qualifyExpr(expr, alias, declaredNames)))
-        case Cmd.Assign(loc, expr) => Cmd.Assign(loc, qualifyExpr(expr, alias, declaredNames))
+        case Cmd.If(cond, t, e, line) => Cmd.If(cond, qualifyBody(t, alias, declaredNames), qualifyBody(e, alias, declaredNames), line)
+        case Cmd.While(cond, body, line) => Cmd.While(cond, qualifyBody(body, alias, declaredNames), line)
+        case Cmd.Return(Some(expr), line) => Cmd.Return(Some(qualifyExpr(expr, alias, declaredNames)), line)
+        case Cmd.Assign(loc, expr, line) => Cmd.Assign(loc, qualifyExpr(expr, alias, declaredNames), line)
         case other => other
     }
 
@@ -82,7 +90,7 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
 
     private def populateStore(params: List[(String, SimpType)], args: List[Expr], callerStore: Store): Store = {
         if params.length != args.length then
-            throw RuntimeException(s"Expected ${params.length} arguments, got ${args.length}")
+            throwError(s"Expected ${params.length} arguments, got ${args.length}")
         val localStore = Store()
         params.zip(args).foreach((param, arg) => {
             val (name, expectedType) = param
@@ -90,17 +98,25 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
                 case SimpType.TypeRef(inner) => {
                     arg match {
                         case Expr.Ref(loc) => {
-                            val currentVal = callerStore.load(loc)
-                            checkType(currentVal, inner, name)
-                            localStore.store(name, Value.RefVal(loc, callerStore))
+                            try {
+                                val currentVal = callerStore.load(loc)
+                                checkType(currentVal, inner, name)
+                                localStore.store(name, Value.RefVal(loc, callerStore))
+                            } catch case e : RuntimeException => {
+                                throwError(s"${e.getMessage}")
+                            }
                         }
-                        case _ => throw RuntimeException(s"Expected a variable name for ref parameter '$name', got a value. Tip: Don't use '!' ")   
+                        case _ => throwError(s"Expected a variable name for ref parameter '$name', got a value. Tip: Don't use '!' ")   
                     }
                 }
                 case _ => {
                     val value = evalExpr(arg, callerStore)
                     checkType(value, expectedType, name)
-                    localStore.store(name, value)
+                    try {
+                        localStore.store(name, value)
+                    } catch case e : RuntimeException => {
+                        throwError(s"${e.getMessage}")
+                    }
                 }
             }
         })
@@ -110,16 +126,20 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
 
     private def populateStoreFromValues(params: List[(String, SimpType)], argVals: List[Value], callerStore: Store): Store = {
         if params.length != argVals.length then
-            throw RuntimeException(s"Expected ${params.length} arguments, got ${argVals.length}")
+            throwError(s"Expected ${params.length} arguments, got ${argVals.length}")
         val localStore = Store()
         params.zip(argVals).foreach((param, value) => {
             val (name, expectedType) = param
             expectedType match {
                 case SimpType.TypeRef(_) =>
-                    throw RuntimeException(s"[Error] Method parameter '$name' cannot be a reference type")
+                    throwError(s"Method parameter '$name' cannot be a reference type")
                 case _ => {
                     checkType(value, expectedType, name)
-                    localStore.store(name, value)
+                    try {
+                        localStore.store(name, value)
+                    } catch case e : RuntimeException => {
+                        throwError(s"${e.getMessage}")
+                    }
                 }
             }
         })
@@ -150,7 +170,7 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
                 val v = evalExpr(expr, store)
                 v match {
                     case Value.BoolVal(b) => b
-                    case x => throw RuntimeException(s"Expected boolean value, got '$x'")
+                    case x => throwError(s"Expected boolean value, got '$x'")
                 }
             }
             case BoolExpr.Compare(l,bop,r) => {
@@ -199,31 +219,31 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
                         bop match {
                             case Bop.Eq => left == right 
                             case Bop.Neq => left != right 
-                            case x => throw RuntimeException(s"Unsupported operation '$x'")
+                            case x => throwError(s"Unsupported operation '$x'")
                         }
                     }
                     case (Value.BoolVal(left), Value.BoolVal(right)) => {
                         bop match {
                             case Bop.Eq => left == right 
                             case Bop.Neq => left != right 
-                            case x => throw RuntimeException(s"Unsupported operation '$x'")
+                            case x => throwError(s"Unsupported operation '$x'")
                         }
                     }
                     case (Value.ArrVal(left), Value.ArrVal(right)) => {
                         bop match {
                             case Bop.Eq => left == right 
                             case Bop.Neq => left != right 
-                            case x => throw RuntimeException(s"Unsupported operation '$x'")
+                            case x => throwError(s"Unsupported operation '$x'")
                         }
                     }
                     case (Value.StructVal(t1, f1), Value.StructVal(t2, f2)) => {
                         bop match {
                             case Bop.Eq => t1 == t2 && structsEqual(f1, f2)
                             case Bop.Neq => t1 != t2 || !structsEqual(f1, f2)
-                            case x => throw RuntimeException(s"Unsupported operation '$x'")
+                            case x => throwError(s"Unsupported operation '$x'")
                         }
                     }
-                    case _ => throw RuntimeException(s"Type Mismatch")
+                    case _ => throwError(s"Type Mismatch")
                 }
             }
         }
@@ -304,9 +324,13 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
             case Expr.Flt(n) => Value.FloatVal(n)
             case Expr.TypeLiteral(t) => Value.TypeVal(t)
             case Expr.Deref(loc) => {
-                store.load(loc) match {
-                    case Value.RefVal(refLoc, refStore) => refStore.load(refLoc)
-                    case v => v
+                try {
+                    store.load(loc) match {
+                        case Value.RefVal(refLoc, refStore) => refStore.load(refLoc)
+                        case v => v
+                    }
+                } catch case e : RuntimeException => {
+                    throwError(s"${e.getMessage}")
                 }
             }
             case Expr.Block(cmds, result) => {
@@ -333,7 +357,7 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
                     }
                 )
                 matched match {
-                    case None => throw RuntimeException("No matching pattern found, pattern non-exhaustive!")
+                    case None => throwError("No matching pattern found, pattern non-exhaustive!")
                     case Some(arm) => {
                         val matchStore = Store()
                         store.entries().foreach((k, v) => matchStore.store(k, v))
@@ -347,7 +371,11 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
             case Expr.Bool(b) => Value.BoolVal(b)
             case Expr.BoolLift(b) => Value.BoolVal(evalBool(b, store))
             case Expr.Ref(loc) => {
-                store.load(loc)
+                try {
+                    store.load(loc)
+                } catch case e : RuntimeException => {
+                    throwError(s"${e.getMessage}")
+                }
             }
             case Expr.ArrLiteral(elements) => {
                 val evaluated = elements.map(evalExpr(_, store))
@@ -364,12 +392,12 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
                 (arrVal, index) match {
                     case (Value.ArrVal(elements), Value.IntVal(i)) => {
                         if i < 0 || i >= elements.length then {
-                            throw RuntimeException(s"Index $i out of bounds for array of length ${elements.length}")
+                            throwError(s"Index $i out of bounds for array of length ${elements.length}")
                         } else {
                             elements(i)
                         }
                     }
-                    case _ => throw RuntimeException("Expected array and integer index")
+                    case _ => throwError("Expected array and integer index")
                 }
             }
             case Expr.UnaryOp(l, op) => {
@@ -377,10 +405,10 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
                     case Value.IntVal(left) => {
                         op match {
                             case Op.BitComplement => Value.IntVal(~left)
-                            case x => throw RuntimeException(s"Unsupported operation '$x'")
+                            case x => throwError(s"Unsupported operation '$x'")
                         }
                     }
-                    case _ => throw RuntimeException(s"Type mismatch in unary operation")
+                    case _ => throwError(s"Type mismatch in unary operation")
                 }
             }
             case Expr.BinaryOp(l, op, r) => {
@@ -391,7 +419,7 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
                             case Op.Sub => Value.IntVal(left - right)
                             case Op.Mul => Value.IntVal(left * right)
                             case Op.Mod => Value.IntVal(left % right)
-                            case Op.Div if right == 0 => throw RuntimeException(s"Division by Zero!")
+                            case Op.Div if right == 0 => throwError(s"Division by Zero!")
                             case Op.Div => Value.IntVal(left / right)
                             case Op.BitAnd => Value.IntVal(left & right)
                             case Op.BitOr => Value.IntVal(left | right)
@@ -399,7 +427,7 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
                             case Op.BitLeft => Value.IntVal(left << right)
                             case Op.BitRight => Value.IntVal(left >> right)
                             case Op.BitRightFill => Value.IntVal(left >>> right)
-                            case x => throw RuntimeException(s"Unsupported operation '$x'") 
+                            case x => throwError(s"Unsupported operation '$x'") 
                         }
                     }
                     case (Value.IntVal(left), Value.FloatVal(right)) => {
@@ -407,9 +435,9 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
                             case Op.Add => Value.FloatVal(left + right)
                             case Op.Sub => Value.FloatVal(left - right)
                             case Op.Mul => Value.FloatVal(left * right)
-                            case Op.Div if right == 0 => throw RuntimeException(s"Division by Zero!")
+                            case Op.Div if right == 0 => throwError(s"Division by Zero!")
                             case Op.Div => Value.FloatVal(left / right)
-                            case x => throw RuntimeException(s"Unsupported operation '$x'")
+                            case x => throwError(s"Unsupported operation '$x'")
                         }
                     }
                     case (Value.FloatVal(left), Value.IntVal(right)) => {
@@ -417,9 +445,9 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
                             case Op.Add => Value.FloatVal(left + right)
                             case Op.Sub => Value.FloatVal(left - right)
                             case Op.Mul => Value.FloatVal(left * right)
-                            case Op.Div if right == 0 => throw RuntimeException(s"Division by Zero!")
+                            case Op.Div if right == 0 => throwError(s"Division by Zero!")
                             case Op.Div => Value.FloatVal(left / right)
-                            case x => throw RuntimeException(s"Unsupported operation '$x'")
+                            case x => throwError(s"Unsupported operation '$x'")
                         }
                     }
                     case (Value.FloatVal(left), Value.FloatVal(right)) => {
@@ -427,18 +455,18 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
                             case Op.Add => Value.FloatVal(left + right)
                             case Op.Sub => Value.FloatVal(left - right)
                             case Op.Mul => Value.FloatVal(left * right)
-                            case Op.Div if right == 0 => throw RuntimeException(s"Division by Zero!")
+                            case Op.Div if right == 0 => throwError(s"Division by Zero!")
                             case Op.Div => Value.FloatVal(left / right)
-                            case x => throw RuntimeException(s"Unsupported operation '$x'")
+                            case x => throwError(s"Unsupported operation '$x'")
                         }
                     }
                     case (Value.StrVal(left),right) => {
                         op match {
                             case Op.Add => Value.StrVal(left + getPrettyPrint(right))
-                            case x => throw RuntimeException(s"Unsupported operation '$x'")
+                            case x => throwError(s"Unsupported operation '$x'")
                         }
                     }
-                    case _ => throw RuntimeException(s"Type mismatch in binary operation")
+                    case _ => throwError(s"Type mismatch in binary operation")
                 }
             }
             case Expr.StructLiteral(typeName, fields) => {
@@ -450,7 +478,7 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
                         case Some((_, expr)) => evalExpr(expr, store)
                         case None => default match {
                             case Some(expr) => evalExpr(expr, store)
-                            case None => throw RuntimeException(s"Missing field '$name' in $typeName literal and no default value provided")
+                            case None => throwError(s"Missing field '$name' in $typeName literal and no default value provided")
                         }
                     }
                     checkType(value, expectedType, name)
@@ -463,21 +491,21 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
                     case Value.PairVal(fst, snd) => field match {
                         case "fst" => fst
                         case "snd" => snd
-                        case _ => throw RuntimeException(s"Pairs only have 'fst' and 'snd' fields")
+                        case _ => throwError(s"Pairs only have 'fst' and 'snd' fields")
                     }
                     case Value.StructVal(_, fields) => {
-                        fields.getOrElse(field, throw RuntimeException(s"Unknown field '$field'"))
+                        fields.getOrElse(field, throwError(s"Unknown field '$field'"))
                     }
-                    case _ => throw RuntimeException("Field access on non-struct or pair value")
+                    case _ => throwError("Field access on non-struct or pair value")
                 }
             }
             case Expr.MethodCall(receiver, methodName, args) => {
                 val receiverVal = evalExpr(receiver, store)
                 val typeName = receiverVal match {
                     case Value.StructVal(name, _) => name
-                    case _ => throw RuntimeException(s"Can't call method '$methodName' on a non-struct value")
+                    case _ => throwError(s"Can't call method '$methodName' on a non-struct value")
                 }
-                val fnDecl = methodTable.getOrElse((typeName, methodName), throw RuntimeException(s"No method '$methodName' found for struct '$typeName'"))
+                val fnDecl = fnEnv.methodTable.getOrElse((typeName, methodName), throwError(s"No method '$methodName' found for struct '$typeName'"))
                 val argVals = receiverVal :: args.map(evalExpr(_, store))
                 callFunctionWithValues(methodName, fnDecl, argVals, store)
             }
@@ -499,7 +527,7 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
         try {
             execCmd(function.body, localStore)
             if function.returnType != SimpType.TypeNull then {
-                throw RuntimeException(s"Function '$name' has no return statement")
+                throwError(s"Function '$name' has no return statement")
             } else {
                 Value.NullVal
             }
@@ -509,14 +537,14 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
                     checkType(value, function.returnType, s"return value of '$name'")
                     value
                 } else {
-                    throw RuntimeException(s"Function '$name' has invalid return statement")
+                    throwError(s"Function '$name' has invalid return statement")
                 }
             }
             case ReturnException(None) => {
                 if function.returnType == SimpType.TypeNull then {
                     Value.NullVal
                 } else {
-                    throw RuntimeException(s"Function '$name' has invalid return statement")
+                    throwError(s"Function '$name' has invalid return statement")
                 }
             }
         }
@@ -526,7 +554,7 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
         try {
             execCmd(function.body, localStore)
             if function.returnType != SimpType.TypeNull then {
-                throw RuntimeException(s"Function '$name' has no return statement")
+                throwError(s"Function '$name' has no return statement")
             } else {
                 Value.NullVal
             }
@@ -536,14 +564,14 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
                     checkType(value, function.returnType, s"return value of '$name'")
                     value
                 } else {
-                    throw RuntimeException(s"Function '$name' has invalid return statement")
+                    throwError(s"Function '$name' has invalid return statement")
                 }
             }
             case ReturnException(None) => {
                 if function.returnType == SimpType.TypeNull then {
                     Value.NullVal
                 } else {
-                    throw RuntimeException(s"Function '$name' has invalid return statement")
+                    throwError(s"Function '$name' has invalid return statement")
                 }
             }
         }
@@ -552,61 +580,82 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
         cmd match {
             case Cmd.Skip => 
             case Cmd.Scope(body) => execCmd(body, store.child())
-            case Cmd.Assign(loc, expr) => {
+            case Cmd.Assign(loc, expr, line) => {
+                pos = line
                 val value = evalExpr(expr, store)
                 try {
                     store.load(loc) match {
                         case Value.RefVal(refLoc, refStore) => {
                             refStore.store(refLoc, value)
                         }
-                        case _ => store.store(loc, value)
+                        case _ => {
+                            store.store(loc, value)
+                        }
                     }
                 } catch {
-                    case _: RuntimeException => store.store(loc, value)
+                    case _: RuntimeException =>  {
+                        try {
+                            store.store(loc, value)
+                        } catch case e : RuntimeException => {
+                            throwError(s"${e.getMessage}")
+                        }
+                    }
                 }
             }
-            case Cmd.ConstAssign(loc, valueExpr) => {
+            case Cmd.ConstAssign(loc, valueExpr, line) => {
+                pos = line
                 val value = evalExpr(valueExpr, store)
                 store.declareConst(loc, value)
             }
-            case Cmd.FieldAssign(loc, field, valueExpr) => {
-                store.load(loc) match {
-                    case Value.StructVal(typeName, fields) => {
-                        val defn = structEnv.lookup(typeName)
-                        val expectedType = defn.fields.find(_._1 == field).getOrElse(
-                            throw RuntimeException(s"Unknown field '$field'")
-                        )._2
-                        val value = evalExpr(valueExpr, store)
-                        checkType(value, expectedType, field)
-                        fields(field) = value
+            case Cmd.FieldAssign(loc, field, valueExpr, line) => {
+                pos = line
+                try {
+                    store.load(loc) match {
+                        case Value.StructVal(typeName, fields) => {
+                            val defn = structEnv.lookup(typeName)
+                            val expectedType = defn.fields.find(_._1 == field).getOrElse(
+                                throwError(s"Unknown field '$field'")
+                            )._2
+                            val value = evalExpr(valueExpr, store)
+                            checkType(value, expectedType, field)
+                            fields(field) = value
+                        }
+                        case _ => throwError(s"'$loc' is not a struct")
                     }
-                    case _ => throw RuntimeException(s"'$loc' is not a struct")
+                } catch case e : RuntimeException => {
+                    throwError(s"${e.getMessage}")
                 }
             }
-            case Cmd.FieldIndexAssign(loc, field, index, valueExpr) => {
-                store.load(loc) match {
-                    case Value.StructVal(_, fields) => {
-                        fields.get(field) match {
-                            case Some(Value.ArrVal(elements)) => {
-                                val idx = evalExpr(index, store) match {
-                                    case Value.IntVal(i) => i
-                                    case _ => throw RuntimeException("Array index must be an integer")
+            case Cmd.FieldIndexAssign(loc, field, index, valueExpr, line) => {
+                pos = line
+                try {
+                    store.load(loc) match {
+                        case Value.StructVal(_, fields) => {
+                            fields.get(field) match {
+                                case Some(Value.ArrVal(elements)) => {
+                                    val idx = evalExpr(index, store) match {
+                                        case Value.IntVal(i) => i
+                                        case _ => throwError("Array index must be an integer")
+                                    }
+                                    if idx < 0 || idx >= elements.length then
+                                        throwError(s"Index $idx out of bounds")
+                                    elements(idx) = evalExpr(valueExpr, store)
                                 }
-                                if idx < 0 || idx >= elements.length then
-                                    throw RuntimeException(s"Index $idx out of bounds")
-                                elements(idx) = evalExpr(valueExpr, store)
+                                case _ => throwError(s"'$field' is not an array")
                             }
-                            case _ => throw RuntimeException(s"'$field' is not an array")
                         }
+                        case _ => throwError(s"'$loc' is not a struct")
                     }
-                    case _ => throw RuntimeException(s"'$loc' is not a struct")
+                } catch case e : RuntimeException => {
+                    throwError(s"${e.getMessage}")
                 }
             }
             case Cmd.Seq(fst, snd) => {
                 execCmd(fst, store)
                 execCmd(snd, store)
             }
-            case Cmd.If(cond, t, e) => {
+            case Cmd.If(cond, t, e, line) => {
+                pos = line
                 val condition = evalBool(cond, store)
                 if condition then {
                     execCmd(t, store.child())
@@ -614,7 +663,8 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
                     execCmd(e, store.child())
                 }
             }
-            case Cmd.While(cond, body) => {
+            case Cmd.While(cond, body, line) => {
+                pos = line
                 var running = true
 
                 while running && evalBool(cond, store) do {
@@ -626,7 +676,8 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
                     }
                 }
             }
-            case Cmd.For(variable, iterable, body) => {
+            case Cmd.For(variable, iterable, body, line) => {
+                pos = line
                 evalExpr(iterable, store) match {
                     case Value.ArrVal(elements) => {
                         var i = 0
@@ -643,83 +694,105 @@ class Evaluator(fnEnv: FunctionEnv, structEnv: StructEnv, cwd: String = "."):
                             i += 1
                         }
                     }
-                    case _ => throw RuntimeException("for loop expects an array")
+                    case _ => throwError("for loop expects an array")
                 }
             }
-            case Cmd.Print(value) => {
+            case Cmd.Print(value, line) => {
+                pos = line
                 println(getPrettyPrint(evalExpr(value, store)))
             }
-            case Cmd.Return(None) => throw ReturnException(None)
-            case Cmd.Return(Some(expr)) => throw ReturnException(Some(evalExpr(expr, store)))
+            case Cmd.Return(None, line) => {
+                pos = line
+                throw ReturnException(None)
+            }
+            case Cmd.Return(Some(expr), line) => {
+                pos = line
+                throw ReturnException(Some(evalExpr(expr, store)))
+            }
             case Cmd.Continue => throw ContinueException()
             case Cmd.Break => throw BreakException()
 
-            case Cmd.ArrAssign(loc, idx, value) => {
-                val arrVal = store.load(loc)
-                val index = evalExpr(idx, store)
-                val v = evalExpr(value, store)
-                (arrVal, index) match {
-                    case (Value.ArrVal(elements), Value.IntVal(i)) => {
-                        if i < 0 || i >= elements.length then {
-                            throw RuntimeException(s"Index $i out of bounds for array of length ${elements.length}")
-                        } else {
-                            elements(i) = v
+            case Cmd.ArrAssign(loc, idx, value, line) => {
+                pos = line
+                try {
+                    val arrVal = store.load(loc)
+                    val index = evalExpr(idx, store)
+                    val v = evalExpr(value, store)
+                    (arrVal, index) match {
+                        case (Value.ArrVal(elements), Value.IntVal(i)) => {
+                            if i < 0 || i >= elements.length then {
+                                throwError(s"Index $i out of bounds for array of length ${elements.length}")
+                            } else {
+                                elements(i) = v
+                            }
                         }
+                        case _ => throwError("Expected array and integer index")
                     }
-                    case _ => throw RuntimeException("Expected array and integer index")
+                } catch case e : RuntimeException => {
+                    throwError(s"${e.getMessage}")
                 }
             }
-            case Cmd.ArrAssignNested(loc, indices, value) => {
+            case Cmd.ArrAssignNested(loc, indices, value, line) => {
+                pos = line
                 val v = evalExpr(value, store)
-                var current = store.load(loc) match {
-                    case Value.ArrVal(elements) => elements
-                    case _ => throw RuntimeException(s"'$loc' is not an array")
-                }
-                var i = 0
-                while i < indices.length - 1 do {
-                    val idx = evalExpr(indices(i), store) match {
-                        case Value.IntVal(n) => n
-                        case _ => throw RuntimeException("Array index must be an integer")
-                    }
-                    current = current(idx) match {
+                try {
+                    var current = store.load(loc) match {
                         case Value.ArrVal(elements) => elements
-                        case _ => throw RuntimeException(s"Not an array at index $idx")
+                        case _ => throwError(s"'$loc' is not an array")
                     }
-                    i += 1
+                    var i = 0
+                    while i < indices.length - 1 do {
+                        val idx = evalExpr(indices(i), store) match {
+                            case Value.IntVal(n) => n
+                            case _ => throwError("Array index must be an integer")
+                        }
+                        current = current(idx) match {
+                            case Value.ArrVal(elements) => elements
+                            case _ => throwError(s"Not an array at index $idx")
+                        }
+                        i += 1
+                    }
+                    val lastIdx = evalExpr(indices.last, store) match {
+                        case Value.IntVal(n) => n
+                        case _ => throwError("Array index must be an integer")
+                    }
+                    current(lastIdx) = v
+                } catch case e : RuntimeException => {
+                    throwError(s"${e.getMessage}")
                 }
-                val lastIdx = evalExpr(indices.last, store) match {
-                    case Value.IntVal(n) => n
-                    case _ => throw RuntimeException("Array index must be an integer")
-                }
-                current(lastIdx) = v
             }
-            case Cmd.FieldIndexAssignNested(loc, field, indices, value) => {
+            case Cmd.FieldIndexAssignNested(loc, field, indices, value, line) => {
+                pos = line
                 val v = evalExpr(value, store)
-                val struct = store.load(loc) match {
-                    case Value.StructVal(_, fields) => fields
-                    case _ => throw RuntimeException(s"[Error] '$loc' is not a struct")
-                }
-                var current = struct(field) match {
-                    case Value.ArrVal(elements) => elements
-                    case _ => throw RuntimeException(s"[Error] '$loc.$field' is not an array")
-                }
-                var i = 0
-                while i < indices.length - 1 do {
-                    val idx = evalExpr(indices(i), store) match {
-                        case Value.IntVal(n) => n
-                        case _ => throw RuntimeException("[Error] Array index must be an integer")
+                try {
+                    val struct = store.load(loc) match {
+                        case Value.StructVal(_, fields) => fields
+                        case _ => throwError(s"[Error] '$loc' is not a struct")
                     }
-                    current = current(idx) match {
+                    var current = struct(field) match {
                         case Value.ArrVal(elements) => elements
-                        case _ => throw RuntimeException(s"[Error] Not an array at index $idx")
+                        case _ => throwError(s"[Error] '$loc.$field' is not an array")
                     }
-                    i += 1
+                    var i = 0
+                    while i < indices.length - 1 do {
+                        val idx = evalExpr(indices(i), store) match {
+                            case Value.IntVal(n) => n
+                            case _ => throwError("[Error] Array index must be an integer")
+                        }
+                        current = current(idx) match {
+                            case Value.ArrVal(elements) => elements
+                            case _ => throwError(s"[Error] Not an array at index $idx")
+                        }
+                        i += 1
+                    }
+                    val lastIdx = evalExpr(indices.last, store) match {
+                        case Value.IntVal(n) => n
+                        case _ => throwError("[Error] Array index must be an integer")
+                    }
+                    current(lastIdx) = v
+                } catch case e : RuntimeException => {
+                    throwError(s"${e.getMessage}")
                 }
-                val lastIdx = evalExpr(indices.last, store) match {
-                    case Value.IntVal(n) => n
-                    case _ => throw RuntimeException("[Error] Array index must be an integer")
-                }
-                current(lastIdx) = v
             }
         }
     }

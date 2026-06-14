@@ -5,6 +5,9 @@ class FunctionEnv:
 
   private val builtins = scala.collection.mutable.Map[String, List[Value] => Value]()
 
+
+  val methodTable = scala.collection.mutable.Map[(String, String), Decl.FnDecl]()
+
   def registerFn(name: String, fn: Decl.FnDecl): Unit = {
     fns(name) = fn
   }
@@ -21,6 +24,11 @@ class FunctionEnv:
 
   def lookupBuiltin(name: String): Option[List[Value] => Value] = {
     builtins.get(name)
+  }
+
+  def clear(): Unit = {
+      fns.clear()
+      methodTable.clear()
   }
 
   def dumpFn(): scala.collection.mutable.Map[String, Decl.FnDecl] = fns

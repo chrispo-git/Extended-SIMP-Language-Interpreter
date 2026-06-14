@@ -2,7 +2,7 @@ package simp
 
 //Lexer for SIMP
 
-class Lexer(source: String):
+class Lexer(source: String, sourceLines: List[String]):
     private var pos: Int = 0
     private val tokens = scala.collection.mutable.ListBuffer[Token]()
     private val lines = scala.collection.mutable.ListBuffer[Int]()
@@ -13,7 +13,10 @@ class Lexer(source: String):
 
     private var isComment: Boolean = false
 
-    private def throwError(msg: String): Nothing = throw RuntimeException(s"on line $line: $msg")
+    private def currentLineSource(): String = sourceLines(line-1).trim
+    private def throwError(msg: String): Nothing = {
+        throw RuntimeException(s"on line ${line}\n${currentLineSource()}\n\u001b[31m$msg\u001b[0m")
+    }
 
     def tokenise(): (List[Token], List[Int]) = {
         while !isAtEnd() do {
@@ -163,8 +166,8 @@ class Lexer(source: String):
         while !isAtEnd() && (peek() != '\n') do {
             advance()
         }
+        if !isAtEnd() then advance()
         line += 1;
-        skipWhitespace()
     }
 
     private def advanceUntilNextWord(): Unit = {
