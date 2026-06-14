@@ -5,8 +5,9 @@ import org.scalatest.funsuite.AnyFunSuite
 class ParserTest extends AnyFunSuite:
 
   def parse(source: String): List[Program] = {
-    val tokens = Lexer(source).tokenise()
-    Parser(tokens._1, StructEnv(), tokens._2).parseProgram()
+    val sourceLines = source.split('\n').toList
+    val tokens = Lexer(source, sourceLines).tokenise()
+    Parser(tokens._1, StructEnv(), tokens._2, sourceLines).parseProgram()
   }
 
   // Commands

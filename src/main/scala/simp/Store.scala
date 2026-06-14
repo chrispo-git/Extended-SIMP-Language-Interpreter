@@ -51,6 +51,11 @@ class Store(val parent: Option[Store] = None):
         consts.remove(name)
     }
 
+    def clear(): Unit = {
+        memory.clear()
+        consts.clear()
+    }
+
     def child(): Store = Store(Some(this))
 
     def dump(): Unit = memory.toSeq.sortBy(_._1).foreach((k, v) => println(s"$k = $v"))

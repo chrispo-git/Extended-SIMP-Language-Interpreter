@@ -2,7 +2,7 @@ package simp
 
 import SimpUtils.*
 
-class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
+class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int], sourceLines: List[String]):
     private var pos: Int = 0
 
     private def isAtEnd(): Boolean = pos >= tokens.length
@@ -23,7 +23,10 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
     }
 
     private def currentLine(): Int = if pos < lines.length then lines(pos) else -1
-    private def throwError(msg: String): Nothing = throw RuntimeException(s"on line ${currentLine()}: $msg")
+    private def currentLineSource(): String = if currentLine() > -1 then sourceLines(currentLine()-1).trim else ""
+    private def throwError(msg: String): Nothing = {
+        throw RuntimeException(s"on line ${currentLine()}\n${currentLineSource()}\n\u001b[31m$msg\u001b[0m")
+    }
 
 
     private def preRegisterStructs(): Unit = {
@@ -48,22 +51,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
             peek() match {
                 case Token.Fn  | Token.Struct | Token.Import => items += Program.PDecl(parseDecl())
                 case Token.Impl => {
-                    advance()
-                    val structName = peek() match {
-                        case Token.Variable(name) => { advance(); name }
-                        case x => throwError(s"Expected struct name after 'impl', got '$x'")
-                    }
-                    expect(Token.OpenBrace)
-                    val methods = scala.collection.mutable.ListBuffer[Decl.FnDecl]()
-                    while peek() != Token.CloseBrace do {
-                        val out = parseDecl() match {
-                            case f: Decl.FnDecl => f
-                            case x => throwError(s"Expected function, got $x")
-                        }
-                        methods += out
-                    }
-                    expect(Token.CloseBrace)
-                    items += Program.PImpl(structName, methods.toList)
+                    items += parseImpl()
                 }
                 case _ => items += Program.PCmd(parseCmd())
             }
@@ -73,13 +61,34 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
         }
         items.toList
     }
+    def parseImpl(): Program.PImpl = {
 
+        advance()
+        val structName = peek() match {
+            case Token.Variable(name) => { advance(); name }
+            case x => throwError(s"Expected struct name after 'impl', got '$x'")
+        }
+        expect(Token.OpenBrace)
+        val methods = scala.collection.mutable.ListBuffer[Decl.FnDecl]()
+        while peek() != Token.CloseBrace do {
+            val out = parseDecl() match {
+                case f: Decl.FnDecl => f
+                case x => throwError(s"Expected function, got $x")
+            }
+            methods += out
+        }
+        expect(Token.CloseBrace)
+        Program.PImpl(structName, methods.toList)
+    }
     def parseRepl(): List[Program] = {
         val items = scala.collection.mutable.ListBuffer[Program]()
 
         while !isAtEnd() && peek() != Token.EOF do {
             val item = peek() match {
-                case Token.Fn |  Token.Struct | Token.Import => Program.PDecl(parseDecl())
+                case Token.Fn |  Token.Struct | Token.Import  => Program.PDecl(parseDecl())
+                case Token.Impl => {
+                    parseImpl()
+                }
                 case Token.BoolLit(_) | Token.Not => Program.PBool(parseBool())
                 case  Token.LiteralFloat(_) |Token.LiteralInt(_) | Token.Deref | Token.BitComplement =>
                     val expr = parseExpr()
@@ -158,25 +167,25 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
                 advance()
                 val value = parseBoolExpr()
                 if extraIndices.isEmpty then
-                    Cmd.FieldIndexAssign(l, field, firstIndex, value)
+                    Cmd.FieldIndexAssign(l, field, firstIndex, value, currentLine())
                 else
-                    Cmd.FieldIndexAssignNested(l, field, firstIndex :: extraIndices.toList, value)
+                    Cmd.FieldIndexAssignNested(l, field, firstIndex :: extraIndices.toList, value, currentLine())
             }
-            case Token.PlusEq => { advance(); Cmd.FieldIndexAssign(l, field, firstIndex, Expr.BinaryOp(Expr.ArrIndex(Expr.FieldAccess(Expr.Ref(l), field), firstIndex), Op.Add, parseExpr())) }
-            case Token.MinusEq => { advance(); Cmd.FieldIndexAssign(l, field, firstIndex, Expr.BinaryOp(Expr.ArrIndex(Expr.FieldAccess(Expr.Ref(l), field), firstIndex), Op.Sub, parseExpr())) }
-            case Token.MulEq => { advance(); Cmd.FieldIndexAssign(l, field, firstIndex, Expr.BinaryOp(Expr.ArrIndex(Expr.FieldAccess(Expr.Ref(l), field), firstIndex), Op.Mul, parseExpr())) }
-            case Token.DivEq => { advance(); Cmd.FieldIndexAssign(l, field, firstIndex, Expr.BinaryOp(Expr.ArrIndex(Expr.FieldAccess(Expr.Ref(l), field), firstIndex), Op.Div, parseExpr())) }
+            case Token.PlusEq => { advance(); Cmd.FieldIndexAssign(l, field, firstIndex, Expr.BinaryOp(Expr.ArrIndex(Expr.FieldAccess(Expr.Ref(l), field), firstIndex), Op.Add, parseExpr()), currentLine()) }
+            case Token.MinusEq => { advance(); Cmd.FieldIndexAssign(l, field, firstIndex, Expr.BinaryOp(Expr.ArrIndex(Expr.FieldAccess(Expr.Ref(l), field), firstIndex), Op.Sub, parseExpr()), currentLine()) }
+            case Token.MulEq => { advance(); Cmd.FieldIndexAssign(l, field, firstIndex, Expr.BinaryOp(Expr.ArrIndex(Expr.FieldAccess(Expr.Ref(l), field), firstIndex), Op.Mul, parseExpr()), currentLine()) }
+            case Token.DivEq => { advance(); Cmd.FieldIndexAssign(l, field, firstIndex, Expr.BinaryOp(Expr.ArrIndex(Expr.FieldAccess(Expr.Ref(l), field), firstIndex), Op.Div, parseExpr()), currentLine()) }
             case x => throwError(s"Expected assignment, got '$x'")
         }
     }
 
     private def parseFieldAssign(l: String, field: String): Cmd = {
         peek() match {
-            case Token.Assign => { advance(); Cmd.FieldAssign(l, field, parseBoolExpr()) }
-            case Token.PlusEq => { advance(); Cmd.FieldAssign(l, field, Expr.BinaryOp(Expr.FieldAccess(Expr.Ref(l), field), Op.Add, parseExpr())) }
-            case Token.MinusEq => { advance(); Cmd.FieldAssign(l, field, Expr.BinaryOp(Expr.FieldAccess(Expr.Ref(l), field), Op.Sub, parseExpr())) }
-            case Token.MulEq => { advance(); Cmd.FieldAssign(l, field, Expr.BinaryOp(Expr.FieldAccess(Expr.Ref(l), field), Op.Mul, parseExpr())) }
-            case Token.DivEq => { advance(); Cmd.FieldAssign(l, field, Expr.BinaryOp(Expr.FieldAccess(Expr.Ref(l), field), Op.Div, parseExpr())) }
+            case Token.Assign => { advance(); Cmd.FieldAssign(l, field, parseBoolExpr(), currentLine()) }
+            case Token.PlusEq => { advance(); Cmd.FieldAssign(l, field, Expr.BinaryOp(Expr.FieldAccess(Expr.Ref(l), field), Op.Add, parseExpr()), currentLine()) }
+            case Token.MinusEq => { advance(); Cmd.FieldAssign(l, field, Expr.BinaryOp(Expr.FieldAccess(Expr.Ref(l), field), Op.Sub, parseExpr()), currentLine()) }
+            case Token.MulEq => { advance(); Cmd.FieldAssign(l, field, Expr.BinaryOp(Expr.FieldAccess(Expr.Ref(l), field), Op.Mul, parseExpr()), currentLine()) }
+            case Token.DivEq => { advance(); Cmd.FieldAssign(l, field, Expr.BinaryOp(Expr.FieldAccess(Expr.Ref(l), field), Op.Div, parseExpr()), currentLine()) }
             case x => throwError(s"Expected assignment, got '$x'")
         }
     }
@@ -191,7 +200,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
                     case Token.OpenBracket => {
                         val args = parseArgs()
                         val expr = parsePostfix(Expr.MethodCall(Expr.Ref(l), field, args))
-                        Cmd.Assign("_", expr)
+                        Cmd.Assign("_", expr, currentLine())
                     }
                     case _ => parseFieldAssign(l, field)
                 }
@@ -215,16 +224,16 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
                 expect(Token.Assign)
                 val value = parseBoolExpr()
                 if extraIndices.isEmpty then {
-                    Cmd.ArrAssign(l, firstIndex, value)
+                    Cmd.ArrAssign(l, firstIndex, value, currentLine())
                 } else {
-                    Cmd.ArrAssignNested(l, firstIndex :: extraIndices.toList, value)
+                    Cmd.ArrAssignNested(l, firstIndex :: extraIndices.toList, value, currentLine())
                 }
             }
-            case Token.Assign => { advance(); Cmd.Assign(l, parseBoolExpr()) }
-            case Token.PlusEq => { advance(); Cmd.Assign(l, Expr.BinaryOp(Expr.Deref(l), Op.Add, parseExpr())) }
-            case Token.MinusEq => { advance(); Cmd.Assign(l, Expr.BinaryOp(Expr.Deref(l), Op.Sub, parseExpr())) }
-            case Token.MulEq => { advance(); Cmd.Assign(l, Expr.BinaryOp(Expr.Deref(l), Op.Mul, parseExpr())) }
-            case Token.DivEq => { advance(); Cmd.Assign(l, Expr.BinaryOp(Expr.Deref(l), Op.Div, parseExpr())) }
+            case Token.Assign => { advance(); Cmd.Assign(l, parseBoolExpr(), currentLine()) }
+            case Token.PlusEq => { advance(); Cmd.Assign(l, Expr.BinaryOp(Expr.Deref(l), Op.Add, parseExpr()), currentLine()) }
+            case Token.MinusEq => { advance(); Cmd.Assign(l, Expr.BinaryOp(Expr.Deref(l), Op.Sub, parseExpr()), currentLine()) }
+            case Token.MulEq => { advance(); Cmd.Assign(l, Expr.BinaryOp(Expr.Deref(l), Op.Mul, parseExpr()), currentLine()) }
+            case Token.DivEq => { advance(); Cmd.Assign(l, Expr.BinaryOp(Expr.Deref(l), Op.Div, parseExpr()), currentLine()) }
             case x => throwError(s"Expected assignment, got '$x'")
         }
     }
@@ -245,11 +254,11 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
     private def foldIf(cond: BoolExpr, t: Cmd, e: Cmd): Cmd = cond match {
         case BoolExpr.Literal(true)  => t
         case BoolExpr.Literal(false) => e
-        case _ => Cmd.If(cond, t, e)
+        case _ => Cmd.If(cond, t, e, currentLine())
     }
     private def foldWhile(cond: BoolExpr, body: Cmd): Cmd = cond match {
         case BoolExpr.Literal(false) => Cmd.Skip
-        case _ => Cmd.While(cond, body)
+        case _ => Cmd.While(cond, body, currentLine())
     }
     private def evalLitCompare(l: Double, bop: Bop, r: Double): Boolean = bop match {
         case Bop.Gt  => l > r
@@ -368,7 +377,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
                 expect(Token.OpenBrace)
                 val body = parseCmd()
                 expect(Token.CloseBrace)
-                Cmd.For(name, iterable, body)
+                Cmd.For(name, iterable, body, currentLine())
             }
             case x => throwError(s"Expected loop variable, got '$x'")
         }
@@ -384,11 +393,11 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
                     advance()
                     val right = parseExpr()
                     expect(Token.CloseBracket)
-                    Cmd.Assign("_", Expr.Pair(expr, right))
+                    Cmd.Assign("_", Expr.Pair(expr, right), currentLine())
                 }
                 case Token.CloseBracket => {
                     advance()
-                    Cmd.Assign("_", expr)
+                    Cmd.Assign("_", expr, currentLine())
                 }
                 case _ => {
                     pos = savedPos
@@ -413,7 +422,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
         advance()
         peek() match {
             case Token.Semicolon | Token.CloseBrace | Token.EOF => Cmd.Return(None)
-            case _ => Cmd.Return(Some(parseBoolExpr()))
+            case _ => Cmd.Return(Some(parseBoolExpr()), currentLine())
         }
     }
     private def parseConstAssign(): Cmd = {
@@ -421,7 +430,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
             case Token.Variable(l) => {
                 advance();
                 expect(Token.Assign)
-                Cmd.ConstAssign(l, parseBoolExpr())
+                Cmd.ConstAssign(l, parseBoolExpr(), currentLine())
             }
             case x => throwError(s"Expected variable name after const, got '$x'")
         }
@@ -449,7 +458,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int]):
             case Token.While    => parseWhileCmd()
             case Token.For      => parseForCmd()
             case Token.Variable(l) => { advance(); parseVarAssign(l) }
-            case Token.Print    => { advance(); Cmd.Print(parseExpr()) }
+            case Token.Print    => { advance(); Cmd.Print(parseExpr(), currentLine()) }
             case Token.OpenBracket => parseOpenBracketCmd()
             case Token.Return   => parseReturnCmd()
             case Token.OpenBrace => {advance(); parseScope()}

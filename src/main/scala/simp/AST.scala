@@ -78,20 +78,20 @@ enum Bop:
 
 enum Cmd:
     case Skip
-    case Assign(loc: String, expr: Expr)
-    case ConstAssign(loc: String, expr: Expr)
+    case Assign(loc: String, expr: Expr, line: Int)
+    case ConstAssign(loc: String, expr: Expr, line: Int)
     case Seq(fst: Cmd, snd: Cmd)
-    case If(cond: BoolExpr, thenBranch: Cmd, elseBranch: Cmd)
+    case If(cond: BoolExpr, thenBranch: Cmd, elseBranch: Cmd, line: Int)
     case Scope(body: Cmd)
-    case While(cond: BoolExpr, body: Cmd)
-    case For(variable: String, iterable: Expr, body: Cmd)
-    case Print(value: Expr)
-    case Return(expr: Option[Expr] = None)
-    case ArrAssign(arr: String, index: Expr, value: Expr)
-    case ArrAssignNested(loc: String, indices: List[Expr], value: Expr)
-    case FieldAssign(loc: String, field: String, value: Expr)
-    case FieldIndexAssign(loc: String, field: String, index: Expr, value: Expr)
-    case FieldIndexAssignNested(loc: String, field: String, indices: List[Expr], value: Expr)
+    case While(cond: BoolExpr, body: Cmd, line: Int)
+    case For(variable: String, iterable: Expr, body: Cmd, line: Int)
+    case Print(value: Expr, line: Int)
+    case Return(expr: Option[Expr] = None, line: Int = 0)
+    case ArrAssign(arr: String, index: Expr, value: Expr, line: Int)
+    case ArrAssignNested(loc: String, indices: List[Expr], value: Expr, line: Int)
+    case FieldAssign(loc: String, field: String, value: Expr, line: Int)
+    case FieldIndexAssign(loc: String, field: String, index: Expr, value: Expr, line: Int)
+    case FieldIndexAssignNested(loc: String, field: String, indices: List[Expr], value: Expr, line: Int)
     case Continue
     case Break
 
