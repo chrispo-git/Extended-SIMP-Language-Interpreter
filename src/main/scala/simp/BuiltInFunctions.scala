@@ -6,6 +6,10 @@ import scala.math._
 
 import scala.util.Random
 
+import scala.sys.process._
+
+import java.io.File
+
 import SimpUtils.*
 
 object Builtins:
@@ -615,5 +619,13 @@ object Builtins:
                 Value.StrVal(if ch <= 0 || ch == 65534 then "" else ch.toChar.toString)
             }
             case _ => throw RuntimeException("readKey takes no arguments")
+        })
+        fnEnv.registerBuiltin("console", args => args match {
+            case List(Value.StrVal(x)) => {
+                try {
+                    Value.StrVal(x.!!)
+                } catch case e: Exception => throw RuntimeException(s"${e.getMessage}")
+            }
+            case _ => throw RuntimeException("console expects a string argument")
         })
     }

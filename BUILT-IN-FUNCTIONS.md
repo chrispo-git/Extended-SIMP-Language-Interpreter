@@ -6,6 +6,7 @@ Each of these functions is available by default in SIMP+.
 |----------|-----------|-------------|
 | `assert` | `assert(Bool, <Str>) -> Bool` | If false, throws an error with optional message |
 | `deepCopy` | `deepCopy(x) -> x` | Returns a deep copy of a value |
+| `console` | `console(Str) -> Str` | Runs a console command |
 
 ---
 
