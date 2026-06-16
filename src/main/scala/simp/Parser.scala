@@ -94,15 +94,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int], sourc
                     val expr = parseExpr()
                     peek() match {
                         case Token.Gt | Token.Lt | Token.Gte | Token.Lte | Token.Eq | Token.Neq =>
-                            val bop = peek() match {
-                                case Token.Gt  => Bop.Gt
-                                case Token.Lt  => Bop.Lt
-                                case Token.Gte => Bop.Gte
-                                case Token.Lte => Bop.Lte
-                                case Token.Eq  => Bop.Eq
-                                case Token.Neq => Bop.Neq
-                                case _ => throwError("unreachable")
-                            }
+                            val bop = parseBoolOp(peek())
                             advance()
                             val right = parseExpr()
                             Program.PBool(foldCompare(expr, bop, right))
@@ -609,15 +601,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int], sourc
         }
         peek() match {
             case Token.Gt | Token.Lt | Token.Gte | Token.Lte | Token.Eq | Token.Neq => {
-                val bop = peek() match {
-                    case Token.Gt  => Bop.Gt
-                    case Token.Lt  => Bop.Lt
-                    case Token.Gte => Bop.Gte
-                    case Token.Lte => Bop.Lte
-                    case Token.Eq  => Bop.Eq
-                    case Token.Neq => Bop.Neq
-                    case _ => throw RuntimeException("unreachable")
-                }
+                val bop = parseBoolOp(peek())
                 advance()
                 val right = parseExpr()
                 Expr.BoolLift(foldCompare(left, bop, right))
@@ -885,15 +869,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int], sourc
                     }
                     case Token.Gt | Token.Lt | Token.Gte | Token.Lte | Token.Eq | Token.Neq => {
                         expect(Token.CloseBracket);
-                        val bop = peek() match {
-                            case Token.Gt  => Bop.Gt
-                            case Token.Lt  => Bop.Lt
-                            case Token.Gte => Bop.Gte
-                            case Token.Lte => Bop.Lte
-                            case Token.Eq  => Bop.Eq
-                            case Token.Neq => Bop.Neq
-                            case _ => throwError("unreachable")
-                        }
+                        val bop = parseBoolOp(peek())
                         advance()
                         val right = parseExpr()
                         Expr.BoolLift(foldCompare(left, bop, right))
@@ -1010,6 +986,17 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int], sourc
         case Expr.Bool(b) => BoolExpr.Literal(b)
         case _ => BoolExpr.FromExpr(expr)
     }
+    private def parseBoolOp(tok: Token): Bop = {
+        tok match {
+            case Token.Gt => Bop.Gt
+            case Token.Gte => Bop.Gte
+            case Token.Lt => Bop.Lt
+            case Token.Lte => Bop.Lte
+            case Token.Eq => Bop.Eq
+            case Token.Neq => Bop.Neq
+            case x => throwError(s"Expected boolean operator, got '${x}'")
+        }
+    }
     private def parseAtomicBool(): BoolExpr = {
         peek() match {
             case Token.BoolLit(b) => {
@@ -1038,15 +1025,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int], sourc
                 val left = parseExpr()
                 peek() match {
                     case Token.Gt | Token.Lt | Token.Gte | Token.Lte | Token.Eq | Token.Neq => {
-                        val bop = peek() match {
-                            case Token.Gt => Bop.Gt
-                            case Token.Gte => Bop.Gte
-                            case Token.Lt => Bop.Lt
-                            case Token.Lte => Bop.Lte
-                            case Token.Eq => Bop.Eq
-                            case Token.Neq => Bop.Neq
-                            case x => throwError(s"Expected boolean operator, got '${x}'")
-                        }
+                        val bop = parseBoolOp(peek())
                         advance()
                         val right = parseExpr()
                         foldCompare(left, bop, right)
@@ -1064,15 +1043,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int], sourc
                 val expr = parsePostfix(parseAtomicExpr())
                 peek() match {
                     case Token.Gt | Token.Lt | Token.Gte | Token.Lte | Token.Eq | Token.Neq =>
-                        val bop = peek() match {
-                            case Token.Gt  => Bop.Gt
-                            case Token.Lt  => Bop.Lt
-                            case Token.Gte => Bop.Gte
-                            case Token.Lte => Bop.Lte
-                            case Token.Eq  => Bop.Eq
-                            case Token.Neq => Bop.Neq
-                            case _ => throwError("unreachable")
-                        }
+                        val bop = parseBoolOp(peek())
                         advance()
                         val right = parseExpr()
                         foldCompare(expr, bop, right)
@@ -1083,15 +1054,7 @@ class Parser(tokens: List[Token], structEnv : StructEnv, lines: List[Int], sourc
                 val expr = parsePostfix(parseAtomicExpr())
                 peek() match {
                     case Token.Gt | Token.Lt | Token.Gte | Token.Lte | Token.Eq | Token.Neq =>
-                        val bop = peek() match {
-                            case Token.Gt  => Bop.Gt
-                            case Token.Lt  => Bop.Lt
-                            case Token.Gte => Bop.Gte
-                            case Token.Lte => Bop.Lte
-                            case Token.Eq  => Bop.Eq
-                            case Token.Neq => Bop.Neq
-                            case _ => throwError("unreachable")
-                        }
+                        val bop = parseBoolOp(peek())
                         advance()
                         val right = parseExpr()
                         foldCompare(expr, bop, right)
