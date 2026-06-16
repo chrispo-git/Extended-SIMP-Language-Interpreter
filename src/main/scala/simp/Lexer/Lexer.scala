@@ -55,8 +55,6 @@ class Lexer(source: String, sourceLines: List[String]):
         source.slice(pos, end)
     }
 
-    // Used to disambiguate '-' as a negative-literal prefix vs a binary subtraction operator.
-    // If the previous token could itself end an expression, '-' here is binary subtraction.
     private def canBeBinaryContext(): Boolean = tokens.lastOption match {
         case Some(Token.LiteralInt(_)) | Some(Token.LiteralFloat(_)) | Some(Token.StringLit(_)) |
              Some(Token.BoolLit(_)) | Some(Token.Variable(_)) | Some(Token.Null) |
