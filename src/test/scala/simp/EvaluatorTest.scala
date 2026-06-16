@@ -466,3 +466,299 @@ class EvaluatorTest extends AnyFunSuite:
       )
       assert(store.load("r") == Value.StrVal("Angèle"))
   }
+
+  // Const
+  test("const declaration") {
+    val store = run("const x := 5")
+    assert(store.load("x") == Value.IntVal(5))
+  }
+
+  test("const reassignment throws") {
+    assertThrows[RuntimeException](run("const x := 5; x := 10"))
+  }
+
+  test("const with expression") {
+    val store = run("const x := 2 + 3")
+    assert(store.load("x") == Value.IntVal(5))
+  }
+
+  test("const += throws") {
+    assertThrows[RuntimeException](run("const x := 5; x += 1"))
+  }
+
+  test("const shadowed in inner scope") {
+    val store = run(
+      "const x := 1; { const x := 2; }; y := !x"
+    )
+    assert(store.load("y") == Value.IntVal(1))
+  }
+
+  test("const inside if branch does not leak") {
+    val store = run(
+      "x := true; if !x then { const inner := 42; } else { skip }; x := 0"
+    )
+    assert(store.load("x") == Value.IntVal(0))
+    assertThrows[RuntimeException](store.load("inner"))
+  }
+
+  // Block Scoping
+  test("variable in inner scope does not leak") {
+    val store = run("{ inner := 5; }; x := 0")
+    assertThrows[RuntimeException](store.load("inner"))
+  }
+
+  test("outer variable mutated from inner scope") {
+    val store = run("x := 1; { x := 2; };")
+    assert(store.load("x") == Value.IntVal(2))
+  }
+
+  test("if branch does not leak variables") {
+    val store = run("x := true; if !x then { inner := 42; } else { skip };")
+    assertThrows[RuntimeException](store.load("inner"))
+  }
+
+  test("while body does not leak variables") {
+    val store = run("i := 0; while !i < 1 do { inner := 99; i += 1; };")
+    assertThrows[RuntimeException](store.load("inner"))
+  }
+
+  test("for body does not leak variables") {
+    val store = run("for n in [1,2,3] { inner := !n; };")
+    assertThrows[RuntimeException](store.load("inner"))
+  }
+
+  test("for loop variable does not leak") {
+    val store = run("for n in [1,2,3] { skip; };")
+    assertThrows[RuntimeException](store.load("n"))
+  }
+
+  test("for loop variable is const") {
+    assertThrows[RuntimeException](run("for n in [1,2,3] { n := 99; }"))
+  }
+
+  test("accumulator updated from for body") {
+    val store = run("total := 0; for n in [1,2,3,4,5] { total += !n; };")
+    assert(store.load("total") == Value.IntVal(15))
+  }
+
+  test("anonymous scope block") {
+    val store = run("x := 1; { x := 2; };")
+    assert(store.load("x") == Value.IntVal(2))
+  }
+
+  test("anonymous scope block variables don't leak") {
+    val store = run("{ y := 42; }; x := 0")
+    assertThrows[RuntimeException](store.load("y"))
+  }
+
+
+  // For Loops
+  test("for loop over array") {
+    val store = run("total := 0; for n in [1,2,3] { total += !n; };")
+    assert(store.load("total") == Value.IntVal(6))
+  }
+
+  test("for loop over string array") {
+    val store = run("result := \"\"; for s in [\"a\",\"b\",\"c\"] { result := !result + !s; };")
+    assert(store.load("result") == Value.StrVal("abc"))
+  }
+
+  test("for loop with break") {
+    val store = run("total := 0; for n in [1,2,3,4,5] { if !n == 3 then { break; } else { skip; }; total += !n; };")
+    assert(store.load("total") == Value.IntVal(3))
+  }
+
+  test("for loop with continue") {
+    val store = run("total := 0; for n in [1,2,3,4,5] { if !n == 3 then { continue; } else { skip; }; total += !n; };")
+    assert(store.load("total") == Value.IntVal(12))
+  }
+
+  test("for loop over empty array") {
+    val store = run("total := 0; for n in [] { total += 1; };")
+    assert(store.load("total") == Value.IntVal(0))
+  }
+
+  // Break / Continue
+  test("break exits while loop") {
+    val store = run("i := 0; while true do { if !i == 3 then { break; } else { skip; }; i += 1; };")
+    assert(store.load("i") == Value.IntVal(3))
+  }
+
+  test("continue skips rest of while body") {
+    val store = run(
+      "i := 0; total := 0; while !i < 5 do { i += 1; if !i == 3 then { continue; } else { skip; }; total += !i; };"
+    )
+    assert(store.load("total") == Value.IntVal(12))
+  }
+
+  // Impl Blocks
+  test("basic method call") {
+    val store = run(
+      """struct Point { x: Int, y: Int }
+        impl Point {
+            fn getX(self: Point) -> Int { return self.x; }
+        }
+        p := Point { x: 42, y: 0 };
+        r := p.getX();""".stripMargin
+    )
+    assert(store.load("r") == Value.IntVal(42))
+  }
+
+  test("method mutates struct field") {
+    val store = run(
+      """struct Point { x: Int, y: Int }
+        impl Point {
+            fn setX(self: Point, v: Int) -> Void { self.x := !v; }
+        }
+        p := Point { x: 0, y: 0 };
+        p.setX(99);
+        r := p.x;""".stripMargin
+    )
+    assert(store.load("r") == Value.IntVal(99))
+  }
+
+  test("method calling another method on self") {
+    val store = run(
+      """struct Counter { n: Int }
+        impl Counter {
+            fn get(self: Counter) -> Int { return self.n; }
+            fn doubled(self: Counter) -> Int { return self.get() * 2; }
+        }
+        c := Counter { n: 5 };
+        r := c.doubled();""".stripMargin
+    )
+    assert(store.load("r") == Value.IntVal(10))
+  }
+
+  test("polymorphic dispatch") {
+    val store = run(
+      """struct Cat {}
+        struct Dog {}
+        impl Cat { fn speak(self: Cat) -> Str { return "meow"; } }
+        impl Dog { fn speak(self: Dog) -> Str { return "woof"; } }
+        animals := [Cat {}, Dog {}, Cat {}];
+        result := "";
+        for a in animals { result := !result + a.speak(); };""".stripMargin
+    )
+    assert(store.load("result") == Value.StrVal("meowwoofmeow"))
+  }
+
+  test("method on result of another method") {
+    val store = run(
+      """struct Rect { w: Int, h: Int }
+        impl Rect {
+            fn area(self: Rect) -> Int { return self.w * self.h; }
+            fn scale(self: Rect, f: Int) -> Rect { return Rect { w: self.w * !f, h: self.h * !f }; }
+        }
+        r := Rect { w: 2, h: 3 };
+        x := r.scale(2).area();""".stripMargin
+    )
+    assert(store.load("x") == Value.IntVal(24))
+  }
+
+  test("unknown method throws") {
+    assertThrows[RuntimeException](run(
+      """struct Point { x: Int, y: Int }
+        p := Point { x: 1, y: 2 };
+        r := p.nonExistent();""".stripMargin
+    ))
+  }
+
+  test("method call on non-struct throws") {
+    assertThrows[RuntimeException](run(
+      "x := 5; r := x.toStr();"
+    ))
+  }
+
+  //Pattern Matching
+  test("match literal") {
+    val store = run("x := match 1 { case 1 => 42; case _ => 0; }")
+    assert(store.load("x") == Value.IntVal(42))
+  }
+
+  test("match wildcard") {
+    val store = run("x := match 5 { case 1 => 1; case _ => 99; }")
+    assert(store.load("x") == Value.IntVal(99))
+  }
+
+  test("match with variable binding") {
+    val store = run("x := match 7 { case n => !n * 2; }")
+    assert(store.load("x") == Value.IntVal(14))
+  }
+
+  test("match string") {
+    val store = run("""x := match "hello" { case "hello" => 1; case _ => 0; }""")
+    assert(store.load("x") == Value.IntVal(1))
+  }
+
+  test("match with guard") {
+    val store = run("x := match 5 { case n if !n > 3 => 1; case _ => 0; }")
+    assert(store.load("x") == Value.IntVal(1))
+  }
+
+  // Map Stuff
+  test("create and get from map") {
+    val store = run(
+      """m := newMap(Str, Int); _:= set(m, "key", 42); x := get(m, "key");""".stripMargin
+    )
+    assert(store.load("x") == Value.IntVal(42))
+  }
+
+  test("hasKey true") {
+    val store = run(
+      """m := newMap(Str, Int); _:= set(m, "key", 1); x := hasKey(m, "key");""".stripMargin
+    )
+    assert(store.load("x") == Value.BoolVal(true))
+  }
+
+  test("hasKey false") {
+    val store = run(
+      """m := newMap(Str, Int); x := hasKey(m, "missing");""".stripMargin
+    )
+    assert(store.load("x") == Value.BoolVal(false))
+  }
+
+  test("map remove") {
+    val store = run(
+      """m := newMap(Str, Int); _:= set(m, "key", 1); _:= remove(m, "key"); x := hasKey(m, "key");""".stripMargin
+    )
+    assert(store.load("x") == Value.BoolVal(false))
+  }
+  // 2D Array!
+
+  test("2D array read") {
+    val store = run(
+      "board := [[1,2,3],[4,5,6],[7,8,9]]; x := board[1][2];"
+    )
+    assert(store.load("x") == Value.IntVal(6))
+  }
+
+  test("2D array write") {
+    val store = run(
+      "board := [[1,2,3],[4,5,6]]; board[0][1] := 99; x := board[0][1];"
+    )
+    assert(store.load("x") == Value.IntVal(99))
+  }
+
+  test("2D array write does not affect other cells") {
+    val store = run(
+      "board := [[1,2,3],[4,5,6]]; board[0][1] := 99; x := board[1][1];"
+    )
+    assert(store.load("x") == Value.IntVal(5))
+  }
+
+  // Pears.
+  test("pair fst") {
+    val store = run("p := (1, 2); x := p.fst")
+    assert(store.load("x") == Value.IntVal(1))
+  }
+
+  test("pair snd") {
+    val store = run("p := (1, 2); x := p.snd")
+    assert(store.load("x") == Value.IntVal(2))
+  }
+
+  test("pair in array") {
+    val store = run("arr := [(1,2),(3,4)]; x := arr[1].fst")
+    assert(store.load("x") == Value.IntVal(3))
+  }
