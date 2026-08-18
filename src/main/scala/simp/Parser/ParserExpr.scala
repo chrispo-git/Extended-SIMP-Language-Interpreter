@@ -103,14 +103,13 @@ trait ParserExpr { self: Parser =>
     protected def parseExpr(): Expr = {
         var left = parseAddSub()
         while List(Token.BitAnd, Token.BitOr, Token.BitXor, Token.BitLeft, Token.BitRight, Token.BitRightFill).contains(peek()) do {
-            val op: Op  = peek() match {
+            val op: Op  = (peek(): @unchecked) match {
                 case Token.BitAnd => Op.BitAnd
                 case Token.BitOr => Op.BitOr
                 case Token.BitXor => Op.BitXor
                 case Token.BitLeft => Op.BitLeft
                 case Token.BitRight => Op.BitRight
                 case Token.BitRightFill => Op.BitRightFill
-                case _ => throwError("unreachable")
             }
             advance()
             val right = parseAddSub()
@@ -129,10 +128,9 @@ trait ParserExpr { self: Parser =>
     protected def parseAddSub(): Expr = {
         var left = parseTerm()
         while List(Token.Add, Token.Sub).contains(peek()) do {
-            val op: Op = peek() match {
+            val op: Op = (peek(): @unchecked) match {
                 case Token.Add => Op.Add
                 case Token.Sub => Op.Sub
-                case _ => throwError("unreachable")
             }
             advance()
             val right = parseTerm()
@@ -143,11 +141,10 @@ trait ParserExpr { self: Parser =>
     protected def parseTerm(): Expr = {
         var left = parsePostfix(parseAtomicExpr())
         while List(Token.Mul, Token.Div, Token.Mod).contains(peek()) do {
-            val op: Op = peek() match {
+            val op: Op = (peek(): @unchecked) match {
                 case Token.Mul => Op.Mul
                 case Token.Div => Op.Div
                 case Token.Mod => Op.Mod
-                case _ => throwError("unreachable")
             }
             advance()
             val right = parsePostfix(parseAtomicExpr())
@@ -282,13 +279,6 @@ trait ParserExpr { self: Parser =>
                         val right = parseExpr()
                         expect(Token.CloseBracket)
                         Expr.Pair(left, right)
-                    }
-                    case Token.Gt | Token.Lt | Token.Gte | Token.Lte | Token.Eq | Token.Neq => {
-                        expect(Token.CloseBracket);
-                        val bop = parseBoolOp(peek())
-                        advance()
-                        val right = parseExpr()
-                        Expr.BoolLift(foldCompare(left, bop, right))
                     }
                     case _ => {expect(Token.CloseBracket); left}
                 }

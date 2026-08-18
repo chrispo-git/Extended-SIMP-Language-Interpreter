@@ -5,8 +5,6 @@ class Store(val parent: Option[Store] = None):
     private val memory = scala.collection.mutable.Map[String, Value]()
     private val consts = scala.collection.mutable.Set[String]()
 
-    private def hasLocal(name: String): Boolean = memory.contains(name)
-    private def isLocalConst(name: String): Boolean = consts.contains(name)
     private def setLocal(name: String, value: Value): Unit = memory(name) = value
     private def getLocal(name: String): Value = memory(name)
 

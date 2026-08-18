@@ -81,17 +81,13 @@ trait EvaluatorFunctions { self: Evaluator =>
                 case _ => {
                     val value = evalExpr(arg, callerStore)
                     checkType(value, expectedType, name)
-                    try {
-                        localStore.store(name, value)
-                    } catch case e : RuntimeException => {
-                        throwError(s"${e.getMessage}")
-                    }
+                    localStore.store(name, value)
                 }
             }
         })
         localStore
     }
-    
+
 
     protected def populateStoreFromValues(params: List[(String, SimpType)], argVals: List[Value], callerStore: Store): Store = {
         if params.length != argVals.length then
@@ -104,11 +100,7 @@ trait EvaluatorFunctions { self: Evaluator =>
                     throwError(s"Method parameter '$name' cannot be a reference type")
                 case _ => {
                     checkType(value, expectedType, name)
-                    try {
-                        localStore.store(name, value)
-                    } catch case e : RuntimeException => {
-                        throwError(s"${e.getMessage}")
-                    }
+                    localStore.store(name, value)
                 }
             }
         })

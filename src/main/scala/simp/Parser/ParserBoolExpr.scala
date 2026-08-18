@@ -7,10 +7,9 @@ trait ParserBoolExpr { self: Parser =>
             val op = peek()
             advance()
             val right = parseExpr()
-            left = op match {
+            left = (op: @unchecked) match {
                 case Token.And => Expr.BoolLift(BoolExpr.And(makeFromExpr(left), makeFromExpr(right)))
                 case Token.Or  => Expr.BoolLift(BoolExpr.Or(makeFromExpr(left), makeFromExpr(right)))
-                case _ => throwError("unreachable")
             }
         }
         left
@@ -25,10 +24,9 @@ trait ParserBoolExpr { self: Parser =>
             val op = peek()
             advance()
             val right = parseAtomicBool()
-            left = op match {
+            left = (op: @unchecked) match {
                 case Token.And => BoolExpr.And(left, right)
                 case Token.Or => BoolExpr.Or(left, right)
-                case _ => throwError("unreachable")
             }
         }
         left
@@ -56,11 +54,7 @@ trait ParserBoolExpr { self: Parser =>
                 val left = Expr.Bool(b)
                 peek() match {
                     case Token.Eq | Token.Neq => {
-                        val bop = peek() match {
-                            case Token.Eq  => Bop.Eq
-                            case Token.Neq => Bop.Neq
-                            case x => throwError(s"Expected boolean operator, got '${x}'")
-                        }
+                        val bop = parseBoolOp(peek())
                         advance()
                         val right = parseExpr()
                         foldCompare(left, bop, right)
@@ -75,15 +69,7 @@ trait ParserBoolExpr { self: Parser =>
             }
             case Token.Deref | Token.LiteralInt(_) | Token.LiteralFloat(_) |  Token.StringLit(_)  => {
                 val left = parseExpr()
-                peek() match {
-                    case Token.Gt | Token.Lt | Token.Gte | Token.Lte | Token.Eq | Token.Neq => {
-                        val bop = parseBoolOp(peek())
-                        advance()
-                        val right = parseExpr()
-                        foldCompare(left, bop, right)
-                    }
-                    case _ => makeFromExpr(left)
-                }
+                makeFromExpr(left)
             }
             case Token.OpenBracket => {
                 advance()

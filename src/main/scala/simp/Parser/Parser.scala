@@ -19,11 +19,7 @@ class Parser(protected val tokens: List[Token], protected val structEnv : Struct
 
     protected def peekNext(): Token = if pos+1 >= tokens.length then Token.EOF else tokens(pos+1)
 
-    protected def peekN(n: Int): Token = if pos+n >= tokens.length then Token.EOF else tokens(pos+n)
-
     protected def advance(): Token = if isAtEnd() then Token.EOF else {val t = tokens(pos);pos+=1;t}
-
-    protected def advanceTo(n: Int): Token = if isAtEnd() then Token.EOF else {val t = tokens(pos);pos+=n;t} 
 
     protected def expect(expected: Token): Unit = {
         if peek() != expected then throwError(s"Expected '$expected', got '${peek()}'")

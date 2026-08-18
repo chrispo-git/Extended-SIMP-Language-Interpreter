@@ -13,14 +13,7 @@ trait ParserRepl { self: Parser =>
                 case Token.BoolLit(_) | Token.Not => Program.PBool(parseBool())
                 case  Token.LiteralFloat(_) |Token.LiteralInt(_) | Token.Deref | Token.BitComplement =>
                     val expr = parseExpr()
-                    peek() match {
-                        case Token.Gt | Token.Lt | Token.Gte | Token.Lte | Token.Eq | Token.Neq =>
-                            val bop = parseBoolOp(peek())
-                            advance()
-                            val right = parseExpr()
-                            Program.PBool(foldCompare(expr, bop, right))
-                        case _ => Program.PExpr(expr)
-                    }
+                    Program.PExpr(expr)
                 case Token.Variable(_) if peekNext() == Token.OpenBracket => Program.PExpr(parseExpr())
                 case Token.Variable(_) if peekNext() == Token.OpenSquare => {
                     val savedPos = pos
