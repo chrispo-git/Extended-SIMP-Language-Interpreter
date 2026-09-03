@@ -8,7 +8,7 @@ class EvaluatorTest extends AnyFunSuite:
     val store = Store()
     val fnEnv = FunctionEnv()
     val structEnv = StructEnv()
-    Builtins.register(fnEnv)
+    Builtins.register(fnEnv, structEnv)
     val sourceLines = source.split('\n').toList
     val tokens = Lexer(source, sourceLines).tokenise()
     val program = Parser(tokens._1, StructEnv(), tokens._2, sourceLines).parseProgram()
@@ -22,8 +22,8 @@ class EvaluatorTest extends AnyFunSuite:
   // syntax (e.g. ref parameters, since the Lexer never emits Token.Ref).
   def directEval(programs: List[Program], store: Store = Store()): Store = {
     val fnEnv = FunctionEnv()
-    Builtins.register(fnEnv)
     val structEnv = StructEnv()
+    Builtins.register(fnEnv, structEnv)
     Evaluator(fnEnv, structEnv, List("")).evalProgram(programs, store)
     store
   }
@@ -1506,44 +1506,44 @@ class EvaluatorTest extends AnyFunSuite:
   // ==== SimpUtils.getPrettyPrint ====
 
   test("SimpUtils.getPrettyPrint for primitives") {
-    assert(SimpUtils.getPrettyPrint(Value.StrVal("hi")) == "hi")
-    assert(SimpUtils.getPrettyPrint(Value.IntVal(5)) == "5")
-    assert(SimpUtils.getPrettyPrint(Value.FloatVal(1.5)) == "1.5")
-    assert(SimpUtils.getPrettyPrint(Value.BoolVal(true)) == "true")
-    assert(SimpUtils.getPrettyPrint(Value.NullVal) == "null")
+    assert(SimpUtils.getPrettyPrint(Value.StrVal("hi"), structEnv) == "hi")
+    assert(SimpUtils.getPrettyPrint(Value.IntVal(5), structEnv) == "5")
+    assert(SimpUtils.getPrettyPrint(Value.FloatVal(1.5), structEnv) == "1.5")
+    assert(SimpUtils.getPrettyPrint(Value.BoolVal(true), structEnv) == "true")
+    assert(SimpUtils.getPrettyPrint(Value.NullVal, structEnv) == "null")
   }
 
   test("SimpUtils.getPrettyPrint for ref") {
     val store = Store()
-    assert(SimpUtils.getPrettyPrint(Value.RefVal("x", store)) == "Ref(x)")
+    assert(SimpUtils.getPrettyPrint(Value.RefVal("x", store), structEnv) == "Ref(x)")
   }
 
   test("SimpUtils.getPrettyPrint for map") {
-    assert(SimpUtils.getPrettyPrint(Value.MapVal(scala.collection.mutable.Map(), SimpType.TypeString, SimpType.TypeInt)) == "Map(Str -> Int)")
+    assert(SimpUtils.getPrettyPrint(Value.MapVal(scala.collection.mutable.Map(), SimpType.TypeString, SimpType.TypeInt), structEnv) == "Map(Str -> Int)")
   }
 
   test("SimpUtils.getPrettyPrint for type value") {
-    assert(SimpUtils.getPrettyPrint(Value.TypeVal(SimpType.TypeInt)) == "Type.Int")
+    assert(SimpUtils.getPrettyPrint(Value.TypeVal(SimpType.TypeInt), structEnv) == "Type.Int")
   }
 
   test("SimpUtils.getPrettyPrint for pair") {
-    assert(SimpUtils.getPrettyPrint(Value.PairVal(Value.IntVal(1), Value.IntVal(2))) == "(1, 2)")
+    assert(SimpUtils.getPrettyPrint(Value.PairVal(Value.IntVal(1), Value.IntVal(2)), structEnv) == "(1, 2)")
   }
 
   test("SimpUtils.getPrettyPrint for struct") {
     val fields = scala.collection.mutable.Map[String, Value]("x" -> Value.IntVal(1))
-    assert(SimpUtils.getPrettyPrint(Value.StructVal("Point", fields)) == "Point { x: 1 }")
+    assert(SimpUtils.getPrettyPrint(Value.StructVal("Point", fields), structEnv) == "Point { x: 1 }")
   }
 
   test("SimpUtils.getPrettyPrint for cyclic struct does not infinite loop") {
     val fields = scala.collection.mutable.Map[String, Value]()
     val selfVal = Value.StructVal("Node", fields)
     fields("next") = selfVal
-    assert(SimpUtils.getPrettyPrint(selfVal) == "Node { next: Node { ... } }")
+    assert(SimpUtils.getPrettyPrint(selfVal, structEnv) == "Node { next: Node { ... } }")
   }
 
   test("SimpUtils.getPrettyPrint for array") {
-    assert(SimpUtils.getPrettyPrint(Value.ArrVal(scala.collection.mutable.ArrayBuffer(Value.IntVal(1), Value.IntVal(2)))) == "[1, 2]")
+    assert(SimpUtils.getPrettyPrint(Value.ArrVal(scala.collection.mutable.ArrayBuffer(Value.IntVal(1), Value.IntVal(2))), structEnv) == "[1, 2]")
   }
 
   // ==== SimpUtils.deepCopyValue ====
@@ -2133,8 +2133,8 @@ class EvaluatorTest extends AnyFunSuite:
   def runWithCwd(source: String, cwd: String): Store = {
     val store = Store()
     val fnEnv = FunctionEnv()
-    Builtins.register(fnEnv)
     val structEnv = StructEnv()
+    Builtins.register(fnEnv, structEnv)
     val sourceLines = source.split('\n').toList
     val tokens = Lexer(source, sourceLines).tokenise()
     val program = Parser(tokens._1, structEnv, tokens._2, sourceLines).parseProgram()
@@ -2155,8 +2155,9 @@ class EvaluatorTest extends AnyFunSuite:
     val lib = new java.io.File(dir, "shapes.simp")
     java.nio.file.Files.writeString(lib.toPath, "struct Point { x: Int, y: Int }")
     val store = Store()
-    val fnEnv = FunctionEnv(); Builtins.register(fnEnv)
+    val fnEnv = FunctionEnv()
     val structEnv = StructEnv()
+    Builtins.register(fnEnv, structEnv)
     val source = """import "shapes.simp" as shapes;"""
     val sourceLines = source.split('\n').toList
     val tokens = Lexer(source, sourceLines).tokenise()
@@ -2233,16 +2234,18 @@ class EvaluatorTest extends AnyFunSuite:
 
   test("runSource: successfully evaluates a program") {
     val store = Store()
-    val fnEnv = FunctionEnv(); Builtins.register(fnEnv)
+    val fnEnv = FunctionEnv()
     val structEnv = StructEnv()
+    Builtins.register(fnEnv, structEnv)
     runSource("x := 5;", store, fnEnv, structEnv)
     assert(store.load("x") == Value.IntVal(5))
   }
 
   test("runSource: catches a RuntimeException instead of propagating it") {
     val store = Store()
-    val fnEnv = FunctionEnv(); Builtins.register(fnEnv)
+    val fnEnv = FunctionEnv() 
     val structEnv = StructEnv()
+    Builtins.register(fnEnv, structEnv)
     runSource("x := 5 / 0;", store, fnEnv, structEnv)
     assertThrows[RuntimeException](store.load("x"))
   }

@@ -217,7 +217,7 @@ trait EvaluatorCmd { self: Evaluator =>
             case Cmd.For(variable, iterable, body, line) => execFor(variable, iterable, body, line, store)
             case Cmd.Print(value, line) => {
                 pos = line
-                println(getPrettyPrint(evalExpr(value, store)))
+                println(getPrettyPrint(evalExpr(value, store), structEnv))
             }
             case Cmd.Return(None, line) => {
                 pos = line

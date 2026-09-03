@@ -27,7 +27,7 @@ object SimpUtils:
                 case v => SimpType.TypeArr(getType(v))
             }
     }
-    def getPrettyPrint(value: Value, visited: Set[AnyRef] = Set()): String = {
+    def getPrettyPrint(value: Value, structEnv: StructEnv, visited: Set[AnyRef] = Set()): String = {
         value match {
             case Value.StrVal(s) => s
             case Value.IntVal(n) => n.toString
@@ -37,16 +37,20 @@ object SimpUtils:
             case Value.RefVal(name,_) => s"Ref($name)"
             case Value.MapVal(_, keyType, valueType) => s"Map(${getSimpTypeName(keyType)} -> ${getSimpTypeName(valueType)})"
             case Value.TypeVal(t) => s"Type.${getSimpTypeName(t)}"
-            case Value.PairVal(fst, snd) => s"(${getPrettyPrint(fst)}, ${getPrettyPrint(snd)})"
+            case Value.PairVal(fst, snd) => s"(${getPrettyPrint(fst, structEnv)}, ${getPrettyPrint(snd, structEnv)})"
             case Value.StructVal(typeName, fields) => {
                 if visited.contains(fields) then {
                     s"$typeName { ... }"
                 } else {
                     val newVisited = visited + fields
-                    s"$typeName { ${fields.map((k,v) => s"$k: ${getPrettyPrint(v, newVisited)}").mkString(", ")} }"
+                    s"$typeName { ${fields.map { (k, v) =>
+                    val isPriv = structEnv.lookup(typeName).fields.find(_(0) == k).exists(_(3))
+                    if (isPriv) s"$k: ???"
+                    else s"$k: ${getPrettyPrint(v, structEnv, newVisited)}"
+                    }.mkString(", ")} }"
                 }
             }
-            case Value.ArrVal(elements) => "[" + elements.map(v => getPrettyPrint(v, visited)).mkString(", ") + "]"
+            case Value.ArrVal(elements) => "[" + elements.map(v => getPrettyPrint(v, structEnv, visited)).mkString(", ") + "]"
         }
     }
     def deepCopyValue(value: Value, visited: Set[AnyRef] = Set()): Value = value match {

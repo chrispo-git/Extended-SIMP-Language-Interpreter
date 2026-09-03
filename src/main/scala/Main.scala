@@ -133,8 +133,8 @@ def startRepl(store: Store, fnEnv: FunctionEnv, structEnv: StructEnv): Unit = {
 @main def run(args: String*): Unit = {
     val store = Store()
     val fnEnv = FunctionEnv()
-    Builtins.register(fnEnv)
     val structEnv = StructEnv()
+    Builtins.register(fnEnv, structEnv)
     if args.isEmpty then {
         startRepl(store, fnEnv, structEnv)
     } else {

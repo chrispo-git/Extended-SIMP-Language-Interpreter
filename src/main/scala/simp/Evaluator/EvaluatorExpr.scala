@@ -166,7 +166,7 @@ trait EvaluatorExpr { self: Evaluator =>
             case (Value.FloatVal(left), Value.FloatVal(right)) => evalBinarySingleNormal(left, op, right)
             case (Value.StrVal(left),right) => {
                 op match {
-                    case Op.Add => Value.StrVal(left + getPrettyPrint(right))
+                    case Op.Add => Value.StrVal(left + getPrettyPrint(right, structEnv))
                     case x => throwError(s"Unsupported operation '$x'")
                 }
             }

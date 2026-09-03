@@ -42,7 +42,7 @@ class Evaluator(protected val fnEnv: FunctionEnv, protected val structEnv: Struc
             case Program.PDecl(Decl.ImportDecl(path, alias)) => processImport(path, alias, cwd, store)
             case Program.PDecl(Decl.StructDecl(name, fields)) => structEnv.register(name, StructDef(fields))
             case Program.PCmd(cmd) => execCmd(cmd, store)
-            case Program.PExpr(expr) => println(getPrettyPrint(evalExpr(expr, store)))
+            case Program.PExpr(expr) => println(getPrettyPrint(evalExpr(expr, store), structEnv))
             case Program.PBool(b) => println(evalBool(b, store))
             case Program.PImpl(structName, methods) => methods.foreach(m => fnEnv.methodTable((structName, m.name)) = m)
         })

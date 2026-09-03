@@ -18,7 +18,7 @@ object Builtins:
         gameTerminal.enterRawMode()
         gameTerminal.reader()
     }
-    def register(fnEnv: FunctionEnv): Unit = {
+    def register(fnEnv: FunctionEnv, structEnv: StructEnv): Unit = {
 
         
         // len - Length of a String or Array
@@ -129,7 +129,7 @@ object Builtins:
 
         // toStr - Converts a value into a String
         fnEnv.registerBuiltin("toStr", args => args match {
-                case List(x) => Value.StrVal(getPrettyPrint(x))
+                case List(x) => Value.StrVal(getPrettyPrint(x, structEnv))
                 case _ => throw RuntimeException("toStr expects 1 argument")
             }
         )
