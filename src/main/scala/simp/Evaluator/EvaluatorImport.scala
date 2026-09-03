@@ -26,13 +26,13 @@ trait EvaluatorImport { self: Evaluator =>
 
 
         val declaredNames = program.collect {
-            case Program.PDecl(Decl.FnDecl(name, _, _, _)) => name
+            case Program.PDecl(Decl.FnDecl(name, _, _, _, _)) => name
         }.toSet
 
         program.foreach(p => p match {
-            case Program.PDecl(Decl.FnDecl(name, params, body, returnType)) => {
+            case Program.PDecl(Decl.FnDecl(name, params, body, returnType, isPrivate)) => {
                 val qualifiedBody = qualifyBody(body, alias, declaredNames)
-                fnEnv.registerFn(s"$alias::$name", Decl.FnDecl(s"$alias::$name", params, qualifiedBody, returnType))
+                fnEnv.registerFn(s"$alias::$name", Decl.FnDecl(s"$alias::$name", params, qualifiedBody, returnType, isPrivate))
             }
             case Program.PDecl(Decl.ImportDecl(path, alias)) => {
                 val importDir = File(fullPath).getParentFile.getAbsolutePath

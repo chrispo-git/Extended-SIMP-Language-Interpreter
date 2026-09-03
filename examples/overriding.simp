@@ -1,5 +1,5 @@
 struct IntWrapper {
-    priv value: Int
+    private value: Int
 }
 impl IntWrapper {
     fn unwrap(self: IntWrapper) -> Int {
@@ -43,4 +43,3 @@ c := !a + !b;
 print !c;
 print !a > !b;
 print !b > !a;
-print a.value;

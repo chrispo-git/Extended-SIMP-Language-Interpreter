@@ -284,14 +284,37 @@ Field mutation through `self` (e.g. `self.x := ...`) works the same as
 any struct passed to a function, structs are reference types, so 
 mutations are visible to the caller.
 
-#### Private Fields
+#### Private Fields & Methods
 
-Structs can have their fields set as private, meaning they are only able to be accessed by their methods
+Structs can have their fields set as private, meaning they are only able to be accessed by their implemented methods
 ```
-struct Point {priv x: Int, y: Int }
+struct Point {private x: Int, y: Int }
 
 myPoint := Point{x: 1, y: 2};
 print myPoint.x; //Error!
+```
+
+Structs with implementations can also have private methods, only able to be accessed by other implemented methods
+```
+struct Point {
+    private x: Int,
+    private y: Int
+}
+impl Point {
+    fn private squareX(self: Point) -> Int {
+        return self.x * self.x;
+    }
+    fn private squareY(self: Point) -> Int {
+        return self.y * self.y;
+    }
+    fn squareAdd(self: Point) -> Int {
+        return self.squareX() + self.squareY();
+    }
+}
+
+myPoint := Point {x : 2, y : 4};
+print myPoint.squareAdd;
+print myPoint.squareY; //Error!
 ```
 
 #### Polymorphism

@@ -53,6 +53,10 @@ trait ParserDecl { self: Parser =>
     protected def parseDecl(): Decl = peek() match {
         case Token.Fn => {
             advance()
+            val isPrivate = peek() match {
+                case Token.Priv => {advance(); true}
+                case _ => false
+            };
             peek() match {
                 case Token.Variable(name) => {
                     advance()
@@ -66,7 +70,7 @@ trait ParserDecl { self: Parser =>
                     val body = parseCmd()
                     //println(s"parseDecl: fn $name body done, peek=${peek()}")
                     expect(Token.CloseBrace)
-                    Decl.FnDecl(name, params, body, returnType)
+                    Decl.FnDecl(name, params, body, returnType, isPrivate)
                 }
                 case x => throwError(s"Expected function name, got '$x'")
             }

@@ -1,0 +1,17 @@
+struct Point {
+    private x: Int,
+    private y: Int
+}
+impl Point {
+    fn private squareX(self: Point) -> Int {
+        return self.x * self.x;
+    }
+    fn private squareY(self: Point) -> Int {
+        return self.y * self.y;
+    }
+    fn squareAdd(self: Point) -> Int {
+        return self.squareX() + self.squareY();
+    }
+}
+
+p := Point {x : 2, y : 4};

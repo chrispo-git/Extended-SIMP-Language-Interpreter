@@ -218,6 +218,7 @@ trait EvaluatorExpr { self: Evaluator =>
             (typeName, methodName),
             throwError(s"No method '$methodName' found for struct '$typeName'")
         )
+        checkMethodPrivacy(typeName, methodName)
         implContextStack = typeName :: implContextStack
         try {
             callFunctionWithValues(methodName, fnDecl, argVals, store)

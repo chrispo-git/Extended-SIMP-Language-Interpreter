@@ -26,10 +26,19 @@ class Evaluator(protected val fnEnv: FunctionEnv, protected val structEnv: Struc
             }
         }
     }
+    protected def checkMethodPrivacy(typeName: String, methodName: String): Unit = {
+        val method = fnEnv.methodTable.getOrElse(
+            (typeName, methodName),
+            throwError(s"No method '$methodName' found for struct '$typeName'")
+        );
+        if !implContextStack.headOption.contains(typeName) && method.isPrivate then {
+            throwError(s"Method '$methodName' is private to struct '$typeName'")
+        }
+    }
 
     def evalProgram(program: List[Program], store: Store): Unit = {
         program.foreach(p => p match {
-            case Program.PDecl(Decl.FnDecl(name, params, body, returnType)) => fnEnv.registerFn(name, Decl.FnDecl(name, params, body, returnType))
+            case Program.PDecl(Decl.FnDecl(name, params, body, returnType, isPrivate)) => fnEnv.registerFn(name, Decl.FnDecl(name, params, body, returnType, isPrivate))
             case Program.PDecl(Decl.ImportDecl(path, alias)) => processImport(path, alias, cwd, store)
             case Program.PDecl(Decl.StructDecl(name, fields)) => structEnv.register(name, StructDef(fields))
             case Program.PCmd(cmd) => execCmd(cmd, store)
