@@ -105,7 +105,7 @@ enum Program:
 
 enum Decl:
   case FnDecl(name: String, params: List[(String, SimpType)], body: Cmd, returnType: SimpType)
-  case StructDecl(name: String, fields: List[(String, SimpType, Option[Expr])])
+  case StructDecl(name: String, fields: List[(String, SimpType, Option[Expr], Boolean)])
   case ImportDecl(path: String, alias: String)
 
 enum SimpType:

@@ -296,6 +296,8 @@ class Lexer(source: String, sourceLines: List[String]):
 
             case x if isWordMatch("impl") => { advanceUntilNextWord(); Token.Impl }
 
+            case x if isWordMatch("priv") => { advanceUntilNextWord(); Token.Priv }
+
 
             case x if isWordMatch("print") => {advanceUntilNextWord(); Token.Print}
 

@@ -34,7 +34,8 @@ trait EvaluatorExpr { self: Evaluator =>
                 value match {
                     case Value.StructVal(vTypeName, fields) if vTypeName == typeName => {
                         val bindings = scala.collection.mutable.Map[String, Value]()
-                        val allMatch = fieldPats.forall((fieldName, fieldPat) =>
+                        val allMatch = fieldPats.forall((fieldName, fieldPat) => {
+                            checkFieldPrivacy(vTypeName, fieldName)
                             fields.get(fieldName) match {
                                 case None => false
                                 case Some(fieldVal) =>
@@ -43,7 +44,7 @@ trait EvaluatorExpr { self: Evaluator =>
                                         case Some(b) => bindings ++= b; true
                                     }
                             }
-                        )
+                        })
                         if allMatch then Some(bindings.toMap) else None
                     }
                     case _ => None
@@ -184,7 +185,7 @@ trait EvaluatorExpr { self: Evaluator =>
     protected def evalStructLiteral(typeName: String, fields: List[(String, Expr)], store: Store): Value = {
         val defn = structEnv.lookup(typeName)
         val fieldMap = scala.collection.mutable.Map[String, Value]()
-        defn.fields.foreach((name, expectedType, default) => {
+        defn.fields.foreach((name, expectedType, default, isPriv) => {
             val fieldExpr = fields.find(_._1 == name)
             val value = fieldExpr match {
                 case Some((_, expr)) => evalExpr(expr, store)
@@ -205,7 +206,8 @@ trait EvaluatorExpr { self: Evaluator =>
                 case "snd" => snd
                 case _ => throwError(s"Pairs only have 'fst' and 'snd' fields")
             }
-            case Value.StructVal(_, fields) => {
+            case Value.StructVal(typeName, fields) => {
+                checkFieldPrivacy(typeName, field)
                 fields.getOrElse(field, throwError(s"Unknown field '$field'"))
             }
             case _ => throwError("Field access on non-struct or pair value")
@@ -216,7 +218,12 @@ trait EvaluatorExpr { self: Evaluator =>
             (typeName, methodName),
             throwError(s"No method '$methodName' found for struct '$typeName'")
         )
-        callFunctionWithValues(methodName, fnDecl, argVals, store)
+        implContextStack = typeName :: implContextStack
+        try {
+            callFunctionWithValues(methodName, fnDecl, argVals, store)
+        } finally {
+            implContextStack = implContextStack.tail
+        }
     }
     protected def evalMethodCall(receiver: Expr, methodName: String, args: List[Expr], store: Store): Value = {
         val receiverVal = evalExpr(receiver, store)

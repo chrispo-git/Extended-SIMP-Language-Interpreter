@@ -324,13 +324,13 @@ class ParserTest extends AnyFunSuite:
   // Structs
   test("parse struct declaration") {
       assert(parse("struct Point { x: Int, y: Int }") == List(Program.PDecl(
-          Decl.StructDecl("Point", List(("x", SimpType.TypeInt, None), ("y", SimpType.TypeInt, None)))
+          Decl.StructDecl("Point", List(("x", SimpType.TypeInt, None, false), ("y", SimpType.TypeInt, None, false)))
       )))
   }
 
   test("parse struct literal") {
       assert(parse("struct Point { x: Int, y: Int }; p := Point { x: 1, y: 2 }") == List(Program.PDecl(
-          Decl.StructDecl("Point", List(("x", SimpType.TypeInt, None), ("y", SimpType.TypeInt, None)))
+          Decl.StructDecl("Point", List(("x", SimpType.TypeInt, None, false), ("y", SimpType.TypeInt, None, false)))
       ),Program.PCmd(
           Cmd.Assign("p", Expr.StructLiteral("Point", List(("x", Expr.Num(1)), ("y", Expr.Num(2)))),1)
       )))
@@ -431,7 +431,7 @@ class ParserTest extends AnyFunSuite:
             fn toStr(self: Point) -> Str { return "point" }
         }""".stripMargin
     ) == List(
-      Program.PDecl(Decl.StructDecl("Point", List(("x", SimpType.TypeInt, None), ("y", SimpType.TypeInt, None)))),
+      Program.PDecl(Decl.StructDecl("Point", List(("x", SimpType.TypeInt, None, false), ("y", SimpType.TypeInt, None, false)))),
       Program.PImpl("Point", List(
         Decl.FnDecl("toStr",
           List(("self", SimpType.TypeStruct("Point"))),
@@ -552,7 +552,7 @@ class ParserTest extends AnyFunSuite:
     // Namespaced structs are only registered in structEnv once an import has
     // been evaluated, so simulate that post-import state directly.
     val structEnv = StructEnv()
-    structEnv.register("shapes::Point", StructDef(List(("x", SimpType.TypeInt, None), ("y", SimpType.TypeInt, None))))
+    structEnv.register("shapes::Point", StructDef(List(("x", SimpType.TypeInt, None, false), ("y", SimpType.TypeInt, None, false))))
     val source = "x := shapes::Point { x: 1, y: 2 }"
     val sourceLines = source.split('\n').toList
     val tokens = Lexer(source, sourceLines).tokenise()

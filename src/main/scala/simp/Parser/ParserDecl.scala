@@ -1,7 +1,11 @@
 package simp
 
 trait ParserDecl { self: Parser =>
-    protected def parseStructField(): (String, SimpType, Option[Expr]) = {
+    protected def parseStructField(): (String, SimpType, Option[Expr], Boolean) = {
+        val isPrivate = peek() match {
+            case Token.Priv => {advance(); true}
+            case _ => false
+        };
         peek() match {
             case Token.Variable(name) => {
                 advance()
@@ -11,7 +15,7 @@ trait ParserDecl { self: Parser =>
                     advance()
                     Some(parseExpr())
                 } else None
-                (name, t, default)
+                (name, t, default, isPrivate)
             }
             case x => throwError(s"Expected field name, got '$x'")
         }
@@ -30,13 +34,13 @@ trait ParserDecl { self: Parser =>
             i += 1
         }
     }
-    protected def parseStructFields(): List[(String, SimpType, Option[Expr])] = {
+    protected def parseStructFields(): List[(String, SimpType, Option[Expr], Boolean)] = {
         expect(Token.OpenBrace)
         if peek() == Token.CloseBrace then {
             advance()
             List()
         } else {
-            val params = scala.collection.mutable.ListBuffer[(String, SimpType, Option[Expr])]()
+            val params = scala.collection.mutable.ListBuffer[(String, SimpType, Option[Expr], Boolean)]()
             params += parseStructField()
             while peek() == Token.Comma do {
                 advance()

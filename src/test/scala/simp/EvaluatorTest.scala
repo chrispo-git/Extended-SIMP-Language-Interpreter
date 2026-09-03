@@ -681,6 +681,139 @@ class EvaluatorTest extends AnyFunSuite:
     ))
   }
 
+  // Private Fields
+  test("private field readable from own impl") {
+    val store = run(
+      """struct Point { x: Int, priv y: Int }
+        impl Point {
+            fn getY(self: Point) -> Int { return self.y; }
+        }
+        p := Point { x: 1, y: 2 };
+        r := p.getY();""".stripMargin
+    )
+    assert(store.load("r") == Value.IntVal(2))
+  }
+
+  test("private field read from outside impl throws") {
+    assertThrows[RuntimeException](run(
+      """struct Point { x: Int, priv y: Int }
+        p := Point { x: 1, y: 2 };
+        r := p.y;""".stripMargin
+    ))
+  }
+
+  test("public field still readable from outside impl") {
+    val store = run(
+      """struct Point { x: Int, priv y: Int }
+        p := Point { x: 1, y: 2 };
+        r := p.x;""".stripMargin
+    )
+    assert(store.load("r") == Value.IntVal(1))
+  }
+
+  test("private field writable via method on own impl") {
+    val store = run(
+      """struct Point { x: Int, priv y: Int }
+        impl Point {
+            fn setY(self: Point, v: Int) -> Void { self.y := !v; }
+            fn getY(self: Point) -> Int { return self.y; }
+        }
+        p := Point { x: 0, y: 0 };
+        p.setY(9);
+        r := p.getY();""".stripMargin
+    )
+    assert(store.load("r") == Value.IntVal(9))
+  }
+
+  test("private field assignment from outside impl throws") {
+    assertThrows[RuntimeException](run(
+      """struct Point { x: Int, priv y: Int }
+        p := Point { x: 0, y: 0 };
+        p.y := 5;""".stripMargin
+    ))
+  }
+
+  test("private array field index assignment from outside impl throws") {
+    assertThrows[RuntimeException](run(
+      """struct Bag { priv items: Int[] }
+        b := Bag { items: [1, 2, 3] };
+        b.items[0] := 9;""".stripMargin
+    ))
+  }
+
+  test("private array field index assignment from own impl succeeds") {
+    val store = run(
+      """struct Bag { priv items: Int[] }
+        impl Bag {
+            fn setFirst(self: Bag, v: Int) -> Void { self.items[0] := !v; }
+            fn first(self: Bag) -> Int { return self.items[0]; }
+        }
+        b := Bag { items: [1, 2, 3] };
+        b.setFirst(9);
+        r := b.first();""".stripMargin
+    )
+    assert(store.load("r") == Value.IntVal(9))
+  }
+
+  test("private field inaccessible from a different struct's impl") {
+    assertThrows[RuntimeException](run(
+      """struct Point { priv y: Int }
+        struct Other {}
+        impl Other {
+            fn peek(self: Other, p: Point) -> Int { return p.y; }
+        }
+        p := Point { y: 1 };
+        o := Other {};
+        r := o.peek(p);""".stripMargin
+    ))
+  }
+
+  test("private field with default can be omitted from outside impl") {
+    val store = run(
+      """struct Point { x: Int, priv y: Int := 7 }
+        impl Point { fn getY(self: Point) -> Int { return self.y; } }
+        p := Point { x: 1 };
+        r := p.getY();""".stripMargin
+    )
+    assert(store.load("r") == Value.IntVal(7))
+  }
+
+  test("private field settable via struct literal from own impl") {
+    val store = run(
+      """struct Point { x: Int, priv y: Int := 0 }
+        impl Point {
+            fn withY(self: Point, newY: Int) -> Point { return Point { x: self.x, y: !newY }; }
+            fn getY(self: Point) -> Int { return self.y; }
+        }
+        p := Point { x: 1 };
+        p2 := p.withY(2);
+        r := p2.getY();""".stripMargin
+    )
+    assert(store.load("r") == Value.IntVal(2))
+  }
+
+  test("private field destructuring in match from outside impl throws") {
+    assertThrows[RuntimeException](run(
+      """struct Point { priv y: Int }
+        p := Point { y: 1 };
+        r := match p { case Point { y: v } => v; };""".stripMargin
+    ))
+  }
+
+  test("private field destructuring in match from own impl succeeds") {
+    val store = run(
+      """struct Point { priv y: Int }
+        impl Point {
+            fn getY(self: Point) -> Int {
+                return match self { case Point { y: v } => v; };
+            }
+        }
+        p := Point { y: 4 };
+        r := p.getY();""".stripMargin
+    )
+    assert(store.load("r") == Value.IntVal(4))
+  }
+
   //Pattern Matching
   test("match literal") {
     val store = run("x := match 1 { case 1 => 42; case _ => 0; }")
@@ -1153,7 +1286,7 @@ class EvaluatorTest extends AnyFunSuite:
 
   test("method parameter cannot be a reference type") {
     assertThrows[RuntimeException](directEval(List(
-      Program.PDecl(Decl.StructDecl("Point", List(("x", SimpType.TypeInt, None)))),
+      Program.PDecl(Decl.StructDecl("Point", List(("x", SimpType.TypeInt, None, false)))),
       Program.PImpl("Point", List(Decl.FnDecl(
         "bad",
         List(("self", SimpType.TypeStruct("Point")), ("r", SimpType.TypeRef(SimpType.TypeInt))),
@@ -1267,7 +1400,7 @@ class EvaluatorTest extends AnyFunSuite:
     val se = StructEnv()
     se.preRegister("Point")
     assert(se.exists("Point"))
-    se.register("Point", StructDef(List(("x", SimpType.TypeInt, None))))
+    se.register("Point", StructDef(List(("x", SimpType.TypeInt, None, false))))
     assert(se.lookup("Point").fields.length == 1)
   }
 

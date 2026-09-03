@@ -13,8 +13,19 @@ class Evaluator(protected val fnEnv: FunctionEnv, protected val structEnv: Struc
 
 
     protected var pos: Int = 0
+    protected var implContextStack: List[String] = Nil
 
     protected def currentLine(): Int = pos
+
+    protected def checkFieldPrivacy(typeName: String, field: String): Unit = {
+        structEnv.lookup(typeName).fields.find(_._1 == field).foreach {
+            case (_, _, _, isPrivate) => {
+                if isPrivate && !implContextStack.headOption.contains(typeName) then {
+                    throwError(s"Field '$field' is private to struct '$typeName'")
+                }
+            }
+        }
+    }
 
     def evalProgram(program: List[Program], store: Store): Unit = {
         program.foreach(p => p match {

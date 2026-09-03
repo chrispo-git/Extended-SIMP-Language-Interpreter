@@ -284,6 +284,16 @@ Field mutation through `self` (e.g. `self.x := ...`) works the same as
 any struct passed to a function, structs are reference types, so 
 mutations are visible to the caller.
 
+#### Private Fields
+
+Structs can have their fields set as private, meaning they are only able to be accessed by their methods
+```
+struct Point { x: Int, y: Int }
+
+myPoint := Point{x: 1, y: 2};
+print myPoint.x; //Error!
+```
+
 #### Polymorphism
 
 Dispatch is based on each value's *runtime* struct type. If two 

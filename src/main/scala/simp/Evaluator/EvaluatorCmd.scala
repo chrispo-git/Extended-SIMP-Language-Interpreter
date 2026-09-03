@@ -39,6 +39,7 @@ trait EvaluatorCmd { self: Evaluator =>
                     val expectedType = defn.fields.find(_._1 == field).getOrElse(
                         throwError(s"Unknown field '$field'")
                     )._2
+                    checkFieldPrivacy(typeName, field)
                     val value = evalExpr(valueExpr, store)
                     checkType(value, expectedType, field)
                     fields(field) = value
@@ -53,7 +54,8 @@ trait EvaluatorCmd { self: Evaluator =>
         pos = line
         try {
             store.load(loc) match {
-                case Value.StructVal(_, fields) => {
+                case Value.StructVal(typeName, fields) => {
+                    checkFieldPrivacy(typeName, field)
                     fields.get(field) match {
                         case Some(Value.ArrVal(elements)) => {
                             val idx = evalExpr(index, store) match {
@@ -170,7 +172,7 @@ trait EvaluatorCmd { self: Evaluator =>
         val v = evalExpr(value, store)
         try {
             val struct = store.load(loc) match {
-                case Value.StructVal(_, fields) => fields
+                case Value.StructVal(typeName, fields) => { checkFieldPrivacy(typeName, field); fields }
                 case _ => throwError(s"[Error] '$loc' is not a struct")
             }
             var current = struct(field) match {

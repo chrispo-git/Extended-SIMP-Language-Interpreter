@@ -101,3 +101,5 @@ enum Token:
     case Const
 
     case Impl
+
+    case Priv

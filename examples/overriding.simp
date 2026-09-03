@@ -1,15 +1,39 @@
 struct IntWrapper {
-    value: Int
+    priv value: Int
 }
 impl IntWrapper {
+    fn unwrap(self: IntWrapper) -> Int {
+        return self.value;
+    }
     fn _add(self: IntWrapper, other: IntWrapper) -> IntWrapper {
-        return IntWrapper { value: self.value + other.value };
+        return IntWrapper { value: self.value + other.unwrap() };
     }
     fn _sub(self: IntWrapper, other: IntWrapper) -> IntWrapper {
-        return IntWrapper { value: self.value - other.value };
+        return IntWrapper { value: self.value - other.unwrap() };
+    }
+    fn _div(self: IntWrapper, other: IntWrapper) -> IntWrapper {
+        return IntWrapper { value: self.value - other.unwrap() };
+    }
+    fn _mod(self: IntWrapper, other: IntWrapper) -> IntWrapper {
+        return IntWrapper { value: self.value % other.unwrap() };
     }
     fn _gt(self: IntWrapper, other: IntWrapper) -> Bool {
-        return self.value > other.value;
+        return self.value > other.unwrap();
+    }
+    fn _gte(self: IntWrapper, other: IntWrapper) -> Bool {
+        return self.value >= other.unwrap();
+    }
+    fn _lt(self: IntWrapper, other: IntWrapper) -> Bool {
+        return self.value < other.unwrap();
+    }
+    fn _lte(self: IntWrapper, other: IntWrapper) -> Bool {
+        return self.value <= other.unwrap();
+    }
+    fn _eq(self: IntWrapper, other: IntWrapper) -> Bool {
+        return self.value == other.unwrap();
+    }
+    fn _neq(self: IntWrapper, other: IntWrapper) -> Bool {
+        return self.value != other.unwrap();
     }
 }
 
@@ -19,3 +43,4 @@ c := !a + !b;
 print !c;
 print !a > !b;
 print !b > !a;
+print a.value;
