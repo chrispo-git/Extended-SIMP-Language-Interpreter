@@ -288,7 +288,7 @@ mutations are visible to the caller.
 
 Structs can have their fields set as private, meaning they are only able to be accessed by their methods
 ```
-struct Point { x: Int, y: Int }
+struct Point {priv x: Int, y: Int }
 
 myPoint := Point{x: 1, y: 2};
 print myPoint.x; //Error!
