@@ -28,9 +28,8 @@ Expressions produce a value in 6 categories:
 | `Map(K, V)` | `newMap(Str, Int)`, `newMap(Int, Bool)` |
 | `(T, U)` | `(1, "hello")`, `(true, 3.14)` |
 
-Pairs are immutable two-element tuples. Elements are accessed with `.fst` and `.snd`.
-Maps are key-value stores with typed keys and values. They are created with `newMap(KeyType, ValueType)` 
-and manipulated exclusively through built-in functions. See [Built-in Functions](BUILT-IN-FUNCTIONS.md).
+Pairs are immutable two-element tuples. Elements are accessed with `.fst` and `.snd`. Maps are key-value stores with typed keys and values. They are created with `newMap(KeyType, ValueType)` and manipulated exclusively through built-in functions. See [Built-in Functions](BUILT-IN-FUNCTIONS.md).
+
 ---
 
 ### Declarations
@@ -305,6 +304,42 @@ for a in animals {
 ExtSimp doesn't support inheritance, each struct's `impl` block is 
 independent. Shared behaviour across types is achieved by giving each 
 type its own implementation of the same method names, shown above.
+
+#### Overriding Operators
+
+Structs can also override operators to implement their own methods for the operator:
+```
+struct IntWrapper {
+    value: Int
+}
+impl IntWrapper {
+    fn _add(self: IntWrapper, other: IntWrapper) -> IntWrapper {
+        return IntWrapper { value: self.value + other.value };
+    }
+    fn _sub(self: IntWrapper, other: IntWrapper) -> IntWrapper {
+        return IntWrapper { value: self.value - other.value };
+    }
+    fn _gt(self: IntWrapper, other: IntWrapper) -> Bool {
+        return self.value > other.value;
+    }
+}
+```
+The list of overridable operators is provided below:
+| Operator | Function Signature |
+|------------|-----------|
+| + | `fn _add(self: T, other: T) -> X`|
+| - | `fn _sub(self: T, other: T) -> X`|
+| * | `fn _mul(self: T, other: T) -> X`|
+| / | `fn _div(self: T, other: T) -> X`|
+| % | `fn _mod(self: T, other: T) -> X`|
+| > | `fn _gt(self: T, other: T) -> Bool`|
+| >= | `fn _gte(self: T, other: T) -> Bool`|
+| < | `fn _lt(self: T, other: T) -> Bool`|
+| <= | `fn _lte(self: T, other: T) -> Bool`|
+| == | `fn _eq(self: T, other: T) -> Bool`|
+| != | `fn _neq(self: T, other: T) -> Bool`|
+
+(Where T is the struct's type and X is any type)
 
 ### Syntactic Sugar
 These constructs don't appear in the AST, but are desugared by the parser.

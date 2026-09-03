@@ -169,7 +169,7 @@ trait EvaluatorExpr { self: Evaluator =>
                     case x => throwError(s"Unsupported operation '$x'")
                 }
             }
-            case (Value.StructVal(t1, fieldL), Value.StructVal(t2, fieldR)) if t1==t2 => {
+            case (Value.StructVal(t1, fieldL), Value.StructVal(t2, fieldR)) if t1==t2 => op match {
                 case Op.Add => callMethod(t1, "_add", List(Value.StructVal(t1, fieldL), Value.StructVal(t2, fieldR)), store)
                 case Op.Sub => callMethod(t1, "_sub", List(Value.StructVal(t1, fieldL), Value.StructVal(t2, fieldR)), store)
                 case Op.Mul => callMethod(t1, "_mul", List(Value.StructVal(t1, fieldL), Value.StructVal(t2, fieldR)), store)

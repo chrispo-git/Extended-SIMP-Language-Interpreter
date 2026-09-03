@@ -51,12 +51,42 @@ trait EvaluatorBoolExpr { self: Evaluator =>
             }
             case (Value.StructVal(t1, f1), Value.StructVal(t2, f2)) if t1 == t2 => {
                 bop match {
-                    case Bop.Gt => callMethod(t1, "_gt", List(Value.StructVal(t1, f1), Value.StructVal(t2, f2)), store)
-                    case Bop.Gte => callMethod(t1, "_gte", List(Value.StructVal(t1, f1), Value.StructVal(t2, f2)), store)
-                    case Bop.Lt => callMethod(t1, "_lt", List(Value.StructVal(t1, f1), Value.StructVal(t2, f2)), store)
-                    case Bop.Lte => callMethod(t1, "_lte", List(Value.StructVal(t1, f1), Value.StructVal(t2, f2)), store)
-                    case Bop.Eq if fnEnv.methodTable.contains((t1, "_eq")) => callMethod(t1, "_eq", List(Value.StructVal(t1, f1), Value.StructVal(t2, f2)), store)
-                    case Bop.Neq if fnEnv.methodTable.contains((t1, "_neq")) => callMethod(t1, "_neq", List(Value.StructVal(t1, f1), Value.StructVal(t2, f2)), store)
+                    case Bop.Gt => {
+                        callMethod(t1, "_gt", List(Value.StructVal(t1, f1), Value.StructVal(t2, f2)), store)  match {
+                            case Value.BoolVal(b) => b
+                            case x => throwError(s"Incorrect return type for method '_gt'")
+                        }
+                    }
+                    case Bop.Gte => {
+                        callMethod(t1, "_gte", List(Value.StructVal(t1, f1), Value.StructVal(t2, f2)), store)  match {
+                            case Value.BoolVal(b) => b
+                            case x => throwError(s"Incorrect return type for method '_gte'")
+                        }
+                    }
+                    case Bop.Lt => {
+                        callMethod(t1, "_lt", List(Value.StructVal(t1, f1), Value.StructVal(t2, f2)), store)  match {
+                            case Value.BoolVal(b) => b
+                            case x => throwError(s"Incorrect return type for method '_lt'")
+                        }
+                    }
+                    case Bop.Lte => {
+                        callMethod(t1, "_lte", List(Value.StructVal(t1, f1), Value.StructVal(t2, f2)), store)  match {
+                            case Value.BoolVal(b) => b
+                            case x => throwError(s"Incorrect return type for method '_lte'")
+                        }
+                    }
+                    case Bop.Eq if fnEnv.methodTable.contains((t1, "_eq")) => {
+                        callMethod(t1, "_eq", List(Value.StructVal(t1, f1), Value.StructVal(t2, f2)), store)  match {
+                            case Value.BoolVal(b) => b
+                            case x => throwError(s"Incorrect return type for method '_eq'")
+                        }
+                    }
+                    case Bop.Neq if fnEnv.methodTable.contains((t1, "_neq")) => {
+                        callMethod(t1, "_neq", List(Value.StructVal(t1, f1), Value.StructVal(t2, f2)), store)  match {
+                            case Value.BoolVal(b) => b
+                            case x => throwError(s"Incorrect return type for method '_neq'")
+                        }
+                    }
                     case Bop.Eq => t1 == t2 && structsEqual(f1, f2)
                     case Bop.Neq => t1 != t2 || !structsEqual(f1, f2)
                     case x => throwError(s"Unsupported operation '$x'")

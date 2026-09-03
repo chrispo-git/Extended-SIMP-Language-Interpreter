@@ -1,0 +1,21 @@
+struct IntWrapper {
+    value: Int
+}
+impl IntWrapper {
+    fn _add(self: IntWrapper, other: IntWrapper) -> IntWrapper {
+        return IntWrapper { value: self.value + other.value };
+    }
+    fn _sub(self: IntWrapper, other: IntWrapper) -> IntWrapper {
+        return IntWrapper { value: self.value - other.value };
+    }
+    fn _gt(self: IntWrapper, other: IntWrapper) -> Bool {
+        return self.value > other.value;
+    }
+}
+
+a := IntWrapper {value: 1};
+b := IntWrapper {value: 2};
+c := !a + !b;
+print !c;
+print !a > !b;
+print !b > !a;
