@@ -138,6 +138,9 @@ trait EvaluatorExpr { self: Evaluator =>
             case x => throwError(s"Unsupported operation '$x'")
         }
     }
+    val opMethodName: Map[Op, String] = Map(
+        Op.Add -> "add", Op.Sub -> "sub", Op.Mul -> "mul", Op.Div -> "div", Op.Mod -> "mod"
+    )
     protected def evalBinaryOp(l: Expr, op: Op, r: Expr, store: Store): Value = {
         (evalExpr(l, store), evalExpr(r, store)) match {
             case (Value.IntVal(left), Value.IntVal(right)) => {
@@ -166,6 +169,15 @@ trait EvaluatorExpr { self: Evaluator =>
                     case x => throwError(s"Unsupported operation '$x'")
                 }
             }
+            case (Value.StructVal(t1, fieldL), Value.StructVal(t2, fieldR)) if t1==t2 => {
+                case Op.Add => callMethod(t1, "_add", List(Value.StructVal(t1, fieldL), Value.StructVal(t2, fieldR)), store)
+                case Op.Sub => callMethod(t1, "_sub", List(Value.StructVal(t1, fieldL), Value.StructVal(t2, fieldR)), store)
+                case Op.Mul => callMethod(t1, "_mul", List(Value.StructVal(t1, fieldL), Value.StructVal(t2, fieldR)), store)
+                case Op.Mod => callMethod(t1, "_mod", List(Value.StructVal(t1, fieldL), Value.StructVal(t2, fieldR)), store)
+                case Op.Div => callMethod(t1, "_div", List(Value.StructVal(t1, fieldL), Value.StructVal(t2, fieldR)), store)
+                case x => throwError(s"Unsupported operation '$x'") 
+            }
+            
             case _ => throwError(s"Type mismatch in binary operation")
         }
     }
@@ -199,15 +211,21 @@ trait EvaluatorExpr { self: Evaluator =>
             case _ => throwError("Field access on non-struct or pair value")
         }
     }
+    protected def callMethod(typeName: String, methodName: String, argVals: List[Value], store: Store): Value = {
+        val fnDecl = fnEnv.methodTable.getOrElse(
+            (typeName, methodName),
+            throwError(s"No method '$methodName' found for struct '$typeName'")
+        )
+        callFunctionWithValues(methodName, fnDecl, argVals, store)
+    }
     protected def evalMethodCall(receiver: Expr, methodName: String, args: List[Expr], store: Store): Value = {
         val receiverVal = evalExpr(receiver, store)
         val typeName = receiverVal match {
             case Value.StructVal(name, _) => name
             case _ => throwError(s"Can't call method '$methodName' on a non-struct value")
         }
-        val fnDecl = fnEnv.methodTable.getOrElse((typeName, methodName), throwError(s"No method '$methodName' found for struct '$typeName'"))
         val argVals = receiverVal :: args.map(evalExpr(_, store))
-        callFunctionWithValues(methodName, fnDecl, argVals, store)
+        callMethod(typeName, methodName, argVals, store)
     }
     protected def evalFnCall(name: String, args: List[Expr], store: Store): Value = {
         val evaluatedArgs = args.map(evalExpr(_, store))
