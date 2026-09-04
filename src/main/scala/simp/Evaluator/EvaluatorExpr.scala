@@ -75,8 +75,7 @@ trait EvaluatorExpr { self: Evaluator =>
                     arm.guard match {
                         case None => true
                         case Some(guard) => {
-                            val guardStore = Store()
-                            store.entries().foreach((k,v) => guardStore.store(k,v))
+                            val guardStore = store.child()
                             bindings.foreach((k,v) => guardStore.store(k,v))
                             evalBool(BoolExpr.FromExpr(guard), guardStore)
                         }
@@ -88,8 +87,7 @@ trait EvaluatorExpr { self: Evaluator =>
         matched match {
             case None => throwError("No matching pattern found, pattern non-exhaustive!")
             case Some(arm) => {
-                val matchStore = Store()
-                store.entries().foreach((k, v) => matchStore.store(k, v))
+                val matchStore = store.child()
                 matchPattern(arm.pattern, value, store).get.foreach((k, v) => matchStore.store(k, v))
                 evalExpr(arm.body, matchStore)
             }

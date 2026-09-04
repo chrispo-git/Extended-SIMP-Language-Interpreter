@@ -257,15 +257,18 @@ trait ParserExpr { self: Parser =>
                 val cmds = scala.collection.mutable.ListBuffer[Cmd]()
                 while peek() != Token.CloseBrace do {
                     val savedPos = pos
-                    val cmd = parseSingleCmd()
-                    if peek() == Token.Semicolon then {
-                        advance()
-                        cmds += cmd
-                    } else {
-                        pos = savedPos
-                        val result = parseExpr()
-                        expect(Token.CloseBrace)
-                        return Expr.Block(cmds.toList, result)
+                    val cmdAttempt = try Some(parseSingleCmd()) catch { case _: RuntimeException => None }
+                    cmdAttempt match {
+                        case Some(cmd) if peek() == Token.Semicolon => {
+                            advance()
+                            cmds += cmd
+                        }
+                        case _ => {
+                            pos = savedPos
+                            val result = parseExpr()
+                            expect(Token.CloseBrace)
+                            return Expr.Block(cmds.toList, result)
+                        }
                     }
                 }
                 throwError("Block expression must end with a value expression")
