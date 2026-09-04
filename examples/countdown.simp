@@ -1,8 +1,227 @@
-x := 10;
-print "Countdown Time!";
-print 10;
-while !x > 0 do {
-    x := !x - 1; 
-    print !x;
+struct IntStack {
+    private stack: Int[] := []
+}
+impl IntStack {
+    fn push(self: IntStack, v: Int) -> Void {
+        _:= push(self.stack, v);
+    }
+    fn peek(self: IntStack) -> Int {
+        if isEmpty(self.stack) then {
+            return -1;
+        } else {
+            return back(self.stack);
+        }
+    }
+    fn pop(self: IntStack) -> Int {
+        if isEmpty(self.stack) then {
+            return -1;
+        } else {
+            return pop(self.stack);
+        }
+    }
+}
+fn evaluatePolish(expr : Str) -> Int {
+    exprSplit := split(expr, " ");
+    stack := IntStack{};
+    validOperators := ["+", "-", "/", "*"];
+    for i in exprSplit {
+        isOperator := false;
+        for op in validOperators {
+            if (!i == !op) then {
+                isOperator := true;
+                break;
+            }
+        };
+        if (¬!isOperator) then {
+            stack.push(toInt(!i));
+        } else {
+            _:= match i {
+                case "+" => {
+                    a := stack.pop();
+                    b := stack.pop();
+                    stack.push(!b+!a);
+                    null
+                };
+                case "-" => {
+                    a := stack.pop();
+                    b := stack.pop();
+                    stack.push(!b-!a);
+                    null
+                };
+                case "*" => {
+                    a := stack.pop();
+                    b := stack.pop();
+                    stack.push(!b*!a);
+                    null
+                };
+                case "/" => {
+                    a := stack.pop();
+                    b := stack.pop();
+                    stack.push(!b/!a);
+                    null
+                };
+                case _ => null;
+            };
+        };
+    };
+    return stack.peek();
+}
+fn getAllPermutations(nums : Int[]) -> Int[][] {
+    permutations : Int[][];
+    _:= recursivePermutations(permutations, nums, 0);
+    return !permutations;
+} 
+fn recursivePermutations(permutations : Int[][], nums : Int[], index : Int) -> Void {
+    if (!index == len(nums)) then {
+        _:= push(permutations, deepCopy(nums));
+        return;
+    };
+    for i in range(!index, len(nums)) {
+        temp := nums[!index];
+        nums[!index] := nums[!i];
+        nums[!i] := !temp;
+
+        _:= recursivePermutations(permutations, nums, !index + 1);
+
+        temp := nums[!index];
+        nums[!index] := nums[!i];
+        nums[!i] := !temp;
+    };
+}
+fn getAllOperationPermutations(operationCount : Int) -> Str[] {
+    permutations : Str[];
+    operatorList : Str[];
+    for i in range(0, !operationCount) {
+        _:= push(operatorList, "+");
+    };
+    _:= recursiveOperationPermutations(permutations, operatorList, 0);
+    return !permutations;
+}
+fn getCachedOperationPermutations(cacheKeys : Int[], cacheVals : Str[][], operationCount : Int) -> Str[] {
+    for i in range(0, len(cacheKeys)) {
+        if (cacheKeys[i] == !operationCount) then {
+            return cacheVals[i];
+        };
+    };
+    permutations := getAllOperationPermutations(!operationCount);
+    _:= push(cacheKeys, !operationCount);
+    _:= push(cacheVals, permutations);
+    return !permutations;
+}
+fn strListToStr(strList : Str[]) -> Str {
+    out := "";
+    for c in strList {
+        out += !c;
+    };
+    return !out;
+}
+fn recursiveOperationPermutations(permutationList : Str[], opList : Str[], index : Int) -> Void {
+    if (!index == len(opList)) then {
+        _:= push(permutationList, strListToStr(opList));
+        return;
+    };
+    opList[!index] := "+";
+    _:= recursiveOperationPermutations(permutationList, opList, !index + 1);
+    opList[!index] := "-";
+    _:= recursiveOperationPermutations(permutationList, opList, !index + 1);
+    opList[!index] := "/";
+    _:= recursiveOperationPermutations(permutationList, opList, !index + 1);
+    opList[!index] := "*";
+    _:= recursiveOperationPermutations(permutationList, opList, !index + 1);
+    opList[!index] := "+";
+}
+
+fn solveCountdownProblem(nums : Int[], target : Int) -> Str {
+    opCacheKeys : Int[];
+    opCacheVals : Str[][];
+    bestSolution := "";
+    bestDiff := 9999 * abs(!target) + 9999;
+    // Cheapest subsets first: a size-k subset costs O(k! * 4^(k-1)) evaluations,
+    // so trying small subsets before the full list avoids the expensive
+    // exhaustive search whenever a smaller subset already hits the target.
+    for size in range(1, len(nums) + 1) {
+        for i in range(0, len(nums) - size + 1) {
+            numTest := slice(nums, i, i + size);
+            testSolution := solveCountdownGivenNumList(numTest, target, opCacheKeys, opCacheVals);
+            result := evaluatePolish(testSolution);
+            if (!result == !target) then {
+                return !testSolution;
+            };
+
+            diff := !result - !target;
+            if (!diff < 0) then {
+                diff *= -1;
+            };
+            if (!diff < !bestDiff) then {
+                bestSolution := deepCopy(testSolution);
+                bestDiff := !diff;
+            };
+        };
+    };
+    return !bestSolution;
+}
+fn solveCountdownGivenNumList(nums : Int[], target : Int, opCacheKeys : Int[], opCacheVals : Str[][]) -> Str {
+    numberPermutations := getAllPermutations(nums);
+    operationPermutations := getCachedOperationPermutations(opCacheKeys, opCacheVals, len(nums) - 1);
+
+    closestPermutation : Str;
+    closestValue := 9999*!target;
+    bullseye := false;
+    for currPermutation in numberPermutations {
+        if (!bullseye) then {
+            break;
+        };
+        for currOperators in operationPermutations {
+            perm := deepCopy(currPermutation);
+            ops := toArr(!currOperators);
+            currentExpr := "";
+            currentExpr += toStr(perm[len(perm) - 1]);
+            currentExpr += " ";
+            perm := slice(perm, 0, len(perm) - 1);
+
+            while len(perm) > 0 && len(ops) > 0 do {
+                currentExpr += toStr(perm[len(perm) - 1]);
+                currentExpr += " ";
+                perm := slice(perm, 0, len(perm) - 1);
+
+                currentExpr += ops[len(ops) - 1];
+                ops := slice(ops, 0, len(ops) - 1);
+                currentExpr += " ";
+            };
+            if (len(ops) > 0) then {
+                currentExpr += ops[len(ops) - 1];
+                ops := slice(ops, 0, len(ops) - 1);
+            };
+
+            endVal := evaluatePolish(!currentExpr);
+            if (!endVal >= 0) then {
+                diff := !endVal - !target;
+                if (!diff < 0) then {
+                    diff *= -1;
+                };
+                if (!diff < !closestValue) then {
+                    closestPermutation := !currentExpr;
+                    closestValue := !endVal;
+                };
+                if (!diff == 0) then {
+                    closestPermutation := !currentExpr;
+                    closestValue := !endVal;
+                    bullseye := true;
+                    break;
+                };
+            };
+        };
+    };
+    return substr(!closestPermutation, 0, len(!closestPermutation) - 1);
+}
+
+// Test Code
+for _ in range(0,6) {
+    pool := [random(1,40), random(1,40), random(1,40), random(1,40)];
+    print "Countdown numbers game: " + !pool;
+    for _ in range(0,6) {
+        target := random(0,300);
+        answer := solveCountdownProblem(!pool, !target);
+        print "Target: " + !target + ", Got: " + evaluatePolish(answer);
+    };
 };
-print "Lift off!";
