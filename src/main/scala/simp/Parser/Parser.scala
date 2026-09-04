@@ -39,7 +39,7 @@ class Parser(protected val tokens: List[Token], protected val structEnv : Struct
         val items = scala.collection.mutable.ListBuffer[Program]()
         while !isAtEnd() && peek() != Token.EOF do {
             peek() match {
-                case Token.Fn  | Token.Struct | Token.Import => items += Program.PDecl(parseDecl())
+                case Token.Fn  | Token.Struct | Token.Locked | Token.Import => items += Program.PDecl(parseDecl())
                 case Token.Impl => {
                     items += parseImpl()
                 }

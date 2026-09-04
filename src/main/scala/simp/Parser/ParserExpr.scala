@@ -223,6 +223,10 @@ trait ParserExpr { self: Parser =>
                 expect(Token.CloseBrace)
                 Expr.StructLiteral(name, fields)
             }
+            case Token.Variable(name) if peekNext() == Token.Dot && structEnv.exists(name) => {
+                advance()
+                Expr.TypeLiteral(SimpType.TypeStruct(name))
+            }
             case Token.Null => { advance(); Expr.Null }
             case Token.Deref => {
                 advance()

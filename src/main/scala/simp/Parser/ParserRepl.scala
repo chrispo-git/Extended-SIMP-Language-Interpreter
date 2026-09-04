@@ -6,7 +6,7 @@ trait ParserRepl { self: Parser =>
 
         while !isAtEnd() && peek() != Token.EOF do {
             val item = peek() match {
-                case Token.Fn |  Token.Struct | Token.Import  => Program.PDecl(parseDecl())
+                case Token.Fn |  Token.Struct | Token.Locked | Token.Import  => Program.PDecl(parseDecl())
                 case Token.Impl => {
                     parseImpl()
                 }

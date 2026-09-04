@@ -50,13 +50,30 @@ trait ParserDecl { self: Parser =>
             params.toList
         }
     }
+    protected def parseStructDecl(isLocked: Boolean): Decl = {
+        advance()
+        peek() match {
+            case Token.Variable(name) => {
+                advance()
+                val fields = parseStructFields()
+                Decl.StructDecl(name, fields, isLocked)
+            }
+            case x => throwError(s"Expected struct name, got '$x'")
+        }
+    }
     protected def parseDecl(): Decl = peek() match {
         case Token.Fn => {
             advance()
-            val isPrivate = peek() match {
-                case Token.Priv => {advance(); true}
-                case _ => false
-            };
+            var isPrivate = false
+            var isStatic = false
+            var parsingModifiers = true
+            while parsingModifiers do {
+                peek() match {
+                    case Token.Priv => { advance(); isPrivate = true }
+                    case Token.Static => { advance(); isStatic = true }
+                    case _ => parsingModifiers = false
+                }
+            }
             peek() match {
                 case Token.Variable(name) => {
                     advance()
@@ -70,20 +87,17 @@ trait ParserDecl { self: Parser =>
                     val body = parseCmd()
                     //println(s"parseDecl: fn $name body done, peek=${peek()}")
                     expect(Token.CloseBrace)
-                    Decl.FnDecl(name, params, body, returnType, isPrivate)
+                    Decl.FnDecl(name, params, body, returnType, isPrivate, isStatic)
                 }
                 case x => throwError(s"Expected function name, got '$x'")
             }
         }
-        case Token.Struct => {
+        case Token.Struct => parseStructDecl(isLocked = false)
+        case Token.Locked => {
             advance()
             peek() match {
-                case Token.Variable(name) => {
-                    advance()
-                    val fields = parseStructFields()
-                    Decl.StructDecl(name, fields)
-                }
-                case x => throwError(s"Expected struct name, got '$x'")
+                case Token.Struct => parseStructDecl(isLocked = true)
+                case x => throwError(s"Expected 'struct' after 'locked', got '$x'")
             }
         }
         case Token.Import => {

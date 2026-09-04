@@ -298,6 +298,10 @@ class Lexer(source: String, sourceLines: List[String]):
 
             case x if isWordMatch("private") => { advanceUntilNextWord(); Token.Priv }
 
+            case x if isWordMatch("static") => { advanceUntilNextWord(); Token.Static }
+
+            case x if isWordMatch("locked") => { advanceUntilNextWord(); Token.Locked }
+
 
             case x if isWordMatch("print") => {advanceUntilNextWord(); Token.Print}
 

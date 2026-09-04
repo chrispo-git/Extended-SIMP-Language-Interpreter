@@ -3,7 +3,7 @@ package simp
 trait ParserCmd { self: Parser =>
     protected def parseCmd(): Cmd = {
         val left = peek() match {
-            case Token.Fn |  Token.Struct | Token.Import => return Cmd.Skip
+            case Token.Fn |  Token.Struct | Token.Locked | Token.Import => return Cmd.Skip
             case _ => parseSingleCmd()
         }
         if peek() == Token.Semicolon then {
@@ -65,7 +65,8 @@ trait ParserCmd { self: Parser =>
                     case Token.OpenSquare => parseFieldIndexAssign(l, field)
                     case Token.OpenBracket => {
                         val args = parseArgs()
-                        val expr = parsePostfix(Expr.MethodCall(Expr.Ref(l), field, args))
+                        val receiver = if structEnv.exists(l) then Expr.TypeLiteral(SimpType.TypeStruct(l)) else Expr.Ref(l)
+                        val expr = parsePostfix(Expr.MethodCall(receiver, field, args))
                         Cmd.Assign("_", expr, currentLine())
                     }
                     case _ => parseFieldAssign(l, field)

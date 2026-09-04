@@ -18,4 +18,4 @@ class StructEnv:
         structs.clear()
     }
 
-case class StructDef(fields: List[(String, SimpType, Option[Expr], Boolean)])
+case class StructDef(fields: List[(String, SimpType, Option[Expr], Boolean)], isLocked: Boolean = false)

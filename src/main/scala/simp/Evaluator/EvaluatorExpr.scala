@@ -181,6 +181,7 @@ trait EvaluatorExpr { self: Evaluator =>
         }
     }
     protected def evalStructLiteral(typeName: String, fields: List[(String, Expr)], store: Store): Value = {
+        checkStructLock(typeName)
         val defn = structEnv.lookup(typeName)
         val fieldMap = scala.collection.mutable.Map[String, Value]()
         defn.fields.foreach((name, expectedType, default, isPriv) => {
@@ -216,6 +217,25 @@ trait EvaluatorExpr { self: Evaluator =>
             (typeName, methodName),
             throwError(s"No method '$methodName' found for struct '$typeName'")
         )
+        if fnDecl.isStatic then {
+            throwError(s"Method '$methodName' is static and must be called as '$typeName.$methodName(...)', not on an instance")
+        }
+        checkMethodPrivacy(typeName, methodName)
+        implContextStack = typeName :: implContextStack
+        try {
+            callFunctionWithValues(methodName, fnDecl, argVals, store)
+        } finally {
+            implContextStack = implContextStack.tail
+        }
+    }
+    protected def callStaticMethod(typeName: String, methodName: String, argVals: List[Value], store: Store): Value = {
+        val fnDecl = fnEnv.methodTable.getOrElse(
+            (typeName, methodName),
+            throwError(s"No method '$methodName' found for struct '$typeName'")
+        )
+        if !fnDecl.isStatic then {
+            throwError(s"Method '$methodName' is not static; it must be called on an instance of '$typeName'")
+        }
         checkMethodPrivacy(typeName, methodName)
         implContextStack = typeName :: implContextStack
         try {
@@ -226,12 +246,17 @@ trait EvaluatorExpr { self: Evaluator =>
     }
     protected def evalMethodCall(receiver: Expr, methodName: String, args: List[Expr], store: Store): Value = {
         val receiverVal = evalExpr(receiver, store)
-        val typeName = receiverVal match {
-            case Value.StructVal(name, _) => name
+        receiverVal match {
+            case Value.TypeVal(SimpType.TypeStruct(typeName)) => {
+                val argVals = args.map(evalExpr(_, store))
+                callStaticMethod(typeName, methodName, argVals, store)
+            }
+            case Value.StructVal(typeName, _) => {
+                val argVals = receiverVal :: args.map(evalExpr(_, store))
+                callMethod(typeName, methodName, argVals, store)
+            }
             case _ => throwError(s"Can't call method '$methodName' on a non-struct value")
         }
-        val argVals = receiverVal :: args.map(evalExpr(_, store))
-        callMethod(typeName, methodName, argVals, store)
     }
     protected def evalFnCall(name: String, args: List[Expr], store: Store): Value = {
         val evaluatedArgs = args.map(evalExpr(_, store))

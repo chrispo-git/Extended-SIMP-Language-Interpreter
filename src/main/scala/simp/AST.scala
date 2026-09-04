@@ -121,8 +121,8 @@ enum Program:
     case PBool(boolExpr: BoolExpr)
 
 enum Decl:
-  case FnDecl(name: String, params: List[(String, SimpType)], body: Cmd, returnType: SimpType, isPrivate: Boolean)
-  case StructDecl(name: String, fields: List[(String, SimpType, Option[Expr], Boolean)])
+  case FnDecl(name: String, params: List[(String, SimpType)], body: Cmd, returnType: SimpType, isPrivate: Boolean, isStatic: Boolean = false)
+  case StructDecl(name: String, fields: List[(String, SimpType, Option[Expr], Boolean)], isLocked: Boolean = false)
   case ImportDecl(path: String, alias: String)
 
 enum SimpType:

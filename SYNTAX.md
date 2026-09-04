@@ -38,6 +38,7 @@ Declarations come in 4 forms, declaring functions, declaring structs, declaring 
 ```
 Decl ::= fn f(x₀ : t₀, x₁ : t₁, ...) -> t { Cmd }  
         | struct S { f₀ : t₀ = v₀, f₁ : t₁ = v₁, ... } 
+        | locked struct S { f₀ : t₀ = v₀, f₁ : t₁ = v₁, ... } 
         | impl S {fn₀, fn₁}
         | import "F"
         | import "F" as A
@@ -318,6 +319,58 @@ myPoint := Point {x : 2, y : 4};
 print myPoint.squareAdd;
 print myPoint.squareY; //Error!
 ```
+
+#### Locked Structs
+
+A struct declared with `locked struct` cannot be constructed with a 
+struct literal (`Name{...}`) from outside its own `impl` block. This 
+is independent of field privacy — locking gates *construction*, while 
+`private` gates *field/method access* on an already-existing value. 
+Combining the two is how you force all construction to go through a 
+static factory method:
+```
+locked struct Point {
+    private x: Int,
+    private y: Int
+}
+impl Point {
+    fn static new(x: Int, y: Int) -> Point {
+        return Point{x: x, y: y};
+    }
+    fn getX(self: Point) -> Int {
+        return self.x;
+    }
+}
+
+p := Point.new(3, 4);
+q := Point{x: 1, y: 1}; // Error!
+```
+
+#### Static Methods
+
+Methods declared with `fn static` inside an `impl` block do not take a 
+`self` parameter and are not called on an instance. They're called on 
+the type name itself with dot syntax:
+```
+struct Point { x: Int, y: Int }
+
+impl Point {
+    fn static origin() -> Point {
+        return Point{x: 0, y: 0};
+    }
+    fn static add(a: Point, b: Point) -> Point {
+        return Point{x: a.x + b.x, y: a.y + b.y};
+    }
+}
+
+p := Point.origin();
+q := Point.add(p, Point{x: 1, y: 1});
+```
+`static` and `private` can be combined (in either order, e.g. `fn 
+static private helper()`), and can appear on functions in any 
+`impl` block. Calling a static method on an instance (`p.origin()`), 
+or an instance method on the type name (`Point.translate()`), is a 
+runtime error.
 
 #### Polymorphism
 

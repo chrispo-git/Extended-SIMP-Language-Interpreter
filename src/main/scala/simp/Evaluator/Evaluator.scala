@@ -17,6 +17,11 @@ class Evaluator(protected val fnEnv: FunctionEnv, protected val structEnv: Struc
 
     protected def currentLine(): Int = pos
 
+    protected def checkStructLock(typeName: String): Unit = {
+        if structEnv.lookup(typeName).isLocked && !implContextStack.headOption.contains(typeName) then {
+            throwError(s"Struct '$typeName' is locked and cannot be constructed directly; use a static factory method")
+        }
+    }
     protected def checkFieldPrivacy(typeName: String, field: String): Unit = {
         structEnv.lookup(typeName).fields.find(_._1 == field).foreach {
             case (_, _, _, isPrivate) => {
@@ -38,9 +43,9 @@ class Evaluator(protected val fnEnv: FunctionEnv, protected val structEnv: Struc
 
     def evalProgram(program: List[Program], store: Store): Unit = {
         program.foreach(p => p match {
-            case Program.PDecl(Decl.FnDecl(name, params, body, returnType, isPrivate)) => fnEnv.registerFn(name, Decl.FnDecl(name, params, body, returnType, isPrivate))
+            case Program.PDecl(Decl.FnDecl(name, params, body, returnType, isPrivate, isStatic)) => fnEnv.registerFn(name, Decl.FnDecl(name, params, body, returnType, isPrivate, isStatic))
             case Program.PDecl(Decl.ImportDecl(path, alias)) => processImport(path, alias, cwd, store)
-            case Program.PDecl(Decl.StructDecl(name, fields)) => structEnv.register(name, StructDef(fields))
+            case Program.PDecl(Decl.StructDecl(name, fields, isLocked)) => structEnv.register(name, StructDef(fields, isLocked))
             case Program.PCmd(cmd) => execCmd(cmd, store)
             case Program.PExpr(expr) => println(getPrettyPrint(evalExpr(expr, store), structEnv))
             case Program.PBool(b) => println(evalBool(b, store))

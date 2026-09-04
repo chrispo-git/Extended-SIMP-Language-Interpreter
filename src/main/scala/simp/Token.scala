@@ -103,3 +103,5 @@ enum Token:
     case Impl
 
     case Priv
+    case Static
+    case Locked

@@ -26,19 +26,19 @@ trait EvaluatorImport { self: Evaluator =>
 
 
         val declaredNames = program.collect {
-            case Program.PDecl(Decl.FnDecl(name, _, _, _, _)) => name
+            case Program.PDecl(Decl.FnDecl(name, _, _, _, _, _)) => name
         }.toSet
 
         program.foreach(p => p match {
-            case Program.PDecl(Decl.FnDecl(name, params, body, returnType, isPrivate)) => {
+            case Program.PDecl(Decl.FnDecl(name, params, body, returnType, isPrivate, isStatic)) => {
                 val qualifiedBody = qualifyBody(body, alias, declaredNames)
-                fnEnv.registerFn(s"$alias::$name", Decl.FnDecl(s"$alias::$name", params, qualifiedBody, returnType, isPrivate))
+                fnEnv.registerFn(s"$alias::$name", Decl.FnDecl(s"$alias::$name", params, qualifiedBody, returnType, isPrivate, isStatic))
             }
             case Program.PDecl(Decl.ImportDecl(path, alias)) => {
                 val importDir = File(fullPath).getParentFile.getAbsolutePath
                 processImport(path, alias, importDir, store)
             }
-            case Program.PDecl(Decl.StructDecl(name, fields)) => structEnv.register(s"$alias::$name", StructDef(fields))
+            case Program.PDecl(Decl.StructDecl(name, fields, isLocked)) => structEnv.register(s"$alias::$name", StructDef(fields, isLocked))
             case _ => throwError(s"Imports can only contain declarations")
         })
 

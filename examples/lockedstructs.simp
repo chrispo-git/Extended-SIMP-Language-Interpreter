@@ -1,0 +1,13 @@
+locked struct Point {
+    x: Int,
+    y: Int,
+    distanceFromOrigin: Float
+}
+impl Point {
+    fn static new(x: Int, y: Int) -> Point {
+        return Point{x: !x, y: !y, distanceFromOrigin: sqrt((!x*!x)+(!y*!y))};
+    }
+}
+
+p := Point.new(3, 4);
+print p.distanceFromOrigin;
