@@ -443,6 +443,18 @@ object Builtins:
             case List(Value.ArrVal(elements)) => Value.BoolVal(elements.isEmpty)
             case _ => throw RuntimeException("isEmpty expects an array")
         })
+        fnEnv.registerBuiltin("pop", args => args match {
+            case List(Value.ArrVal(elements)) =>
+                if elements.isEmpty then throw RuntimeException("pop expects a non-empty array")
+                elements.remove(elements.length - 1)
+            case _ => throw RuntimeException("pop expects an array")
+        })
+        fnEnv.registerBuiltin("back", args => args match {
+            case List(Value.ArrVal(elements)) =>
+                if elements.isEmpty then throw RuntimeException("back expects a non-empty array")
+                elements.last
+            case _ => throw RuntimeException("back expects an array")
+        })
 
         // Awesome Map Stuff
         fnEnv.registerBuiltin("newMap", args => args match {

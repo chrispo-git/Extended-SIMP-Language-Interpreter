@@ -100,6 +100,8 @@ Each of these functions is available by default in SIMP+.
 | `contains` | `contains(T[], x) -> Bool` | Checks if an array contains a value |
 | `slice` | `slice(T[], Int, Int) -> T[]` | Gets a subset of the target array |
 | `push` | `push(T[], T) -> T[]` | Appends a value to the end of an array |
+| `pop` | `pop(T[]) -> T` | Removes and returns the last value of an array |
+| `back` | `back(T[]) -> T` | Returns the last value of an array without removing it |
 | `flatten` | `flatten(T[][]) -> T[]` | Flattens a nested array one level deep |
 | `sum` | `sum(Int[] \| Float[]) -> Int \| Float` | Sums all values in an array |
 | `range` | `range(Int, <Int>, <Int>) -> Int[]` | Returns an array of integers. 0 to end, start to end, or start to end with step |
