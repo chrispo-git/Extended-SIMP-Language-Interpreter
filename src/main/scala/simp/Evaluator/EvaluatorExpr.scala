@@ -258,7 +258,7 @@ trait EvaluatorExpr { self: Evaluator =>
             case Expr.Ref(loc) => evalRef(loc, store)
             case Expr.ArrLiteral(elements) => {
                 val evaluated = elements.map(evalExpr(_, store))
-                Value.ArrVal(scala.collection.mutable.ArrayBuffer(evaluated*))
+                Value.ArrVal(TypedArray(evaluated*))
             }
             case Expr.Pair(l, r) => {
                 val fst = evalExpr(l, store);

@@ -21,7 +21,7 @@ object SimpUtils:
                 case v => getType(v)
             }
         case Value.ArrVal(elements) =>
-            if elements.isEmpty then SimpType.TypeArr(SimpType.TypeInt)
+            if elements.isEmpty then SimpType.TypeArr(elements.declaredType.getOrElse(SimpType.TypeInt))
             else elements.head match {
                 case Value.RefVal(_, _) => throw RuntimeException("Arrays of references are not supported")
                 case v => SimpType.TypeArr(getType(v))
@@ -60,7 +60,7 @@ object SimpUtils:
         case Value.BoolVal(_) => value
         case Value.NullVal    => value
         case Value.TypeVal(_)    => value
-        case Value.ArrVal(elements) => Value.ArrVal(scala.collection.mutable.ArrayBuffer.from(elements.map(e => deepCopyValue(e, visited))))
+        case Value.ArrVal(elements) => Value.ArrVal(TypedArray.from(elements.map(e => deepCopyValue(e, visited))))
         case Value.MapVal(entries, keyType, valueType) => {
             Value.MapVal(
                 scala.collection.mutable.Map(entries.map((k, v) => deepCopyValue(k) -> deepCopyValue(v)).toSeq*),
@@ -125,7 +125,7 @@ object SimpUtils:
         case Value.PairVal(fst, snd) => s"Pair(${getTypeName(fst)}, ${getTypeName(snd)})"
         case Value.TypeVal(t) => s"Type.${getSimpTypeName(t)}"
         case Value.ArrVal(elements) =>
-            if elements.isEmpty then "Unknown[]"
+            if elements.isEmpty then elements.declaredType.map(t => s"${getSimpTypeName(t)}[]").getOrElse("Unknown[]")
             else s"${getTypeName(elements.head)}[]"
         case Value.NullVal => "Null"
     }

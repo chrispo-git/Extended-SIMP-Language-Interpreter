@@ -684,7 +684,7 @@ class EvaluatorTest extends AnyFunSuite:
   // Private Fields
   test("private field readable from own impl") {
     val store = run(
-      """struct Point { x: Int, priv y: Int }
+      """struct Point { x: Int, private y: Int }
         impl Point {
             fn getY(self: Point) -> Int { return self.y; }
         }
@@ -696,7 +696,7 @@ class EvaluatorTest extends AnyFunSuite:
 
   test("private field read from outside impl throws") {
     assertThrows[RuntimeException](run(
-      """struct Point { x: Int, priv y: Int }
+      """struct Point { x: Int, private y: Int }
         p := Point { x: 1, y: 2 };
         r := p.y;""".stripMargin
     ))
@@ -704,7 +704,7 @@ class EvaluatorTest extends AnyFunSuite:
 
   test("public field still readable from outside impl") {
     val store = run(
-      """struct Point { x: Int, priv y: Int }
+      """struct Point { x: Int, private y: Int }
         p := Point { x: 1, y: 2 };
         r := p.x;""".stripMargin
     )
@@ -713,7 +713,7 @@ class EvaluatorTest extends AnyFunSuite:
 
   test("private field writable via method on own impl") {
     val store = run(
-      """struct Point { x: Int, priv y: Int }
+      """struct Point { x: Int, private y: Int }
         impl Point {
             fn setY(self: Point, v: Int) -> Void { self.y := !v; }
             fn getY(self: Point) -> Int { return self.y; }
@@ -727,7 +727,7 @@ class EvaluatorTest extends AnyFunSuite:
 
   test("private field assignment from outside impl throws") {
     assertThrows[RuntimeException](run(
-      """struct Point { x: Int, priv y: Int }
+      """struct Point { x: Int, private y: Int }
         p := Point { x: 0, y: 0 };
         p.y := 5;""".stripMargin
     ))
@@ -735,7 +735,7 @@ class EvaluatorTest extends AnyFunSuite:
 
   test("private array field index assignment from outside impl throws") {
     assertThrows[RuntimeException](run(
-      """struct Bag { priv items: Int[] }
+      """struct Bag { private items: Int[] }
         b := Bag { items: [1, 2, 3] };
         b.items[0] := 9;""".stripMargin
     ))
@@ -743,7 +743,7 @@ class EvaluatorTest extends AnyFunSuite:
 
   test("private array field index assignment from own impl succeeds") {
     val store = run(
-      """struct Bag { priv items: Int[] }
+      """struct Bag { private items: Int[] }
         impl Bag {
             fn setFirst(self: Bag, v: Int) -> Void { self.items[0] := !v; }
             fn first(self: Bag) -> Int { return self.items[0]; }
@@ -757,7 +757,7 @@ class EvaluatorTest extends AnyFunSuite:
 
   test("private field inaccessible from a different struct's impl") {
     assertThrows[RuntimeException](run(
-      """struct Point { priv y: Int }
+      """struct Point { private y: Int }
         struct Other {}
         impl Other {
             fn peek(self: Other, p: Point) -> Int { return p.y; }
@@ -770,7 +770,7 @@ class EvaluatorTest extends AnyFunSuite:
 
   test("private field with default can be omitted from outside impl") {
     val store = run(
-      """struct Point { x: Int, priv y: Int := 7 }
+      """struct Point { x: Int, private y: Int := 7 }
         impl Point { fn getY(self: Point) -> Int { return self.y; } }
         p := Point { x: 1 };
         r := p.getY();""".stripMargin
@@ -780,7 +780,7 @@ class EvaluatorTest extends AnyFunSuite:
 
   test("private field settable via struct literal from own impl") {
     val store = run(
-      """struct Point { x: Int, priv y: Int := 0 }
+      """struct Point { x: Int, private y: Int := 0 }
         impl Point {
             fn withY(self: Point, newY: Int) -> Point { return Point { x: self.x, y: !newY }; }
             fn getY(self: Point) -> Int { return self.y; }
@@ -794,7 +794,7 @@ class EvaluatorTest extends AnyFunSuite:
 
   test("private field destructuring in match from outside impl throws") {
     assertThrows[RuntimeException](run(
-      """struct Point { priv y: Int }
+      """struct Point { private y: Int }
         p := Point { y: 1 };
         r := match p { case Point { y: v } => v; };""".stripMargin
     ))
@@ -802,7 +802,7 @@ class EvaluatorTest extends AnyFunSuite:
 
   test("private field destructuring in match from own impl succeeds") {
     val store = run(
-      """struct Point { priv y: Int }
+      """struct Point { private y: Int }
         impl Point {
             fn getY(self: Point) -> Int {
                 return match self { case Point { y: v } => v; };
@@ -1024,7 +1024,7 @@ class EvaluatorTest extends AnyFunSuite:
   // ==== EvaluatorExpr.scala ====
 
   test("dereferencing a location holding a ref chases through to the value") {
-    val fnDecl = Decl.FnDecl("getRef", List(("x", SimpType.TypeRef(SimpType.TypeInt))), Cmd.Return(Some(Expr.Deref("x")), 1), SimpType.TypeInt)
+    val fnDecl = Decl.FnDecl("getRef", List(("x", SimpType.TypeRef(SimpType.TypeInt))), Cmd.Return(Some(Expr.Deref("x")), 1), SimpType.TypeInt, false)
     val store = directEval(List(
       Program.PDecl(fnDecl),
       Program.PCmd(Cmd.Assign("y", Expr.Num(7), 1)),
@@ -1247,7 +1247,7 @@ class EvaluatorTest extends AnyFunSuite:
   // ==== Ref parameters (direct AST; unreachable via the parser) ====
 
   test("ref parameter function call reads current value") {
-    val fnDecl = Decl.FnDecl("getRef", List(("x", SimpType.TypeRef(SimpType.TypeInt))), Cmd.Return(Some(Expr.Deref("x")), 1), SimpType.TypeInt)
+    val fnDecl = Decl.FnDecl("getRef", List(("x", SimpType.TypeRef(SimpType.TypeInt))), Cmd.Return(Some(Expr.Deref("x")), 1), SimpType.TypeInt, false)
     val store = directEval(List(
       Program.PDecl(fnDecl),
       Program.PCmd(Cmd.Assign("y", Expr.Num(5), 1)),
@@ -1258,7 +1258,7 @@ class EvaluatorTest extends AnyFunSuite:
 
   test("assigning through a ref parameter writes to the caller's store") {
     val incBody = Cmd.Assign("x", Expr.BinaryOp(Expr.Deref("x"), Op.Add, Expr.Num(1)), 1)
-    val fnDecl = Decl.FnDecl("inc", List(("x", SimpType.TypeRef(SimpType.TypeInt))), incBody, SimpType.TypeNull)
+    val fnDecl = Decl.FnDecl("inc", List(("x", SimpType.TypeRef(SimpType.TypeInt))), incBody, SimpType.TypeNull, false)
     val store = directEval(List(
       Program.PDecl(fnDecl),
       Program.PCmd(Cmd.Assign("y", Expr.Num(5), 1)),
@@ -1268,7 +1268,7 @@ class EvaluatorTest extends AnyFunSuite:
   }
 
   test("ref parameter requires a bare variable argument") {
-    val fnDecl = Decl.FnDecl("getRef", List(("x", SimpType.TypeRef(SimpType.TypeInt))), Cmd.Return(Some(Expr.Deref("x")), 1), SimpType.TypeInt)
+    val fnDecl = Decl.FnDecl("getRef", List(("x", SimpType.TypeRef(SimpType.TypeInt))), Cmd.Return(Some(Expr.Deref("x")), 1), SimpType.TypeInt, false)
     assertThrows[RuntimeException](directEval(List(
       Program.PDecl(fnDecl),
       Program.PCmd(Cmd.Assign("z", Expr.FnCall("getRef", List(Expr.Num(5))), 1))
@@ -1276,7 +1276,7 @@ class EvaluatorTest extends AnyFunSuite:
   }
 
   test("ref parameter type mismatch throws") {
-    val fnDecl = Decl.FnDecl("getRef", List(("x", SimpType.TypeRef(SimpType.TypeInt))), Cmd.Return(Some(Expr.Deref("x")), 1), SimpType.TypeInt)
+    val fnDecl = Decl.FnDecl("getRef", List(("x", SimpType.TypeRef(SimpType.TypeInt))), Cmd.Return(Some(Expr.Deref("x")), 1), SimpType.TypeInt, false)
     assertThrows[RuntimeException](directEval(List(
       Program.PDecl(fnDecl),
       Program.PCmd(Cmd.Assign("y", Expr.Str("hi"), 1)),
@@ -1290,7 +1290,7 @@ class EvaluatorTest extends AnyFunSuite:
       Program.PImpl("Point", List(Decl.FnDecl(
         "bad",
         List(("self", SimpType.TypeStruct("Point")), ("r", SimpType.TypeRef(SimpType.TypeInt))),
-        Cmd.Return(Some(Expr.Num(1)), 1), SimpType.TypeInt
+        Cmd.Return(Some(Expr.Num(1)), 1), SimpType.TypeInt, false
       ))),
       Program.PCmd(Cmd.Assign("p", Expr.StructLiteral("Point", List(("x", Expr.Num(1)))), 1)),
       Program.PCmd(Cmd.Assign("z", Expr.MethodCall(Expr.Ref("p"), "bad", List(Expr.Num(1))), 1))
@@ -1425,14 +1425,14 @@ class EvaluatorTest extends AnyFunSuite:
 
   test("functionEnv: hasFn true and false") {
     val fe = FunctionEnv()
-    fe.registerFn("f", Decl.FnDecl("f", List(), Cmd.Skip, SimpType.TypeNull))
+    fe.registerFn("f", Decl.FnDecl("f", List(), Cmd.Skip, SimpType.TypeNull, false))
     assert(fe.hasFn("f"))
     assert(!fe.hasFn("g"))
   }
 
   test("functionEnv: findNamespaced finds a qualified name") {
     val fe = FunctionEnv()
-    fe.registerFn("mod::f", Decl.FnDecl("mod::f", List(), Cmd.Skip, SimpType.TypeNull))
+    fe.registerFn("mod::f", Decl.FnDecl("mod::f", List(), Cmd.Skip, SimpType.TypeNull, false))
     assert(fe.findNamespaced("f") == Some("mod::f"))
     assert(fe.findNamespaced("nope") == None)
   }
@@ -1446,8 +1446,8 @@ class EvaluatorTest extends AnyFunSuite:
 
   test("functionEnv: clear removes functions and methods") {
     val fe = FunctionEnv()
-    fe.registerFn("f", Decl.FnDecl("f", List(), Cmd.Skip, SimpType.TypeNull))
-    fe.methodTable(("S", "m")) = Decl.FnDecl("m", List(), Cmd.Skip, SimpType.TypeNull)
+    fe.registerFn("f", Decl.FnDecl("f", List(), Cmd.Skip, SimpType.TypeNull, false))
+    fe.methodTable(("S", "m")) = Decl.FnDecl("m", List(), Cmd.Skip, SimpType.TypeNull, false)
     fe.clear()
     assert(!fe.hasFn("f"))
     assert(!fe.methodTable.contains(("S", "m")))
@@ -1455,7 +1455,7 @@ class EvaluatorTest extends AnyFunSuite:
 
   test("functionEnv: dumpFn returns registered functions") {
     val fe = FunctionEnv()
-    fe.registerFn("f", Decl.FnDecl("f", List(), Cmd.Skip, SimpType.TypeNull))
+    fe.registerFn("f", Decl.FnDecl("f", List(), Cmd.Skip, SimpType.TypeNull, false))
     assert(fe.dumpFn().contains("f"))
   }
 
@@ -1479,8 +1479,8 @@ class EvaluatorTest extends AnyFunSuite:
     assert(SimpUtils.getType(Value.MapVal(scala.collection.mutable.Map(), SimpType.TypeInt, SimpType.TypeString)) == SimpType.TypeMap(SimpType.TypeInt, SimpType.TypeString))
     assert(SimpUtils.getType(Value.PairVal(Value.IntVal(1), Value.StrVal("x"))) == SimpType.TypePair(SimpType.TypeInt, SimpType.TypeString))
     assert(SimpUtils.getType(Value.TypeVal(SimpType.TypeInt)) == SimpType.TypeType)
-    assert(SimpUtils.getType(Value.ArrVal(scala.collection.mutable.ArrayBuffer())) == SimpType.TypeArr(SimpType.TypeInt))
-    assert(SimpUtils.getType(Value.ArrVal(scala.collection.mutable.ArrayBuffer(Value.IntVal(1)))) == SimpType.TypeArr(SimpType.TypeInt))
+    assert(SimpUtils.getType(Value.ArrVal(TypedArray())) == SimpType.TypeArr(SimpType.TypeInt))
+    assert(SimpUtils.getType(Value.ArrVal(TypedArray(Value.IntVal(1)))) == SimpType.TypeArr(SimpType.TypeInt))
   }
 
   test("SimpUtils.getType on ref value dereferences the store") {
@@ -1500,12 +1500,13 @@ class EvaluatorTest extends AnyFunSuite:
   test("SimpUtils.getType throws on array of references") {
     val store = Store()
     store.store("x", Value.IntVal(5))
-    assertThrows[RuntimeException](SimpUtils.getType(Value.ArrVal(scala.collection.mutable.ArrayBuffer(Value.RefVal("x", store)))))
+    assertThrows[RuntimeException](SimpUtils.getType(Value.ArrVal(TypedArray(Value.RefVal("x", store)))))
   }
 
   // ==== SimpUtils.getPrettyPrint ====
 
   test("SimpUtils.getPrettyPrint for primitives") {
+    val structEnv = StructEnv()
     assert(SimpUtils.getPrettyPrint(Value.StrVal("hi"), structEnv) == "hi")
     assert(SimpUtils.getPrettyPrint(Value.IntVal(5), structEnv) == "5")
     assert(SimpUtils.getPrettyPrint(Value.FloatVal(1.5), structEnv) == "1.5")
@@ -1514,28 +1515,36 @@ class EvaluatorTest extends AnyFunSuite:
   }
 
   test("SimpUtils.getPrettyPrint for ref") {
+    val structEnv = StructEnv()
     val store = Store()
     assert(SimpUtils.getPrettyPrint(Value.RefVal("x", store), structEnv) == "Ref(x)")
   }
 
   test("SimpUtils.getPrettyPrint for map") {
+    val structEnv = StructEnv()
     assert(SimpUtils.getPrettyPrint(Value.MapVal(scala.collection.mutable.Map(), SimpType.TypeString, SimpType.TypeInt), structEnv) == "Map(Str -> Int)")
   }
 
   test("SimpUtils.getPrettyPrint for type value") {
+    val structEnv = StructEnv()
     assert(SimpUtils.getPrettyPrint(Value.TypeVal(SimpType.TypeInt), structEnv) == "Type.Int")
   }
 
   test("SimpUtils.getPrettyPrint for pair") {
+    val structEnv = StructEnv()
     assert(SimpUtils.getPrettyPrint(Value.PairVal(Value.IntVal(1), Value.IntVal(2)), structEnv) == "(1, 2)")
   }
 
   test("SimpUtils.getPrettyPrint for struct") {
+    val structEnv = StructEnv()
+    structEnv.register("Point", StructDef(List(("x", SimpType.TypeInt, None, false))))
     val fields = scala.collection.mutable.Map[String, Value]("x" -> Value.IntVal(1))
     assert(SimpUtils.getPrettyPrint(Value.StructVal("Point", fields), structEnv) == "Point { x: 1 }")
   }
 
   test("SimpUtils.getPrettyPrint for cyclic struct does not infinite loop") {
+    val structEnv = StructEnv()
+    structEnv.register("Node", StructDef(List(("next", SimpType.TypeStruct("Node"), None, false))))
     val fields = scala.collection.mutable.Map[String, Value]()
     val selfVal = Value.StructVal("Node", fields)
     fields("next") = selfVal
@@ -1543,7 +1552,8 @@ class EvaluatorTest extends AnyFunSuite:
   }
 
   test("SimpUtils.getPrettyPrint for array") {
-    assert(SimpUtils.getPrettyPrint(Value.ArrVal(scala.collection.mutable.ArrayBuffer(Value.IntVal(1), Value.IntVal(2))), structEnv) == "[1, 2]")
+    val structEnv = StructEnv()
+    assert(SimpUtils.getPrettyPrint(Value.ArrVal(TypedArray(Value.IntVal(1), Value.IntVal(2))), structEnv) == "[1, 2]")
   }
 
   // ==== SimpUtils.deepCopyValue ====
@@ -1560,7 +1570,7 @@ class EvaluatorTest extends AnyFunSuite:
   }
 
   test("SimpUtils.deepCopyValue for array makes an independent copy") {
-    val original: Value.ArrVal = Value.ArrVal(scala.collection.mutable.ArrayBuffer(Value.IntVal(1)))
+    val original: Value.ArrVal = Value.ArrVal(TypedArray(Value.IntVal(1)))
     val copy = SimpUtils.deepCopyValue(original).asInstanceOf[Value.ArrVal]
     copy.elements(0) = Value.IntVal(99)
     assert(original.elements(0) == Value.IntVal(1))
@@ -1604,11 +1614,11 @@ class EvaluatorTest extends AnyFunSuite:
   }
 
   test("SimpUtils.checkType allows an empty array for any array type") {
-    SimpUtils.checkType(Value.ArrVal(scala.collection.mutable.ArrayBuffer()), SimpType.TypeArr(SimpType.TypeInt), "x")
+    SimpUtils.checkType(Value.ArrVal(TypedArray()), SimpType.TypeArr(SimpType.TypeInt), "x")
   }
 
   test("SimpUtils.checkType throws on empty array for a non-array type") {
-    assertThrows[RuntimeException](SimpUtils.checkType(Value.ArrVal(scala.collection.mutable.ArrayBuffer()), SimpType.TypeInt, "x"))
+    assertThrows[RuntimeException](SimpUtils.checkType(Value.ArrVal(TypedArray()), SimpType.TypeInt, "x"))
   }
 
   test("SimpUtils.checkType passes on a matching type") {
@@ -1647,8 +1657,8 @@ class EvaluatorTest extends AnyFunSuite:
     assert(SimpUtils.getTypeName(Value.MapVal(scala.collection.mutable.Map(), SimpType.TypeString, SimpType.TypeInt)) == "Map(Str -> Int)")
     assert(SimpUtils.getTypeName(Value.PairVal(Value.IntVal(1), Value.StrVal("x"))) == "Pair(Int, Str)")
     assert(SimpUtils.getTypeName(Value.TypeVal(SimpType.TypeInt)) == "Type.Int")
-    assert(SimpUtils.getTypeName(Value.ArrVal(scala.collection.mutable.ArrayBuffer())) == "Unknown[]")
-    assert(SimpUtils.getTypeName(Value.ArrVal(scala.collection.mutable.ArrayBuffer(Value.IntVal(1)))) == "Int[]")
+    assert(SimpUtils.getTypeName(Value.ArrVal(TypedArray())) == "Unknown[]")
+    assert(SimpUtils.getTypeName(Value.ArrVal(TypedArray(Value.IntVal(1)))) == "Int[]")
     assert(SimpUtils.getTypeName(Value.NullVal) == "Null")
   }
 
@@ -1730,7 +1740,7 @@ class EvaluatorTest extends AnyFunSuite:
 
   test("reverse: string and array") {
     assert(run("""x := reverse("abc")""").load("x") == Value.StrVal("cba"))
-    assert(run("x := reverse([1,2,3])").load("x") == Value.ArrVal(scala.collection.mutable.ArrayBuffer(Value.IntVal(3), Value.IntVal(2), Value.IntVal(1))))
+    assert(run("x := reverse([1,2,3])").load("x") == Value.ArrVal(TypedArray(Value.IntVal(3), Value.IntVal(2), Value.IntVal(1))))
   }
   test("reverse: error on unsupported type") { assertThrows[RuntimeException](run("x := reverse(5)")) }
 
@@ -1753,7 +1763,7 @@ class EvaluatorTest extends AnyFunSuite:
   test("substr") { assert(run("""x := substr("abcdef", 1, 3)""").load("x") == Value.StrVal("bc")) }
   test("substr: error on wrong types") { assertThrows[RuntimeException](run("x := substr(5, 5, 5)")) }
 
-  test("slice") { assert(run("x := slice([1,2,3,4], 1, 3)").load("x") == Value.ArrVal(scala.collection.mutable.ArrayBuffer(Value.IntVal(2), Value.IntVal(3)))) }
+  test("slice") { assert(run("x := slice([1,2,3,4], 1, 3)").load("x") == Value.ArrVal(TypedArray(Value.IntVal(2), Value.IntVal(3)))) }
   test("slice: error on wrong types") { assertThrows[RuntimeException](run("x := slice(5, 5, 5)")) }
 
   test("indexOf") { assert(run("""x := indexOf("abc", "b")""").load("x") == Value.IntVal(1)) }
@@ -1792,16 +1802,16 @@ class EvaluatorTest extends AnyFunSuite:
   test("toBool") { assert(run("""x := toBool("true")""").load("x") == Value.BoolVal(true)) }
   test("toBool: error on non-string") { assertThrows[RuntimeException](run("x := toBool(5)")) }
 
-  test("toArr") { assert(run("""x := toArr("ab")""").load("x") == Value.ArrVal(scala.collection.mutable.ArrayBuffer(Value.StrVal("a"), Value.StrVal("b")))) }
+  test("toArr") { assert(run("""x := toArr("ab")""").load("x") == Value.ArrVal(TypedArray(Value.StrVal("a"), Value.StrVal("b")))) }
   test("toArr: error on non-string") { assertThrows[RuntimeException](run("x := toArr(5)")) }
 
-  test("split") { assert(run("""x := split("a,b", ",")""").load("x") == Value.ArrVal(scala.collection.mutable.ArrayBuffer(Value.StrVal("a"), Value.StrVal("b")))) }
+  test("split") { assert(run("""x := split("a,b", ",")""").load("x") == Value.ArrVal(TypedArray(Value.StrVal("a"), Value.StrVal("b")))) }
   test("split: error on wrong types") { assertThrows[RuntimeException](run("x := split(5, 5)")) }
 
   test("range: one, two, and three arguments") {
-    assert(run("x := range(3)").load("x") == Value.ArrVal(scala.collection.mutable.ArrayBuffer(Value.IntVal(0), Value.IntVal(1), Value.IntVal(2))))
-    assert(run("x := range(1, 3)").load("x") == Value.ArrVal(scala.collection.mutable.ArrayBuffer(Value.IntVal(1), Value.IntVal(2))))
-    assert(run("x := range(0, 6, 2)").load("x") == Value.ArrVal(scala.collection.mutable.ArrayBuffer(Value.IntVal(0), Value.IntVal(2), Value.IntVal(4))))
+    assert(run("x := range(3)").load("x") == Value.ArrVal(TypedArray(Value.IntVal(0), Value.IntVal(1), Value.IntVal(2))))
+    assert(run("x := range(1, 3)").load("x") == Value.ArrVal(TypedArray(Value.IntVal(1), Value.IntVal(2))))
+    assert(run("x := range(0, 6, 2)").load("x") == Value.ArrVal(TypedArray(Value.IntVal(0), Value.IntVal(2), Value.IntVal(4))))
   }
   test("range: error on wrong types") { assertThrows[RuntimeException](run("""x := range("a")""")) }
 
@@ -1952,7 +1962,7 @@ class EvaluatorTest extends AnyFunSuite:
     f.deleteOnExit()
     java.nio.file.Files.write(f.toPath, "a\nb\nc".getBytes)
     val store = run(s"""x := readFile("${f.getAbsolutePath}");""")
-    assert(store.load("x") == Value.ArrVal(scala.collection.mutable.ArrayBuffer(Value.StrVal("a"), Value.StrVal("b"), Value.StrVal("c"))))
+    assert(store.load("x") == Value.ArrVal(TypedArray(Value.StrVal("a"), Value.StrVal("b"), Value.StrVal("c"))))
   }
   test("readFile: error on missing file") {
     assertThrows[RuntimeException](run("""x := readFile("/nonexistent/path/does-not-exist.txt");"""))
@@ -1987,7 +1997,7 @@ class EvaluatorTest extends AnyFunSuite:
   test("typeOf") { assert(run("x := typeOf(5)").load("x") == Value.StrVal("Int")) }
   test("typeOf: error on wrong arity") { assertThrows[RuntimeException](run("x := typeOf()")) }
 
-  test("deepCopy") { assert(run("x := deepCopy([1,2,3])").load("x") == Value.ArrVal(scala.collection.mutable.ArrayBuffer(Value.IntVal(1), Value.IntVal(2), Value.IntVal(3)))) }
+  test("deepCopy") { assert(run("x := deepCopy([1,2,3])").load("x") == Value.ArrVal(TypedArray(Value.IntVal(1), Value.IntVal(2), Value.IntVal(3)))) }
   test("deepCopy: error on wrong arity") { assertThrows[RuntimeException](run("x := deepCopy()")) }
 
   test("isNull") {
@@ -1998,7 +2008,7 @@ class EvaluatorTest extends AnyFunSuite:
 
   test("push: mutates the array in place") {
     val store = run("arr := [1]; _ := push(arr, 2); x := arr;")
-    assert(store.load("x") == Value.ArrVal(scala.collection.mutable.ArrayBuffer(Value.IntVal(1), Value.IntVal(2))))
+    assert(store.load("x") == Value.ArrVal(TypedArray(Value.IntVal(1), Value.IntVal(2))))
   }
   test("push: error on non-array") { assertThrows[RuntimeException](run("x := push(5, 1)")) }
 
@@ -2031,7 +2041,7 @@ class EvaluatorTest extends AnyFunSuite:
 
   test("keys") {
     val store = run("""m := newMap(Str, Int); _ := set(m, "a", 1); x := keys(m);""")
-    assert(store.load("x") == Value.ArrVal(scala.collection.mutable.ArrayBuffer(Value.StrVal("a"))))
+    assert(store.load("x") == Value.ArrVal(TypedArray(Value.StrVal("a"))))
   }
   test("keys: error on non-map") { assertThrows[RuntimeException](run("x := keys(5)")) }
 
@@ -2068,7 +2078,7 @@ class EvaluatorTest extends AnyFunSuite:
 
   test("flatten") {
     val store = run("x := flatten([[1,2],[3,4]])")
-    assert(store.load("x") == Value.ArrVal(scala.collection.mutable.ArrayBuffer(Value.IntVal(1), Value.IntVal(2), Value.IntVal(3), Value.IntVal(4))))
+    assert(store.load("x") == Value.ArrVal(TypedArray(Value.IntVal(1), Value.IntVal(2), Value.IntVal(3), Value.IntVal(4))))
   }
   test("flatten: error on inner non-array element") { assertThrows[RuntimeException](run("x := flatten([1,2])")) }
   test("flatten: error on non-array") { assertThrows[RuntimeException](run("x := flatten(5)")) }
@@ -2094,7 +2104,7 @@ class EvaluatorTest extends AnyFunSuite:
 
   test("zip") {
     val store = run("x := zip([1,2],[3,4])")
-    assert(store.load("x") == Value.ArrVal(scala.collection.mutable.ArrayBuffer(
+    assert(store.load("x") == Value.ArrVal(TypedArray(
       Value.PairVal(Value.IntVal(1), Value.IntVal(3)),
       Value.PairVal(Value.IntVal(2), Value.IntVal(4))
     )))
@@ -2361,7 +2371,7 @@ class EvaluatorTest extends AnyFunSuite:
         "s" -> Value.StrVal("hi"),
         "b" -> Value.BoolVal(true),
         "u" -> Value.NullVal,
-        "arr" -> Value.ArrVal(scala.collection.mutable.ArrayBuffer(Value.IntVal(1), Value.IntVal(2)))
+        "arr" -> Value.ArrVal(TypedArray(Value.IntVal(1), Value.IntVal(2)))
       )
       Value.StructVal("Node", f)
     }

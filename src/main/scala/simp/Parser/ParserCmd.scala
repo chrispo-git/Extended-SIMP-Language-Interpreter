@@ -233,6 +233,12 @@ trait ParserCmd { self: Parser =>
             case Token.Break    => { advance(); Cmd.Break }
             case Token.Const => {advance(); parseConstAssign() }
             case Token.Variable(l) if peekNext() == Token.Dot => { advance(); parseFieldOrIndexAssign(l) }
+            case Token.Variable(l) if peekNext() == Token.Colon => {
+                advance()
+                advance()
+                val t = parseType()
+                Cmd.TypeDecl(l, t, currentLine())
+            }
             case Token.If       => parseIfCmd()
             case Token.Elif     => parseElifCmd()
             case Token.While    => parseWhileCmd()

@@ -43,6 +43,22 @@ enum Pattern:
 enum Op:
     case Add, Sub, Mul, Div, Mod, BitAnd, BitOr, BitXor, BitComplement, BitLeft, BitRight, BitRightFill
 
+// An ArrayBuffer that optionally remembers the element type it was declared
+// with (e.g. `x: Int[];`), so an empty array can still report/enforce its type.
+class TypedArray(var declaredType: Option[SimpType] = None) extends scala.collection.mutable.ArrayBuffer[Value]
+object TypedArray:
+    def apply(elems: Value*): TypedArray = {
+        val a = new TypedArray()
+        a ++= elems
+        a
+    }
+    def apply(declaredType: SimpType): TypedArray = new TypedArray(Some(declaredType))
+    def from(elems: IterableOnce[Value]): TypedArray = {
+        val a = new TypedArray()
+        a ++= elems
+        a
+    }
+
 // Values allowed, including a ref value
 enum Value:
   case IntVal(n: Int)
@@ -50,7 +66,7 @@ enum Value:
   case StrVal(s: String)
   case BoolVal(b: Boolean)
   case RefVal(loc: String, store: Store)
-  case ArrVal(elements: scala.collection.mutable.ArrayBuffer[Value])
+  case ArrVal(elements: TypedArray)
   case StructVal(typeName: String, fields: scala.collection.mutable.Map[String, Value])
   case MapVal(entries: scala.collection.mutable.Map[Value, Value], keyType: SimpType, valueType: SimpType)
   case TypeVal(t: SimpType)
@@ -80,6 +96,7 @@ enum Cmd:
     case Skip
     case Assign(loc: String, expr: Expr, line: Int)
     case ConstAssign(loc: String, expr: Expr, line: Int)
+    case TypeDecl(loc: String, t: SimpType, line: Int)
     case Seq(fst: Cmd, snd: Cmd)
     case If(cond: BoolExpr, thenBranch: Cmd, elseBranch: Cmd, line: Int)
     case Scope(body: Cmd)

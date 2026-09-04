@@ -49,7 +49,7 @@ object Builtins:
         // reverse - Reverses a string or Array
         fnEnv.registerBuiltin("reverse", args => args match {
                 case List(Value.StrVal(s)) => Value.StrVal(s.reverse)
-                case List(Value.ArrVal(s)) => Value.ArrVal(s.reverse)
+                case List(Value.ArrVal(s)) => Value.ArrVal(TypedArray.from(s.reverse))
                 case _ => throw RuntimeException("reverse expects a string or array")
             }
         )
@@ -86,7 +86,7 @@ object Builtins:
         )
         // slice - Gets a slice of the target array
         fnEnv.registerBuiltin("slice", args => args match {
-                case List(Value.ArrVal(arr), Value.IntVal(i1), Value.IntVal(i2)) => Value.ArrVal(arr.slice(i1, i2))
+                case List(Value.ArrVal(arr), Value.IntVal(i1), Value.IntVal(i2)) => Value.ArrVal(TypedArray.from(arr.slice(i1, i2)))
                 case _ => throw RuntimeException("slice expects 1 array & 2 ints (arr, start, end)")
             }
         )
@@ -156,7 +156,7 @@ object Builtins:
         // toArr - Converts a String into an Array of individual character strings
         fnEnv.registerBuiltin("toArr", args => args match {
                 case List(Value.StrVal(s)) => {
-                    Value.ArrVal(scala.collection.mutable.ArrayBuffer(
+                    Value.ArrVal(TypedArray(
                         s.map(c => Value.StrVal(c.toString))*
                     ))
                 }
@@ -166,7 +166,7 @@ object Builtins:
         // split - Splits a string into an array with a delimiter
         fnEnv.registerBuiltin("split", args => args match {
             case List(Value.StrVal(s), Value.StrVal(delimiter)) =>
-                Value.ArrVal(scala.collection.mutable.ArrayBuffer(
+                Value.ArrVal(TypedArray(
                     s.split(scala.util.matching.Regex.quote(delimiter))
                     .map(Value.StrVal(_))
                     .toSeq*
@@ -176,11 +176,11 @@ object Builtins:
         // range
         fnEnv.registerBuiltin("range", args => args match {
             case List(Value.IntVal(end)) =>
-                Value.ArrVal(scala.collection.mutable.ArrayBuffer((0 until end).map(Value.IntVal(_))* ))
+                Value.ArrVal(TypedArray((0 until end).map(Value.IntVal(_))* ))
             case List(Value.IntVal(start), Value.IntVal(end)) =>
-                Value.ArrVal(scala.collection.mutable.ArrayBuffer((start until end).map(Value.IntVal(_))*))
+                Value.ArrVal(TypedArray((start until end).map(Value.IntVal(_))*))
             case List(Value.IntVal(start), Value.IntVal(end), Value.IntVal(step)) =>
-                Value.ArrVal(scala.collection.mutable.ArrayBuffer((start until end by step).map(Value.IntVal(_))*))
+                Value.ArrVal(TypedArray((start until end by step).map(Value.IntVal(_))*))
             case _ => throw RuntimeException("range expects 1-3 integer arguments")
         })
         // abs - Absolute Value
@@ -388,7 +388,7 @@ object Builtins:
                     val out = scala.collection.mutable.ArrayBuffer[Value]()
                     val lines = fromFile(file).getLines
                     lines.foreach(str => out += Value.StrVal(str))
-                    Value.ArrVal(out)
+                    Value.ArrVal(TypedArray.from(out))
                 } catch case e: Exception => throw RuntimeException(s"Could not read file '$file': ${e.getMessage}")
             }
             case _ => throw RuntimeException("readFile expected a filepath")    
@@ -434,6 +434,7 @@ object Builtins:
 
         fnEnv.registerBuiltin("push", args => args match {
             case List(Value.ArrVal(elements), value) =>
+                elements.declaredType.foreach(t => checkType(value, t, "pushed value"))
                 elements += value
                 Value.ArrVal(elements)
             case _ => throw RuntimeException("push expects an array and a value")
@@ -483,7 +484,7 @@ object Builtins:
 
         fnEnv.registerBuiltin("keys", args => args match {
             case List(Value.MapVal(entries, _, _)) =>
-                Value.ArrVal(scala.collection.mutable.ArrayBuffer(entries.keys.toSeq*))
+                Value.ArrVal(TypedArray(entries.keys.toSeq*))
             case _ => throw RuntimeException("keys expects a map")
         })
 
@@ -537,7 +538,7 @@ object Builtins:
                     case Value.ArrVal(inner) => result ++= inner
                     case _ => throw RuntimeException("flatten expects an array of arrays")
                 }
-                Value.ArrVal(result)
+                Value.ArrVal(TypedArray.from(result))
             }
             case _ => throw RuntimeException("flatten expects an array")
         })
@@ -567,7 +568,7 @@ object Builtins:
         fnEnv.registerBuiltin("zip", args => args match {
             case List(Value.ArrVal(a), Value.ArrVal(b)) =>
                 val length = math.min(a.length, b.length)
-                Value.ArrVal(scala.collection.mutable.ArrayBuffer(
+                Value.ArrVal(TypedArray(
                     (0 until length).map(i => Value.PairVal(a(i), b(i)))*
                 ))
             case _ => throw RuntimeException("zip expects two arrays")

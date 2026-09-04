@@ -30,6 +30,33 @@ trait EvaluatorCmd { self: Evaluator =>
         val value = evalExpr(valueExpr, store)
         store.declareConst(loc, value)
     }
+    protected def defaultValueFor(t: SimpType, store: Store): Value = t match {
+        case SimpType.TypeInt => Value.IntVal(0)
+        case SimpType.TypeFloat => Value.FloatVal(0.0)
+        case SimpType.TypeString => Value.StrVal("")
+        case SimpType.TypeBool => Value.BoolVal(false)
+        case SimpType.TypeNull => Value.NullVal
+        case SimpType.TypeType => throwError(s"Cannot create a default value for type 'type'")
+        case SimpType.TypeArr(inner) => Value.ArrVal(TypedArray(inner))
+        case SimpType.TypeMap(keyType, valueType) => Value.MapVal(scala.collection.mutable.Map(), keyType, valueType)
+        case SimpType.TypePair(fst, snd) => Value.PairVal(defaultValueFor(fst, store), defaultValueFor(snd, store))
+        case SimpType.TypeRef(_) => throwError(s"Cannot create a default value for a reference type")
+        case SimpType.TypeStruct(name) => {
+            val defn = structEnv.lookup(name)
+            val fieldMap = scala.collection.mutable.Map[String, Value]()
+            defn.fields.foreach((fname, ftype, fdefault, _) => {
+                fieldMap(fname) = fdefault match {
+                    case Some(expr) => evalExpr(expr, store)
+                    case None => defaultValueFor(ftype, store)
+                }
+            })
+            Value.StructVal(name, fieldMap)
+        }
+    }
+    protected def execTypeDecl(loc: String, t: SimpType, line: Int, store: Store): Unit = {
+        pos = line
+        store.store(loc, defaultValueFor(t, store))
+    }
     protected def execFieldAssign(loc: String, field: String, valueExpr: Expr, line: Int, store: Store): Unit = {
         pos = line
         try {
@@ -206,6 +233,7 @@ trait EvaluatorCmd { self: Evaluator =>
             case Cmd.Scope(body) => execCmd(body, store.child())
             case Cmd.Assign(loc, expr, line) => execAssign(loc, expr, line, store)
             case Cmd.ConstAssign(loc, valueExpr, line) => execConstAssign(loc, valueExpr, line, store)
+            case Cmd.TypeDecl(loc, t, line) => execTypeDecl(loc, t, line, store)
             case Cmd.FieldAssign(loc, field, valueExpr, line) => execFieldAssign(loc, field, valueExpr, line, store)
             case Cmd.FieldIndexAssign(loc, field, index, valueExpr, line) => execFieldIndexAssign(loc, field, index, valueExpr, line, store)
             case Cmd.Seq(fst, snd) => {

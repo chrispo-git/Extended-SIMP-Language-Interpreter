@@ -360,7 +360,7 @@ class ParserTest extends AnyFunSuite:
       Decl.FnDecl("add",
         List(("x", SimpType.TypeInt), ("y", SimpType.TypeInt)),
         Cmd.Return(Some(Expr.BinaryOp(Expr.Deref("x"), Op.Add, Expr.Deref("y"))), 1),
-        SimpType.TypeInt
+        SimpType.TypeInt, false
       )
     )))
   }
@@ -369,7 +369,7 @@ class ParserTest extends AnyFunSuite:
       Decl.FnDecl("greet",
         List(("name", SimpType.TypeString)),
         Cmd.Skip,
-        SimpType.TypeNull
+        SimpType.TypeNull, false
       )
     )))
   }
@@ -379,7 +379,7 @@ class ParserTest extends AnyFunSuite:
       Decl.FnDecl("half",
         List(("x", SimpType.TypeFloat)),
         Cmd.Return(Some(Expr.BinaryOp(Expr.Deref("x"), Op.Div, Expr.Flt(2.0))), 1),
-        SimpType.TypeFloat
+        SimpType.TypeFloat, false
       )
     )))
   }
@@ -388,7 +388,7 @@ class ParserTest extends AnyFunSuite:
       Decl.FnDecl("f",
         List(("x", SimpType.TypeArr(SimpType.TypeInt))),
         Cmd.Return(Some(Expr.Deref("x")), 1),
-        SimpType.TypeArr(SimpType.TypeInt)
+        SimpType.TypeArr(SimpType.TypeInt), false
       )
     )))
   }
@@ -398,7 +398,7 @@ class ParserTest extends AnyFunSuite:
       Decl.FnDecl("f",
         List(("m", SimpType.TypeMap(SimpType.TypeString, SimpType.TypeInt))),
         Cmd.Skip,
-        SimpType.TypeNull
+        SimpType.TypeNull, false
       )
     )))
   }
@@ -408,7 +408,7 @@ class ParserTest extends AnyFunSuite:
       Decl.FnDecl("f",
         List(("p", SimpType.TypePair(SimpType.TypeInt, SimpType.TypeString))),
         Cmd.Skip,
-        SimpType.TypeNull
+        SimpType.TypeNull, false
       )
     )))
   }
@@ -418,7 +418,7 @@ class ParserTest extends AnyFunSuite:
       Decl.FnDecl("f",
         List(("p", SimpType.TypeStruct("Point"))),
         Cmd.Skip,
-        SimpType.TypeNull
+        SimpType.TypeNull, false
       )
     )))
   }
@@ -436,7 +436,7 @@ class ParserTest extends AnyFunSuite:
         Decl.FnDecl("toStr",
           List(("self", SimpType.TypeStruct("Point"))),
           Cmd.Return(Some(Expr.Str("point")), 3),
-          SimpType.TypeString
+          SimpType.TypeString, false
         )
       ))
     ))
@@ -638,7 +638,7 @@ class ParserTest extends AnyFunSuite:
     // command; hitting Fn there short-circuits to Skip, wrapped in a Seq.
     assert(parse("skip; fn f() -> Void { skip }") == List(
       Program.PCmd(Cmd.Seq(Cmd.Skip, Cmd.Skip)),
-      Program.PDecl(Decl.FnDecl("f", List(), Cmd.Skip, SimpType.TypeNull))
+      Program.PDecl(Decl.FnDecl("f", List(), Cmd.Skip, SimpType.TypeNull, false))
     ))
   }
 
@@ -800,7 +800,7 @@ class ParserTest extends AnyFunSuite:
 
   test("parse bare return") {
     assert(parse("fn f() -> Void { return; }") == List(Program.PDecl(
-      Decl.FnDecl("f", List(), Cmd.Return(None), SimpType.TypeNull)
+      Decl.FnDecl("f", List(), Cmd.Return(None), SimpType.TypeNull, false)
     )))
   }
 
@@ -852,7 +852,7 @@ class ParserTest extends AnyFunSuite:
 
   test("parse 2D array type") {
     assert(parse("fn f(x: Int[][]) -> Void { skip }") == List(Program.PDecl(
-      Decl.FnDecl("f", List(("x", SimpType.TypeArr(SimpType.TypeArr(SimpType.TypeInt)))), Cmd.Skip, SimpType.TypeNull)
+      Decl.FnDecl("f", List(("x", SimpType.TypeArr(SimpType.TypeArr(SimpType.TypeInt)))), Cmd.Skip, SimpType.TypeNull, false)
     )))
   }
 
@@ -862,7 +862,7 @@ class ParserTest extends AnyFunSuite:
 
   test("parse empty params list") {
     assert(parse("fn f() -> Void { skip }") == List(Program.PDecl(
-      Decl.FnDecl("f", List(), Cmd.Skip, SimpType.TypeNull)
+      Decl.FnDecl("f", List(), Cmd.Skip, SimpType.TypeNull, false)
     )))
   }
 
@@ -1024,7 +1024,7 @@ class ParserTest extends AnyFunSuite:
 
   test("parse function call in bool position with comparison") {
     assert(parse("fn f() -> Int { return 5; } if f() > 3 then {x:=1} else {x:=2}") == List(
-      Program.PDecl(Decl.FnDecl("f", List(), Cmd.Return(Some(Expr.Num(5)), 1), SimpType.TypeInt)),
+      Program.PDecl(Decl.FnDecl("f", List(), Cmd.Return(Some(Expr.Num(5)), 1), SimpType.TypeInt, false)),
       Program.PCmd(Cmd.If(
         BoolExpr.Compare(Expr.FnCall("f", List()), Bop.Gt, Expr.Num(3)),
         Cmd.Assign("x", Expr.Num(1), 1), Cmd.Assign("x", Expr.Num(2), 1), 1
@@ -1034,7 +1034,7 @@ class ParserTest extends AnyFunSuite:
 
   test("parse function call in bool position without comparison") {
     assert(parse("fn f() -> Bool { return true; } if f() then {x:=1} else {x:=2}") == List(
-      Program.PDecl(Decl.FnDecl("f", List(), Cmd.Return(Some(Expr.Bool(true)), 1), SimpType.TypeBool)),
+      Program.PDecl(Decl.FnDecl("f", List(), Cmd.Return(Some(Expr.Bool(true)), 1), SimpType.TypeBool, false)),
       Program.PCmd(Cmd.If(
         BoolExpr.FromExpr(Expr.FnCall("f", List())),
         Cmd.Assign("x", Expr.Num(1), 1), Cmd.Assign("x", Expr.Num(2), 1), 1
@@ -1074,7 +1074,7 @@ class ParserTest extends AnyFunSuite:
 
   test("repl parses declaration") {
     assert(repl("fn f() -> Void { skip }") == List(Program.PDecl(
-      Decl.FnDecl("f", List(), Cmd.Skip, SimpType.TypeNull)
+      Decl.FnDecl("f", List(), Cmd.Skip, SimpType.TypeNull, false)
     )))
   }
 
