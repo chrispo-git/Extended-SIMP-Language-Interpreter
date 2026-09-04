@@ -78,13 +78,15 @@ A VS Code extension for SIMP+ syntax highlighting is available [here](vsCodeExte
 - String, Float and Boolean variables
 - Arrays & Structs
 - Struct Impl methods
+- Struct static methods
+- Private fields and methods
 - for loops
 - Basic import system
 - Map data structure with typed keys and values
 - Pattern Matching
 - if / elif / else conditionals
 - Compound assignment operators
-- Single-line comments
+- Comments (Single & Multi-line)
 - Negative integer literals
 - Curly brace syntax for blocks
 - Pairs
