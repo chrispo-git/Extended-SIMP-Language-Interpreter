@@ -1,6 +1,28 @@
 package simp
 
 trait ParserDecl { self: Parser =>
+    // Parses an optional `<T, U, ...>` type-parameter declaration list (e.g. after
+    // `struct Stack` or `impl Stack`), returning the declared names. Returns an
+    // empty list if no `<` follows.
+    protected def parseTypeParamDecls(): List[String] = {
+        if peek() != Token.Lt then {
+            List()
+        } else {
+            advance()
+            val params = scala.collection.mutable.ListBuffer[String]()
+            def parseOne(): Unit = peek() match {
+                case Token.Variable(name) => { advance(); params += name }
+                case x => throwError(s"Expected type parameter name, got '$x'")
+            }
+            parseOne()
+            while peek() == Token.Comma do {
+                advance()
+                parseOne()
+            }
+            expect(Token.Gt)
+            params.toList
+        }
+    }
     protected def parseStructField(): (String, SimpType, Option[Expr], Boolean) = {
         val isPrivate = peek() match {
             case Token.Priv => {advance(); true}
@@ -55,8 +77,11 @@ trait ParserDecl { self: Parser =>
         peek() match {
             case Token.Variable(name) => {
                 advance()
-                val fields = parseStructFields()
-                Decl.StructDecl(name, fields, isLocked)
+                val typeParams = parseTypeParamDecls()
+                val savedTypeParams = activeTypeParams
+                activeTypeParams = typeParams.toSet
+                val fields = try parseStructFields() finally activeTypeParams = savedTypeParams
+                Decl.StructDecl(name, fields, isLocked, typeParams)
             }
             case x => throwError(s"Expected struct name, got '$x'")
         }
@@ -131,16 +156,23 @@ trait ParserDecl { self: Parser =>
             case Token.Variable(name) => { advance(); name }
             case x => throwError(s"Expected struct name after 'impl', got '$x'")
         }
+        val typeParams = parseTypeParamDecls()
+        val savedTypeParams = activeTypeParams
+        activeTypeParams = typeParams.toSet
         expect(Token.OpenBrace)
         val methods = scala.collection.mutable.ListBuffer[Decl.FnDecl]()
-        while peek() != Token.CloseBrace do {
-            val out = parseDecl() match {
-                case f: Decl.FnDecl => f
-                case x => throwError(s"Expected function, got $x")
+        try {
+            while peek() != Token.CloseBrace do {
+                val out = parseDecl() match {
+                    case f: Decl.FnDecl => f
+                    case x => throwError(s"Expected function, got $x")
+                }
+                methods += out
             }
-            methods += out
+            expect(Token.CloseBrace)
+        } finally {
+            activeTypeParams = savedTypeParams
         }
-        expect(Token.CloseBrace)
         Program.PImpl(structName, methods.toList)
     }
     protected def parseArrType(t: SimpType): SimpType = {
@@ -209,9 +241,20 @@ trait ParserDecl { self: Parser =>
             var t: SimpType = SimpType.TypeBool
             parseArrType(t)
         }
-        case Token.Variable(name) => { 
-            advance(); 
-            var t: SimpType = SimpType.TypeStruct(name) 
+        case Token.Variable(name) => {
+            advance();
+            var t: SimpType = if activeTypeParams.contains(name) then SimpType.TypeParam(name) else SimpType.TypeStruct(name)
+            if peek() == Token.Lt then {
+                // Generic type arguments (e.g. Stack<Int>) are parsed and discarded:
+                // generics are erased at runtime, so no type substitution happens here.
+                advance()
+                parseType()
+                while peek() == Token.Comma do {
+                    advance()
+                    parseType()
+                }
+                expect(Token.Gt)
+            }
             parseArrType(t)
         }
         case Token.TypeMap => {

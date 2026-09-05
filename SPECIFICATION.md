@@ -138,15 +138,35 @@ on their first character and must be disambiguated by lookahead):
    makes `x - 1` lex differently from `[-1, 2]` or `f(-1)`.
 5. **Keywords vs. identifiers**: for every reserved word (`fn if then
    else elif while do break continue for in struct impl private static
-   locked import as const null match case print skip return true false
-   Int Str Bool Float Void Map`), check "does the identifier-scan-from-
-   here exactly equal this word" (whole-word match: the character right
-   after the word must not itself be a letter/digit/`_`, else it's a
-   longer identifier, e.g. `structs` ≠ `struct`+`s`). Order doesn't matter
-   between keywords (they're mutually exclusive by exact string), but
-   **all keyword checks must run before the generic identifier-fallback
-   rule** (`[A-Za-z_][A-Za-z0-9_]*` → `Variable(name)`), which is your
-   last-resort case.
+   locked try catch throw import as const null match case print skip
+   return true false Int Str Bool Float Void Map`), check "does the
+   identifier-scan-from-here exactly equal this word" (whole-word match:
+   the character right after the word must not itself be a
+   letter/digit/`_`, else it's a longer identifier, e.g. `structs` ≠
+   `struct`+`s`). Order doesn't matter between keywords (they're mutually
+   exclusive by exact string), but **all keyword checks must run before
+   the generic identifier-fallback rule** (`[A-Za-z_][A-Za-z0-9_]*` →
+   `Variable(name)`), which is your last-resort case.
+
+   **A trap that only surfaces once you add generics (Phase 4.8)**: once
+   an identifier can legally be followed immediately by `<` with **no
+   whitespace** (`Stack<T>`), make sure whatever helper function your
+   keyword/identifier rules use to "skip past the word just matched" stops
+   at *every* operator-leading character — not just punctuation like
+   `( ) { } [ ] , . ; :`, but also `< > = ! ~ ^ & |` — and does **not**
+   simply keep consuming letters/digits past that point. A scanner that
+   only special-cases whitespace and a narrow punctuation set as
+   word-boundaries will, given `Stack<T>` with zero surrounding
+   whitespace, correctly identify the word `Stack` but then silently
+   swallow `<T>` as if it were trailing filler being skipped past — no
+   `Lt`/`Variable("T")`/`Gt` tokens ever get emitted, and the parser sees
+   `Stack` immediately followed by `{` with the type argument simply
+   gone, no error raised anywhere. This is easy to miss because ordinary
+   comparisons (`a < b`) almost always have surrounding spaces in
+   practice, so the bug stays latent until something writes a bare
+   generic-type usage with no space. Test this specific case explicitly:
+   tokenize `Stack<T>` with **no spaces** and confirm you get `Variable
+   (Stack)`, `Lt`, `Variable(T)`, `Gt` — four tokens, not one.
 6. **String literals**: opening `"` begins a scan that consumes escapes
    (`\n \t \r \' \" \\ \a \b \f \v \0` → their control-character
    equivalents; any other `\x` is a lex error) until a closing `"`; EOF
@@ -182,6 +202,7 @@ matches the expected token sequence.
 SimpType   = Int | String | Float | Bool | Null | Type
            | Ref(SimpType) | Arr(SimpType) | Struct(name)
            | Map(SimpType, SimpType) | Pair(SimpType, SimpType)
+           | Param(name)                     -- a generic type parameter, e.g. `T` (see Phase 4.8, 5.3)
 
 Op         = Add Sub Mul Div Mod BitAnd BitOr BitXor BitComplement
              BitLeft BitRight BitRightFill
@@ -214,6 +235,10 @@ Cmd        = Skip | Assign(loc, Expr, line) | ConstAssign(loc, Expr, line)
            | FieldIndexAssign(loc, field, index: Expr, value: Expr, line)
            | FieldIndexAssignNested(loc, field, indices: Expr[], value: Expr, line)
            | Continue | Break
+           | Try(tryBody: Cmd, catches: CatchClause[], line)
+           | Throw(errorType: name?, Expr, line)
+
+CatchClause = { errorType: name, bindVar: name?, body: Cmd }   -- see Phase 5.5
 
 Decl       = FnDecl(name, params: (name,SimpType)[], body: Cmd, returnType: SimpType,
                      isPrivate: bool, isStatic: bool)
@@ -281,6 +306,18 @@ the one above it):
    standalone recursive rule: `Int|Str|Bool|Float|Void|Map(K,V)|(A,B)|
    ref T|StructName`, each optionally followed by any number of `[]`
    suffixes (each `[]` wraps the type one level deeper in `Arr(...)`).
+   For a bare identifier (the `StructName` case), first check it against
+   a parser-level mutable set of **currently active generic type
+   parameter names** (empty outside a generic `struct`/`impl` — see Phase
+   4.8): if the identifier is in that set, produce `Param(name)` instead
+   of `Struct(name)`. Either way, then check whether `<` immediately
+   follows: if so, parse a comma-separated list of further types
+   (recursively, via this same `parseType`) until `>`, and **discard**
+   them — this is what lets a *usage* of a generic type in a type
+   position (e.g. `self: Stack<T>`, or `Stack<Int>` as a return type)
+   parse at all, without needing to do anything with the type arguments
+   at runtime (see Phase 5.3's `containsTypeParam`/erasure rule). Only
+   *after* that optional `<...>` do you apply the `[]`-suffix loop.
 2. **`parseAtomicExpr`** — the base case, handles (in whatever internal
    order, since each is guarded by a distinct leading token so order
    only matters between overlapping-lookahead cases):
@@ -297,18 +334,44 @@ the one above it):
    - `namespace::name(...)` / `namespace::StructName{...}` — only when a
      `Variable` is immediately followed by `::` (1-token lookahead).
    - `StructName{f: E, ...}` — only when a `Variable` naming a *known*
-     struct (per 4.2's registry) is immediately followed by `{`.
+     struct (per 4.2's registry) is immediately followed by `{`. Produces
+     a struct-literal node with an empty type-argument list — valid as-is
+     only for a non-generic struct (Phase 5.6 rejects it at *eval* time
+     for a generic one with no ambient binding available; this isn't a
+     parse-time distinction, since the parser doesn't know at this point
+     whether an ambient binding will exist when this code actually runs).
+   - `StructName<T0, T1, ...>` — only when a `Variable` naming a known
+     struct is immediately followed by `<` (checked *before* the `Dot`
+     case below, since both can follow a known struct name and `<` takes
+     priority when present): parse a type-argument list the same way
+     `parseType` does (4.3 step 1) — comma-separated full types via
+     `parseType`, closing `>` — then look at what follows: `{` → a
+     generic struct literal carrying this type-argument list (parse
+     fields exactly as the plain case above, just with a non-empty
+     type-argument list attached); `.` → produces the "type name with
+     bound arguments" marker node the next bullet describes, just
+     carrying this non-empty list instead of an empty one; anything else
+     is a parse error (there's no third thing `<...>` could be followed
+     by at an expression site).
    - `StructName.` — only when a `Variable` naming a known struct is
-     immediately followed by `.` (**not** `{`) — this produces the
-     "bare type name" marker expression that static-method-call syntax
-     needs (postfix parsing, 4.3.4, then attaches `.methodName(...)` on
-     top of it exactly like it would for an instance).
-     **Order this check and the previous one so struct-literal `{`
-     lookahead is tried first, dot-marker second** — both fire on
-     `Variable(name)` where `name` is a known struct, differing only in
-     the very next token (`{` vs `.`), so they don't actually conflict,
-     but keep them as two distinct guarded cases rather than one,
-     for clarity.
+     immediately followed by `.` (**not** `{` or `<`) — this produces a
+     "type name" marker expression (with an empty type-argument list)
+     that static-method-call syntax needs (postfix parsing, 4.3.4, then
+     attaches `.methodName(...)` on top of it exactly like it would for
+     an instance). This is the same marker node the `<...>` case above
+     produces when followed by `.`, just for the common case of calling
+     a static method on a struct that either isn't generic, or is being
+     called through the "inherit the ambient binding" path (Phase 5.6) —
+     which, note, only applies to a bare `StructName{}` *literal* inside
+     that struct's own methods, **not** to a bare static call: a static
+     call on a generic struct always needs its own explicit `<...>`,
+     since there's no receiver instance to inherit a binding from the way
+     a literal can inherit one from its enclosing method.
+     **Order matters**: check `{` first, then `<`, then bare `.` last —
+     all three guard on the same `Variable(name)` where `name` is a known
+     struct, distinguished only by the very next token, so they don't
+     actually conflict, but keep them as distinct guarded cases rather
+     than one combined one, for clarity.
    - `!variable` (deref).
    - `¬E` — switches into the *separate* boolean-expression sub-grammar
      (4.5) for its operand, then wraps the result back into an
@@ -469,6 +532,31 @@ current token:
   `return;`, no value) or else a `parseBoolExpr()` value.
 - `{` → an anonymous scope block: parse a nested `Cmd` sequence until
   `}` (an empty `{}` is a valid no-op scope).
+- `try` → `{`, a nested `Cmd` sequence (the try-body) until `}`, then
+  **one or more** catch clauses, each: `catch`, an error-type name (an
+  identifier that must be one of the fixed set from Phase 5.5 — reject
+  anything else as a parse error, ideally naming the valid set in the
+  message), optionally `as` followed by a variable name (the name the
+  caught error's message will be bound under — omit `as` and no binding
+  happens, useful when you only care that a particular type occurred),
+  `{`, a nested `Cmd` sequence (the catch-body) until `}`. Keep parsing
+  further `catch ...` clauses as long as `catch` keeps appearing (no
+  separator needed between them). Build
+  `Try(tryBody, catches: CatchClause[], line)`.
+- `throw` → **two forms**, disambiguated by 2-token lookahead right after
+  `throw`: if the next token is an identifier that's one of the fixed
+  error-type names *and* the token after that is `(`, it's a **typed**
+  throw — consume the type name, `(`, a `parseBoolExpr()` value, `)`, and
+  build `Throw(Some(typeName), expr, line)`. Otherwise it's an
+  **untyped** throw — just `parseBoolExpr()` for the value, building
+  `Throw(None, expr, line)` (this raises the umbrella `Error` type at
+  eval time — see Phase 5.5). Requiring the type name to be from the
+  fixed set (not any arbitrary identifier) is what keeps this
+  unambiguous with an ordinary `throw someFunctionCall(x);` — a call to
+  a real function whose name isn't one of the six reserved type names
+  falls through to the untyped path exactly as it should, evaluating the
+  whole call as the message expression, not misparsing the function name
+  as a type tag.
 
 Then, **statement sequencing**: a top-level "parse a full `Cmd`" function
 that parses one single-statement via the dispatch above, and — critically
@@ -488,12 +576,29 @@ otherwise return just the single statement.
   `static` modifier tokens (track two booleans), then a name, then a
   parameter list (`(name: Type, ...)` or `()`), `->`, a return type,
   `{`, a `Cmd` body (4.7), `}`.
-- `struct` → advance, a name, then `{ field, ... }` where each field is
-  an optional `private` marker, a name, `:`, a type, and an optional
-  `= <Expr>` default, comma-separated, until `}` (a struct with zero
-  fields — `{}` — is valid).
-- `locked struct` → same as `struct` but with a lock flag set; require
-  the `struct` keyword to immediately follow `locked`.
+- `struct` → advance, a name, then an **optional generic type-parameter
+  list**: if `<` follows the name, parse a comma-separated list of plain
+  identifiers (raw names, not full types — this is a *declaration* of new
+  names, not a *use* of existing ones) until `>`. Before parsing the
+  field list, install these names into the parser-level "currently active
+  type parameters" set (4.3 step 1) — replacing whatever was active
+  before, empty for a non-generic struct — and restore whatever was
+  active beforehand once the field list is done (a plain save/set/parse/
+  restore, no real nesting occurs in practice since structs never nest,
+  but restoring defensively costs nothing). Then `{ field, ... }` where
+  each field is an optional `private` marker, a name, `:`, a type
+  (parsed with the type-parameter set active, so a field can use `T` —
+  see 4.3 step 1), and an optional `= <Expr>` default, comma-separated,
+  until `}` (a struct with zero fields — `{}` — is valid). **Unlike an
+  erasure-only design, the declared type-parameter names here must be
+  carried forward** — store them on the `StructDecl` node and, once
+  registered, on the struct's definition (Phase 5.4/8.1) — because Phase
+  5.6's reified-generics machinery needs to know, at construction time,
+  how many type arguments a given struct expects and what to call each
+  one when building the `{name -> concreteType}` binding map.
+- `locked struct` → same as `struct` (including the optional `<...>`)
+  but with a lock flag set; require the `struct` keyword to immediately
+  follow `locked`.
 - `import "path"` optionally followed by `as alias` (default alias, if
   omitted: the path's filename with its directory stripped and
   **everything from the first `.` onward** stripped too — i.e. splitting
@@ -501,9 +606,36 @@ otherwise return just the single statement.
   `a`, not `a.b` — replicate this exactly, it is almost certainly not
   what a user would expect from a file named `a.b.simp`, but is the
   reference behavior).
-- `impl StructName { ... }` → repeatedly parse declarations via the `fn`
-  rule above **only** (anything else inside an `impl` block, including a
-  nested `struct`/`impl`/`import`, is a parse error) until `}`.
+- `impl StructName { ... }` → parse the same optional `<...>`
+  type-parameter-name list described above right after `StructName`,
+  install it as the active type-parameter set for the duration of parsing
+  every method in this block (including each method's own body, via
+  4.7's `l : T` statement form and any nested type annotations — the
+  active set must stay installed across the *entire* block, not just each
+  method's signature), restoring whatever was active before once the
+  block's closing `}` is reached. Inside, repeatedly parse declarations
+  via the `fn` rule above **only** (anything else inside an `impl` block,
+  including a nested `struct`/`impl`/`import`, is a parse error) until
+  `}`. Unlike the struct declaration's type-parameter list, **this one is
+  not stored anywhere** — its only job is letting `T` parse as a type
+  inside this block's method signatures/bodies (matched against the
+  struct's own registered parameter names purely by *position*, not by
+  the local name chosen here — nothing requires `impl Stack<T>` to spell
+  its parameter the same way `struct Stack<T>` did, though doing
+  otherwise would be needlessly confusing). The method dispatch table
+  (Phase 8.1) is keyed only by the struct's base name (`"Stack"`, never
+  `"Stack<T>"`) regardless.
+- **Where a struct or static-call *expression* needs a type-argument
+  list** (a generic struct literal `Stack<Int>{...}`, or a static call on
+  one `Stack<Int>.new()` — Phase 4.3.2's struct-literal/static-call
+  cases): parse `<`, then one or more comma-separated full types (via
+  `parseType`, so a type argument can itself be another generic type, a
+  built-in type, etc.), then `>`. Unlike the *declaration*-site list
+  above (raw parameter *names*), this is a *use*-site list of actual
+  types, evaluated and bound at runtime (Phase 5.6) — keep the two
+  parsers/AST shapes distinct even though the punctuation looks the
+  same, since declaring `<T>` and using `<Int>` are different grammar
+  productions with different content.
 
 ### 4.9 Top-level program parser
 Loop until `EOF`: if the current token is `Fn`/`Struct`/`Locked`/
@@ -547,8 +679,8 @@ copies by value.
 ### 5.2 `Store` (the scope chain)
 A mutable name→`Value` map plus a set of const-protected names, plus an
 *optional* parent `Store` reference. Operations:
-- `load(name)`: search this scope, then walk up parents; throw "unbound"
-  if never found in the whole chain.
+- `load(name)`: search this scope, then walk up parents; throw a
+  `NameError` "unbound" (Phase 5.5) if never found in the whole chain.
 - `store(name, value)`: search this scope, then walk up parents for an
   *existing* binding of `name`; if found anywhere in the chain, **mutate
   it in place at whichever scope owns it** (this is what makes ordinary
@@ -586,23 +718,57 @@ be written, and unit-tested standalone, before the evaluator proper:
   only from its first element** — no homogeneity is ever checked here or
   anywhere else; a mixed-type array is fully constructible), throwing if
   that first element is itself a `Ref`.
-- **`isNullable(t) -> bool`**: `false` only for `Int`/`Str`/`Bool`; **note
-  `Float` is *not* in this exclusion list** (so `null` currently type-
-  checks successfully against a `Float`-typed slot, unlike the other
-  three primitives — decide whether to replicate this apparent
-  inconsistency or fix it, and document your choice; see Phase 12).
-  Every other type is nullable.
-- **`checkType(value, expected, name) -> void|throw`**: the single
-  dynamic type-check gate used everywhere a value flows into a typed
-  slot. If `getType(value) == Null`, pass iff `isNullable(expected)`.
-  Else if `value` is an *empty* `Arr`, pass iff `expected` is *any*
-  `Arr(_)` (**inner element type is never checked for an empty array** —
-  a genuine hole: an empty `Int[]` satisfies a `Str[]`-typed slot with no
-  error). Else, pass iff `getType(value) == expected` **exactly**
-  (recursive structural equality on the whole type descriptor) — no
-  numeric widening (`Int` never satisfies `Float` or vice versa at this
-  gate — widening only ever happens via arithmetic *producing* a new
-  Float value, never via a bare type check), no struct subtyping.
+- **`isNullable(t) -> bool`**: `false` for `Int`/`Str`/`Bool`/`Float` — all
+  four primitives reject `null`. Every other type (`Null` itself, `Type`,
+  `Ref`, `Arr`, `Struct`, `Map`, `Pair`, and a generic `Param` — see
+  below) is nullable.
+- **`containsTypeParam(t) -> bool`**: `true` if `t` is `Param(_)` itself,
+  or recursively contains one (`Arr(inner)`, `Ref(inner)`,
+  `Pair(fst,snd)`, `Map(k,v)` — recurse into each sub-type); `false` for
+  every concrete type. Used by `checkType` (next) to know when a type
+  needs resolving against the current generic bindings before it can be
+  checked at all — see Phase 5.6 for what those bindings are and how
+  they're maintained; **generics here are reified, not erased** (unlike
+  a first draft of this feature might reasonably assume from "Java-style
+  `<T>` syntax" — the syntax is Java-like, the runtime behavior isn't:
+  every generic-typed slot is actually checked, against whatever concrete
+  type that specific instance/call was bound to).
+- **`resolveTypeParams(t, typeBindings) -> SimpType`**: substitutes every
+  `Param(name)` found in `t` (recursively, through `Arr`/`Ref`/`Pair`/
+  `Map`) with `typeBindings(name)`. Throws `TypeError` "Unbound type
+  parameter" if some `name` isn't in `typeBindings` — by the time this
+  is ever called on a real program, a binding should always be present
+  (Phase 5.6 guarantees one is pushed before any code that could hit a
+  `Param`-typed slot runs); seeing this error indicates a real gap in
+  your own binding-frame coverage, not something to paper over by
+  falling back to "allow anything."
+- **`checkType(value, expected, name, typeBindings) -> void|throw`**: the
+  single dynamic type-check gate used everywhere a value flows into a
+  typed slot. Takes the current generic type-bindings map as a fourth
+  parameter (Phase 5.6) — every caller inside the evaluator passes
+  whatever is currently on top of the type-binding stack; standalone
+  callers with no generics involved (e.g. unit tests) can omit it,
+  defaulting to empty, which is harmless as long as `expected` doesn't
+  actually contain a `Param` (if it does with no binding, you get the
+  "unbound type parameter" throw above, which is the correct outcome —
+  there's no silent fallback). Every failure case below raises a
+  `TypeError` specifically, not the generic `Error` type (see Phase 5.5).
+  **First**, if `containsTypeParam(expected)`, replace it with
+  `resolveTypeParams(expected, typeBindings)` before doing anything else
+  — from this point on the check proceeds exactly as if `expected` had
+  always been that resolved concrete type. Then: if `getType(value) ==
+  Null`, pass iff `isNullable(expected)` (now correctly following
+  whatever concrete type `T` resolved to — a `T` bound to `Str` rejects
+  `null` exactly like a literal `Str`-typed slot would, a `T` bound to a
+  struct type still accepts it). Else if `value` is an *empty* `Arr`,
+  pass iff `expected` is *any* `Arr(_)` (**inner element type is never
+  checked for an empty array** — a genuine hole: an empty `Int[]`
+  satisfies a `Str[]`-typed slot with no error). Else, pass iff
+  `getType(value) == expected` **exactly** (recursive structural equality
+  on the whole type descriptor) — no numeric widening (`Int` never
+  satisfies `Float` or vice versa at this gate — widening only ever
+  happens via arithmetic *producing* a new Float value, never via a bare
+  type check), no struct subtyping.
 - **`deepCopyValue(value, visited) -> Value`**: primitives/`Null`/`Type`
   return as-is (immutable, nothing to copy); `Ref` returns as-is
   **unrecursed** (deep-copying through a ref keeps the same live
@@ -646,6 +812,198 @@ be written, and unit-tested standalone, before the evaluator proper:
 `getPrettyPrint` pass against a table of representative inputs (including
 the empty-array edge cases and a cyclic-struct case for `deepCopyValue`)
 with no evaluator/parser involved at all.
+
+### 5.5 Typed runtime errors
+Build this now, even though nothing throws one yet — every evaluator
+function you write from Phase 6 onward needs this type to already exist
+so each of *its own* error sites can be tagged correctly as it's
+written, rather than retrofitted afterward across dozens of call sites
+(which is exactly the order this reference implementation was built in,
+and retrofitting was the more error-prone, harder-to-audit path).
+
+**The error value itself**: a small record `{ errorType: string, msg:
+string }`, thrown/raised via whatever your host language's error-
+propagation mechanism is (an exception subclass, in most languages).
+Every runtime error your evaluator raises — a type mismatch, an
+out-of-bounds index, an unbound variable, a builtin's own failure, an
+explicit `throw` — should go through this one shape, not a bare
+string-only error, so that `try`/`catch` (built in Phase 7.2) has
+something to match against.
+
+**The fixed error-type catalog** — a closed set of six names, matching
+what a `catch`/`throw TypeName(...)` clause is allowed to name (Phase
+4.7):
+```
+Error       -- the umbrella: matches (is a supertype of) every type below
+TypeError   -- a value doesn't match the type expected
+ValueError  -- a correctly-typed value that's semantically invalid
+IndexError  -- an array index out of bounds
+KeyError    -- a map key that doesn't exist
+NameError   -- an unbound variable, or an unknown struct/method/field/function
+```
+This is a **flat** hierarchy — none of the five specific types nest
+under each other, they're all direct "subtypes" of `Error` and nothing
+else. Matching a caught error's actual type against a `catch` clause's
+requested type is exactly:
+```
+matches(caughtType, wantedType) = (wantedType == "Error") or (caughtType == wantedType)
+```
+An error not explicitly given a more specific type (see the mapping
+below) defaults to plain `Error` — this includes any raw host-language
+exception that escapes from somewhere you haven't wrapped (a file I/O
+failure, a host runtime exception from deep inside a builtin, etc.): a
+bare `catch Error as e` should still catch these, only a *specific*
+`catch TypeError`/etc. won't match something that was never tagged more
+specifically than the default.
+
+**How to tag each error site** — as you write each phase's evaluator
+code (Phase 6 onward), use this mapping for the errors described
+elsewhere in this document. This is not exhaustive of every possible
+error message (there are far more distinct messages than six types —
+many builtin-specific "wrong argument shape" errors in Phase 9, for
+instance, are reasonable to leave as plain `Error` unless you want to
+invest in tagging them individually too), but covers every *category*
+of failure discussed in this spec:
+| Failure | Type |
+|---|---|
+| `checkType`'s null-rejection and type-mismatch throws (Phase 5.3) | `TypeError` |
+| Wrong argument count to a function/method call (Phase 7.4) | `TypeError` |
+| A `ref`-typed method parameter, or a non-variable argument to a `ref` parameter (Phase 8) | `TypeError` |
+| An unsupported operator for the given operand types, "can't call method on non-struct value", static/instance call mismatch (Phase 6.4-6.5, 6.14) | `TypeError` |
+| Division or modulo by zero (Phase 6.4) | `ValueError` |
+| A missing required field with no default in a struct literal (Phase 6.9) | `ValueError` |
+| A failed `assert` builtin call (Phase 9) | `ValueError` |
+| An array index out of bounds, anywhere (Phase 6.7, 7.2) | `IndexError` |
+| A map `get` on a key that doesn't exist (Phase 9) | `KeyError` |
+| An unbound variable (`Store.load` failing, Phase 5.2) | `NameError` |
+| An unknown struct type, unknown function, unknown method, or unknown struct field (Phase 5.4, 6.10, 6.14) | `NameError` |
+
+**A subtlety with re-thrown/wrapped errors**: several places in this
+spec describe catching a lower-level error just to add context and
+re-raise it (e.g. any "load a location, and if that fails wrap the
+message" pattern). When you do this, **preserve the original error's
+type** rather than defaulting back to plain `Error` — otherwise a
+`checkType` failure that happens to get re-wrapped somewhere upstream
+would silently stop being catchable as `TypeError` specifically, only as
+the generic umbrella. Concretely: your "re-throw with added context"
+helper should extract whatever type tag the caught error already carried
+(falling back to `Error` only if it didn't have one) and use that same
+tag on the new error it raises.
+
+**Why now, before Phase 6:** `checkType` (5.3, just built) is the very
+first error-raising function in the whole evaluator, and it needs to
+raise a `TypeError`, not a generic `Error`, from the moment you write it
+— there's no point writing it untyped and coming back later.
+
+### 5.6 Reified generics: the type-binding stack
+Build this now too, alongside 5.5, for the same reason: `checkType`
+already expects a `typeBindings` map to be passed in, and every
+generic-aware evaluator function you write from Phase 6 onward (struct
+literal construction, method dispatch, default-value construction) needs
+to push/pop a frame onto this stack at exactly the right moments. Get
+the mechanism nailed down before you start writing the functions that
+depend on it, rather than threading it through as an afterthought.
+
+**The core design decision, stated plainly:** a struct declared `struct
+Stack<T> { ... }` is **reified**, not erased — this is a deliberate
+choice, and it means "Java-style `<T>` syntax" describes the spelling
+only, not the runtime semantics (Java itself erases). Every value that
+flows into a `T`-typed slot (a field, a method parameter, a method
+return) is checked against the *concrete* type that specific instance
+was bound to at construction, exactly the way `Map(K, V)` already checks
+its `get`/`set` calls against its own concrete `K`/`V` (Phase 9) — a
+generic struct's type argument gets the same treatment `Map` already
+gave its key/value types, just generalized to user-declared structs.
+
+**The data:**
+- A generic struct's instances (`Value.Struct`, Phase 5.1) carry an
+  extra field: `typeArgs: Map<name, SimpType>` — e.g. a `Stack<Int>`
+  instance stores `{"T": Int}`. A non-generic struct's instances simply
+  carry an empty map; nothing about non-generic structs changes.
+- `StructDef` (Phase 5.4) needs to record the struct's declared type
+  *parameter names* (`["T"]` for `Stack<T>`) — captured once, when the
+  declaration is parsed (Phase 4.8), and carried unchanged into the
+  registered definition. This is the one place type-parameter *names*
+  persist past parse time; every other generics-parsing detail (Phase
+  4.3 step 1's "is this identifier currently an active type parameter"
+  set) is purely local to parsing and discarded once a declaration is
+  fully parsed.
+- A single mutable stack, parallel to and pushed/popped in lockstep with
+  the impl-context stack (Phase 8.2): `typeBindingStack: (structName,
+  {name -> SimpType})[]`. `currentTypeBindings` reads the map from
+  whatever frame is on top (empty if the stack is empty).
+
+**Where a frame gets pushed** (always in a `try`/`finally` so it's
+popped even if the body throws — identical discipline to Phase 8.2's
+impl-context stack, and for the same reason: an exception must not leave
+a stale frame behind for the next unrelated call to see):
+1. **Constructing a struct literal** (Phase 6.9): resolve the binding
+   first (see below), push `(typeName, binding)`, evaluate every field
+   (so field-default expressions and `checkType` calls see the binding
+   via `currentTypeBindings`), build the `Value.Struct` carrying that
+   same binding as its own `typeArgs`, pop.
+2. **Calling an instance method** (Phase 8.3's `callMethod`): push
+   `(typeName, receiver.typeArgs)` — read straight off the receiver
+   value, no re-resolution needed, since it was already resolved once
+   at that instance's construction time. Pop after the call.
+3. **Calling a static method** (Phase 8.3's `callStaticMethod`): push
+   `(typeName, binding)` where `binding` comes from resolving the type
+   arguments given *at this call site* (`Stack<Int>.new()`) — see below.
+   Pop after the call.
+4. **Constructing a default value for a bare `x : StructName;`
+   declaration** (Phase 7.1's `defaultValueFor`): same as (1), resolved
+   with no explicit arguments (so it only succeeds inside an ambient
+   context, or throws — see below), pushed for the duration of building
+   that struct's field defaults, popped after.
+
+**Resolving a binding** — one shared piece of logic used by all four
+call sites above, parameterized only by "were explicit type arguments
+given at this exact spot, or not":
+- Look up the struct's declared parameter names. If there are none
+  (not generic), the binding is trivially empty — none of what follows
+  applies, and generic-free code is completely unaffected.
+- **If explicit type arguments were given** (`Stack<Int>{...}`,
+  `Stack<Int>.new()`): arity-check them against the declared parameter
+  count (throw `TypeError` on mismatch), then — **critically** —
+  resolve each given argument against `currentTypeBindings` before
+  binding it (`resolveTypeParams` from 5.3), *not* the raw parsed type.
+  Skipping this step is a real bug, not a hypothetical one: it's exactly
+  what happens when a generic struct's own method constructs another
+  instance of itself using its *own* type parameter name explicitly —
+  `fn static new() -> Stack<T> { return Stack<T>{}; }` — as opposed to
+  the equivalent bare `Stack{}` (next bullet). Parsed literally, that
+  inner `<T>` is just the placeholder `Param("T")`; only resolving it
+  against the ambient binding turns it into the real concrete type the
+  *caller* of `new()` chose. Storing the unresolved placeholder instead
+  produces an instance that's bound to a type parameter that doesn't
+  exist anywhere anymore — every subsequent `checkType` against it then
+  fails `resolveTypeParams`'s "unbound type parameter" check, rejecting
+  even correctly-typed values. Test both spellings (bare and explicit)
+  and confirm they produce identical, correct bindings (Phase 12).
+- **If no explicit type arguments were given** (`Stack{}`, written with
+  no `<...>` at all): search the *current* `typeBindingStack` for a
+  frame whose struct name matches this exact struct, and use its binding
+  if found — this is what makes a generic struct's own static factory
+  method able to write the bare, unparameterized `Stack{}` and have it
+  correctly inherit whatever type the method itself was invoked with
+  (case 3 above pushes that frame *before* the method body, containing
+  this literal, ever runs). If no such frame exists (the bare literal
+  wasn't written inside that struct's own generic context at all — e.g.
+  at top-level, or inside some *other* struct's method), this is a
+  `TypeError`: a generic struct can never be constructed without a bound
+  type, from anywhere, by design — there is no "leave it unbound" option.
+
+**What requires an explicit type argument, and what doesn't** — this is
+a deliberate asymmetry, not an oversight: type arguments are **mandatory
+at every construction site** (a struct literal or a static call that
+produces a new instance) and **mandatory in type-annotation positions**
+that reference the struct generically (`self: Stack<T>`, a field's
+declared type, a return type) — but **never accepted at a plain instance
+method call** (`s.push(1)`, never `s.push<Int>(1)`) or at a non-static,
+already-existing-instance's field/method usage in general, since the
+binding was already fixed at construction and there's nothing left to
+specify. Reject `<...>` anywhere it would be redundant with an already-
+bound instance, exactly as strictly as you require it at construction.
 
 ---
 
@@ -805,7 +1163,12 @@ defaultValueFor(A), defaultValueFor(B))`; `struct S -> a fresh Struct`
 with every field set to its own default-expression (evaluated in the
 *current* store, same rule as Phase 6.9) if present, else recursively
 `defaultValueFor` of that field's type; `Void`/`ref T` as a *value*-typed
-target throw (you cannot default-construct a `Void` or a reference).
+target throw (you cannot default-construct a `Void` or a reference); a
+generic `Param(_)` (or anything wrapping one, e.g. `Param("T")[]`'s
+element position) → `Null` — there's no principled zero-value for an
+unknown, erased type, so `null` is the permissive default (consistent
+with `checkType`'s Phase 5.3 rule that a generic slot accepts `null`
+unconditionally).
 
 ### 7.2 Statement execution (`execCmd`)
 - `Skip`: no-op.
@@ -844,6 +1207,41 @@ target throw (you cannot default-construct a `Void` or a reference).
 - `Return`/`Break`/`Continue`: raise the corresponding signal (7.3).
 - `Seq(a, b)`: execute `a` then `b` **in the same store, no new child
   scope** — this is the one construct that does *not* introduce scoping.
+- `Try(tryBody, catches)`: execute `tryBody` in a **child** store, inside
+  whatever your host's "catch an error" construct is. If it completes
+  without an error, that's it — no `catches` clause runs. If it raises a
+  genuine runtime error (Phase 5.5's typed error record — a type
+  mismatch, an out-of-bounds index, a builtin's own error, a user
+  `Throw`, etc.), extract its `errorType` (defaulting to `"Error"` if it
+  wasn't one of your typed errors — e.g. a raw host exception that leaked
+  through unwrapped), then walk `catches` **in the order they were
+  written** looking for the first clause whose `errorType` matches per
+  Phase 5.5's `matches(caughtType, wantedType)` rule. If none match,
+  **re-raise the original error unchanged** — it keeps propagating
+  outward exactly as if this `Try` weren't there at all (up to an
+  enclosing `try`, or a crash if there isn't one). If one matches, create
+  a **separate fresh child** store (of the *original* store `Try` was
+  invoked in, not of `tryBody`'s now-abandoned child store), bind the
+  error's message as a `Str` under that clause's bind-variable (if it has
+  one — a clause with no `as` binds nothing) via `declareConst`, and
+  execute that clause's body in the new store. **Critical: this must
+  catch only genuine runtime errors, never the `Return`/`Break`/
+  `Continue` signals from 7.3** — those must still unwind straight
+  through an enclosing `try`, exactly as they unwind through an
+  `if`/`while`/block. If your host language uses exceptions for both
+  (runtime errors *and* the control-flow signals), give the control-flow
+  signals a distinct exception type/class that your `try`
+  implementation's catch clause deliberately does not match (this is why
+  Phase 7.3 calls for the signals to **not** extend whatever your generic
+  runtime-error exception type is, if you're using exceptions for both
+  mechanisms) — getting this wrong means a `return` written inside a
+  SIMP+ `try` block would be silently swallowed and misreported as a
+  caught error instead of actually returning from the function.
+- `Throw(errorType, expr)`: evaluate `expr`; if it's a `Str`, use it
+  directly as the error message, otherwise pretty-print it (Phase 5.3's
+  `getPrettyPrint`); raise a typed error (Phase 5.5) carrying that
+  message, tagged with `errorType` if present, else the umbrella
+  `"Error"`.
 
 ### 7.3 Non-local control flow
 Implement `return`/`break`/`continue` as whatever your host language's
@@ -866,6 +1264,12 @@ non-exception language). The unwind boundaries are:
   depth counter suffices, since it requires no data-flow analysis) if you
   want a cleaner error than "crash"; either choice is defensible, just
   make it deliberately (see Phase 12).
+- If you implement these three signals as exceptions, make their
+  exception type/class **distinct from and not a subclass of** whatever
+  general-purpose "runtime error" exception type the rest of the
+  evaluator throws (type mismatches, out-of-bounds, `Throw`, etc.) — this
+  is what lets `try`/`catch` (7.2) catch only genuine errors while
+  letting `return`/`break`/`continue` unwind straight through untouched.
 
 ### 7.4 Function calling convention
 Two argument-binding strategies, used in different places:
@@ -956,19 +1360,32 @@ boundaries, only this single-frame, method-call-boundary-only stack.
 
 ### 8.3 Method dispatch
 `callMethod(typeName, methodName, argValues)` (instance path) and
-`callStaticMethod(...)` (static path) both: look up `(typeName,
+`callStaticMethod(typeName, methodName, typeArgs, argValues)` (static
+path — note it additionally takes the type arguments given at the call
+site, e.g. the `Int` in `Stack<Int>.new()`) both: look up `(typeName,
 methodName)` in the method table (throw "no method found" if absent,
 **before** checking anything else); then check the found method's
 static/instance flag matches the path being used (throw a specific
 "static method called on instance" / "instance method called
 statically" error if not); then run `checkMethodPrivacy`; then push
-`typeName` onto the impl-context stack; then run the 7.4 "from-Value-
-arguments" calling convention against the method's declared params and
-the given `argValues` (for the instance path, `argValues` already has the
-receiver struct value prepended as the first entry — by whichever param
-name the method declares first, conventionally but not structurally
-`self`; for the static path, no such prepending happens); then pop the
-stack (even on throw).
+`typeName` onto the impl-context stack **and** push a matching frame onto
+the type-binding stack (Phase 5.6) — for the instance path, the pushed
+binding is read straight off the receiver's own `typeArgs` (already
+resolved, from whenever that instance was constructed); for the static
+path, it's resolved fresh from `typeArgs` given at *this* call site
+(arity-checked against the struct's declared parameter count, and
+each argument re-resolved against whatever binding was already active
+before this call, per Phase 5.6's explicit-argument-resolution rule) —
+then run the 7.4 "from-Value-arguments" calling convention against the
+method's declared params and the given `argValues` (for the instance
+path, `argValues` already has the receiver struct value prepended as the
+first entry — by whichever param name the method declares first,
+conventionally but not structurally `self`; for the static path, no such
+prepending happens); then pop **both** stacks (even on throw) — they're
+pushed and popped together, in lockstep, at exactly the same two
+boundaries (method-call entry/exit), so treat them as one combined
+"enter/exit a struct's own context" operation with two parallel pieces
+of state, not two independently-timed mechanisms.
 
 ### 8.4 Operator-overload dispatch table
 A fixed mapping consulted only when both operands of a binary op or
@@ -1137,9 +1554,12 @@ it) — write one small test program per item:
 5. An empty `Int[]`-declared array satisfies a `Str[]`-typed slot with no
    error (Phase 5.3's `checkType` hole) — decide and document if you're
    keeping or closing this hole.
-6. `f: Float := null` — decide and document whether `Float` rejects
-   `null` like `Int`/`Str`/`Bool` do, or accepts it like every other
-   type (the reference accepts it — Phase 5.3's `isNullable`).
+6. `fn f(x: Float) -> Void {...}` called as `f(null)` throws a type error
+   — `Float` rejects `null` exactly like `Int`/`Str`/`Bool` do (Phase
+   5.3's `isNullable`; this was a deliberate fix over an earlier revision
+   of this spec/the reference implementation, where `Float` was
+   inconsistently left nullable — there is no longer an open question
+   here, `Float` is simply non-nullable).
 7. Top-level `Arr == Arr`/`Pair == Pair` on a value containing a cycle —
    decide and document whether this is cycle-safe (it isn't, in the
    reference) versus struct-field equality and struct printing, which
@@ -1171,6 +1591,89 @@ it) — write one small test program per item:
     of the same struct type, if that outer variable changed between them
     (Phase 6.9/7.1 — defaults are evaluated per-call, not once at
     struct-definition time).
+15. A `return` inside a `try` block still returns from the enclosing
+    function — it is not caught or reported as an error by any of the
+    `try`'s `catch` clauses, even a `catch Error as e` umbrella (Phase
+    7.2/7.3's exception-type-separation requirement). Same for
+    `break`/`continue` inside a `try` that's itself inside a loop.
+16. `throw ValueError("msg")` inside a `try { ... } catch ValueError as e
+    { ... }` is caught, with `e` holding exactly `"msg"`; the same
+    `throw` inside a `try` with only `catch KeyError as e { ... }` (no
+    matching clause) is **not** caught — it keeps propagating outward as
+    if the `try` weren't there — and an untyped `throw "msg"` (raises
+    `Error`) is caught only by a `catch Error as e` clause, never by a
+    `catch ValueError`/etc. An uncaught `throw` of either form (no
+    enclosing `try`, or no matching clause anywhere up the chain) still
+    crashes the program with that message, exactly like any other
+    uncaught runtime error (Phase 7.2, 5.5).
+17. Two `catch` clauses on the same `try`, ordered `catch KeyError as e
+    {...} catch IndexError as e2 {...}`, each actually independently
+    reachable — trigger a `KeyError` and confirm only the first clause
+    runs; trigger an `IndexError` and confirm only the second runs
+    (Phase 7.2's "first matching clause, in written order" rule — a
+    naive implementation might instead check all clauses for the *best*
+    match, or match the *last* one, both of which are wrong here).
+18. `catch Error as e` placed *before* a more specific `catch TypeError
+    as e2` on the same `try` makes the second clause unreachable dead
+    code — the umbrella matches first and the specific clause never
+    runs (Phase 5.5's flat-hierarchy `matches` rule: `Error` matches
+    everything, with no notion of "more specific wins"). This spec does
+    not require detecting/warning about this at parse time (the
+    reference implementation doesn't either) — just confirm your
+    matching logic actually produces this behavior rather than some
+    "most specific match wins" logic you might be tempted to add.
+19. `catch Nonsense as e { ... }` (an error-type name outside the fixed
+    six-name set) is a parse error, not a runtime failure to match
+    anything — validate the type name eagerly, at parse time (Phase
+    4.7).
+20. Tokenizing `Stack<T>` with **zero surrounding whitespace** produces
+    four separate tokens (`Variable(Stack)`, `Lt`, `Variable(T)`, `Gt`),
+    not one swallowed identifier — this is the identifier/keyword
+    word-boundary trap called out in Phase 2, step 5's addendum; it's
+    easy to pass every other test and still have this one silently
+    broken, since ordinary spaced-out comparisons never trigger it.
+21. Inside `struct Stack<T> { items: T[] := [] } impl Stack<T> { fn
+    push(self: Stack<T>, v: T) -> Void {...} }`, calling
+    `Stack<Int>.new()` then `.push(1)` succeeds, but `.push("two")` on
+    that *same* instance throws a `TypeError` — this is the whole point
+    of reified generics (Phase 5.6): a value flowing into a `T`-typed
+    slot is checked against *that instance's own bound type*, not waved
+    through. Also confirm a second, independently-constructed
+    `Stack<Str>` instance still happily accepts strings at the same
+    time — one instance's binding must never leak into or override
+    another's.
+22. `Stack<Int>{items: []}` and `Stack<Int>.new()` (type arguments at a
+    construction/static-call site) are **required**, not rejected: a
+    bare `Stack{items: []}` or `Stack.new()` for a generic struct is a
+    `TypeError` unless written *inside that struct's own `impl` block*
+    with an ambient binding already on the type-binding stack (item 23).
+    A **non**-generic struct is entirely unaffected either way — `Point
+    {x: 1, y: 2}` never accepts or requires `<...>`.
+23. `fn static new() -> Stack<T> { return Stack{}; }` — a bare,
+    unparameterized literal — correctly inherits the caller's chosen
+    type: `Stack<Int>.new()` produces an `Int`-bound stack, and
+    `Stack<Str>.new()` (a *separate* call) produces a `Str`-bound one,
+    from that one identical line of code (Phase 5.6's ambient-binding
+    inheritance). Confirm the **explicit** spelling of the same thing —
+    `return Stack<T>{};`, referencing the method's own type parameter by
+    name — produces an *identical* binding, not a broken one: this is
+    exactly the case that's easy to get wrong, because a naive
+    implementation will parse `<T>` into the placeholder `Param("T")`
+    and bind the new instance to that unresolved placeholder literally,
+    instead of resolving it through the current ambient binding first.
+    A `Stack` instance bound to a dangling `Param("T")` instead of a
+    real concrete type fails every subsequent `checkType` against it
+    (Phase 5.3's "unbound type parameter" throw) — including checks that
+    should have trivially succeeded, like pushing a plain `Int` onto
+    what was supposed to be a `Stack<Int>`. Test both spellings and
+    diff their resulting bindings, not just their pass/fail outcome.
+24. A generic struct's static method called with *no* type arguments at
+    all (`Stack.new()` for a generic `Stack` — there's no receiver to
+    inherit a binding from the way a bare struct literal can) is a
+    `TypeError`, distinct from item 22's literal case
+    only in the wording of the message, not the underlying rule: a
+    generic struct's static call site always needs its own explicit
+    `<...>`.
 
 Each item above should have a corresponding automated test in your test
 suite before calling the implementation complete.

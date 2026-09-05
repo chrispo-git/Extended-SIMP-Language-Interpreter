@@ -14,6 +14,13 @@ class Evaluator(protected val fnEnv: FunctionEnv, protected val structEnv: Struc
 
     protected var pos: Int = 0
     protected var implContextStack: List[String] = Nil
+    // Stack of (structName, {typeParamName -> concreteType}) frames, pushed whenever
+    // constructing an instance of a generic struct or entering one of its methods
+    // (static or instance), so a `TypeParam` can be resolved to the concrete type
+    // it's bound to for the struct currently under construction/execution.
+    protected var typeBindingStack: List[(String, Map[String, SimpType])] = Nil
+
+    protected def currentTypeBindings: Map[String, SimpType] = typeBindingStack.headOption.map(_._2).getOrElse(Map())
 
     protected def currentLine(): Int = pos
 
@@ -45,7 +52,7 @@ class Evaluator(protected val fnEnv: FunctionEnv, protected val structEnv: Struc
         program.foreach(p => p match {
             case Program.PDecl(Decl.FnDecl(name, params, body, returnType, isPrivate, isStatic)) => fnEnv.registerFn(name, Decl.FnDecl(name, params, body, returnType, isPrivate, isStatic))
             case Program.PDecl(Decl.ImportDecl(path, alias)) => processImport(path, alias, cwd, store)
-            case Program.PDecl(Decl.StructDecl(name, fields, isLocked)) => structEnv.register(name, StructDef(fields, isLocked))
+            case Program.PDecl(Decl.StructDecl(name, fields, isLocked, typeParams)) => structEnv.register(name, StructDef(fields, isLocked, typeParams))
             case Program.PCmd(cmd) => execCmd(cmd, store)
             case Program.PExpr(expr) => println(getPrettyPrint(evalExpr(expr, store), structEnv))
             case Program.PBool(b) => println(evalBool(b, store))
@@ -53,8 +60,8 @@ class Evaluator(protected val fnEnv: FunctionEnv, protected val structEnv: Struc
         })
     }
     protected def currentLineSource(): String = sourceLines(currentLine()-1).trim
-    protected def throwError(msg: String): Nothing = {
-        throw RuntimeException(s"on line ${currentLine()}\n${currentLineSource()}\n\u001b[31m$msg\u001b[0m")
+    protected def throwError(msg: String, errorType: String = SimpError.Root): Nothing = {
+        throw SimpError(errorType, s"on line ${currentLine()}\n${currentLineSource()}\n\u001b[31m$msg\u001b[0m")
     }
     
     

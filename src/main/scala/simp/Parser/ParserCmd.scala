@@ -65,7 +65,7 @@ trait ParserCmd { self: Parser =>
                     case Token.OpenSquare => parseFieldIndexAssign(l, field)
                     case Token.OpenBracket => {
                         val args = parseArgs()
-                        val receiver = if structEnv.exists(l) then Expr.TypeLiteral(SimpType.TypeStruct(l)) else Expr.Ref(l)
+                        val receiver = if structEnv.exists(l) then Expr.StructTypeRef(l, List()) else Expr.Ref(l)
                         val expr = parsePostfix(Expr.MethodCall(receiver, field, args))
                         Cmd.Assign("_", expr, currentLine())
                     }
@@ -217,6 +217,58 @@ trait ParserCmd { self: Parser =>
             case x => throwError(s"Expected variable name after const, got '$x'")
         }
     }
+    protected def parseErrorTypeName(): String = peek() match {
+        case Token.Variable(name) if SimpError.KnownTypes.contains(name) => { advance(); name }
+        case Token.Variable(name) => throwError(
+            s"Unknown error type '$name'. Expected one of: ${SimpError.KnownTypes.toList.sorted.mkString(", ")}"
+        )
+        case x => throwError(s"Expected an error type name, got '$x'")
+    }
+    protected def parseCatchClause(): CatchClause = {
+        expect(Token.Catch)
+        val errorType = parseErrorTypeName()
+        val bindVar = if peek() == Token.As then {
+            advance()
+            peek() match {
+                case Token.Variable(name) => { advance(); Some(name) }
+                case x => throwError(s"Expected variable name after 'as', got '$x'")
+            }
+        } else None
+        expect(Token.OpenBrace)
+        val body = parseScope()
+        CatchClause(errorType, bindVar, body)
+    }
+    protected def parseTryCmd(): Cmd = {
+        advance()
+        expect(Token.OpenBrace)
+        val tryBody = parseScope()
+        val line = currentLine()
+        val catches = scala.collection.mutable.ListBuffer[CatchClause]()
+        catches += parseCatchClause()
+        while peek() == Token.Catch do {
+            catches += parseCatchClause()
+        }
+        Cmd.Try(tryBody, catches.toList, line)
+    }
+    protected def parseThrowCmd(): Cmd = {
+        advance()
+        val errorType = peek() match {
+            case Token.Variable(name) if SimpError.KnownTypes.contains(name) && peekNext() == Token.OpenBracket => {
+                advance()
+                Some(name)
+            }
+            case _ => None
+        }
+        errorType match {
+            case Some(t) => {
+                expect(Token.OpenBracket)
+                val expr = parseBoolExpr()
+                expect(Token.CloseBracket)
+                Cmd.Throw(Some(t), expr, currentLine())
+            }
+            case None => Cmd.Throw(None, parseBoolExpr(), currentLine())
+        }
+    }
     protected def parseScope(): Cmd = {
         if peek() == Token.CloseBrace then {
             advance();
@@ -244,6 +296,8 @@ trait ParserCmd { self: Parser =>
             case Token.Elif     => parseElifCmd()
             case Token.While    => parseWhileCmd()
             case Token.For      => parseForCmd()
+            case Token.Try      => parseTryCmd()
+            case Token.Throw    => parseThrowCmd()
             case Token.Variable(l) => { advance(); parseVarAssign(l) }
             case Token.Print    => { advance(); Cmd.Print(parseExpr(), currentLine()) }
             case Token.OpenBracket => parseOpenBracketCmd()

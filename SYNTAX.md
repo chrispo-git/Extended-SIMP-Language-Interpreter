@@ -38,12 +38,15 @@ Declarations come in 4 forms, declaring functions, declaring structs, declaring 
 ```
 Decl ::= fn f(x₀ : t₀, x₁ : t₁, ...) -> t { Cmd }  
         | struct S { f₀ : t₀ = v₀, f₁ : t₁ = v₁, ... } 
+        | struct S<T₀, T₁, ...> { f₀ : t₀ = v₀, f₁ : t₁ = v₁, ... } 
         | locked struct S { f₀ : t₀ = v₀, f₁ : t₁ = v₁, ... } 
         | impl S {fn₀, fn₁}
+        | impl S<T₀, T₁, ...> {fn₀, fn₁}
         | import "F"
         | import "F" as A
 where x₀, x₁, ... are parameter names (locations)
-where t, t₀, t₁, ... are parameter types (One of Str, Int, Bool, Int[], Str[], Bool[], Struct, Struct[], (T,U), Map(K, V), or Void)
+where t, t₀, t₁, ... are parameter types (One of Str, Int, Bool, Int[], Str[], Bool[], Struct, Struct[], (T,U), Map(K, V), a struct's own type parameter, or Void)
+where T₀, T₁, ... are type parameter names declared by a generic struct/impl (see Generics)
 where f₀, f₁, ... are field names
 where fn₀, fn₁, ... are function declarations
 where v₀, v₁, ... are optional default values
@@ -85,6 +88,10 @@ Cmd ::= skip                                -- no-op
       | print E                            -- print any expression
       | return E                           -- return from function
       | l.f := E                                 -- field assignment (write)
+      | try { Cmd } catch TypeName [as l] { Cmd }
+        (catch TypeName [as l] { Cmd })*    -- error handling, see below
+      | throw E                            -- raises an untyped runtime error
+      | throw TypeName(E)                  -- raises a typed runtime error, see below
 ```
 
 Where:
@@ -93,6 +100,90 @@ Where:
 - `T` a type
 
 Note: blocks within if-then-else statements, while do statements, and for statements have their own scope, variables created in that block are scoped to that block.
+
+#### Error Handling
+
+Every runtime error carries one of six built-in **error types**:
+
+| Type | Raised for |
+|------|-----------|
+| `TypeError` | a value doesn't match the type expected (function/method arguments, return values, field assignment, wrong number of arguments, unsupported operator for the given operand types, calling a static method on an instance or vice versa) |
+| `ValueError` | a correctly-typed value that's semantically invalid (a failed `assert`, division/modulo by zero, a missing required field in a struct literal) |
+| `IndexError` | an array index out of bounds |
+| `KeyError` | a map key that doesn't exist (`get`) |
+| `NameError` | an unbound variable, or an unknown struct/method/field/function |
+| `Error` | the umbrella type — every error, of every type above, is also an `Error` |
+
+`try { ... } catch TypeName [as e] { ... }` runs its body, and if a
+runtime error of the matching type occurs anywhere inside it, execution
+jumps to that `catch` block instead of crashing the program. Naming a
+type with no `as` just discards the error (useful when you only care
+*that* it happened); naming it with `as e` binds the error's message as
+a `Str` under `e`, visible only inside that `catch` block:
+```
+arr := [1, 2, 3];
+try {
+    print arr[10];
+} catch IndexError {
+    print "index was out of range";
+}
+
+try {
+    result := 10 / 0;
+    print result;
+} catch ValueError as e {
+    print "Something went wrong: " + e;
+}
+```
+A `try` can chain multiple `catch` clauses — the first one whose type
+matches the error is used, checked in the order they're written:
+```
+try {
+    _ := doSomethingRisky();
+} catch KeyError as e {
+    print "missing key: " + e;
+} catch IndexError as e {
+    print "out of range: " + e;
+} catch Error as e {
+    print "something else went wrong: " + e;   // umbrella, catches anything
+}
+```
+Since `Error` matches any error type, `catch Error as e` is how you write
+a catch-all — put it last, since an earlier `catch Error` would shadow
+every more specific clause after it. If no `catch` clause in a `try`
+matches the error that occurred, it keeps propagating outward exactly as
+if that `try` weren't there (up to an enclosing `try`, or to a crash if
+there isn't one).
+
+`throw E` raises an untyped error (type `Error`) carrying `E` as its
+message (`E` must be a `Str`, or a value convertible via the same rules
+`print`/`toStr` use). `throw TypeName(E)` raises a *typed* error instead
+— this is how you signal your own errors as a specific, catchable type:
+```
+fn withdraw(balance: Int, amount: Int) -> Int {
+    if (amount > balance) then {
+        throw ValueError("insufficient funds");
+    };
+    return balance - amount;
+}
+
+try {
+    _ := withdraw(10, 50);
+} catch ValueError as e {
+    print e;   // "insufficient funds"
+}
+```
+`TypeName` in both `catch` and `throw` must be one of the six built-in
+error types listed above — ExtSimp doesn't currently support declaring
+your own error types, only tagging a `throw` with one of the existing
+six that best fits.
+
+`try`/`catch` only intercepts genuine errors, `break`/`continue`/`return`
+still pass straight through a `try` block uninterrupted (a `return`
+inside a `try` still returns from the enclosing function, it isn't
+treated as an error). An error of a type with no matching `catch`
+clause anywhere still crashes the program exactly as before `try`/`catch`
+existed.
 
 ---
 
@@ -124,6 +215,12 @@ E ::= n                                    -- integer literal (n ∈ ℤ)
 
 Note: Block expressions execute a sequence of commands and return the value of the final expression.
 The final expression can't have a trailing semicolon.
+
+Note: `null` is only valid where a non-primitive type is expected. `Int`, 
+`Str`, `Bool`, and `Float` all reject `null` — assigning, passing, or 
+returning `null` where one of these four is expected is a type error. 
+Every other type (structs, arrays, maps, pairs, generic type parameters) 
+accepts `null`.
 
 #### Arithmetic Operators
 
@@ -371,6 +468,70 @@ static private helper()`), and can appear on functions in any
 `impl` block. Calling a static method on an instance (`p.origin()`), 
 or an instance method on the type name (`Point.translate()`), is a 
 runtime error.
+
+#### Generics
+
+Structs and their `impl` blocks can declare type parameters with 
+Java-style `<T>` syntax, letting a field or method signature reference a 
+placeholder type instead of a concrete one:
+```
+struct Stack<T> {
+    private items: T[] := []
+}
+impl Stack<T> {
+    fn static new() -> Stack<T> {
+        return Stack{};
+    }
+    fn push(self: Stack<T>, v: T) -> Void {
+        _ := push(self.items, v);
+    }
+    fn pop(self: Stack<T>) -> T {
+        return pop(self.items);
+    }
+}
+
+s := Stack<Int>.new();
+s.push(1);
+s.push(2);
+print s.pop();   // 2
+```
+Unlike Java, ExtSimp's generics are **reified, not erased**: the concrete
+type bound to `T` is recorded on each instance at construction time and
+enforced on every subsequent field assignment and method call against
+that instance:
+```
+s := Stack<Int>.new();
+s.push(1);
+s.push("two");   // Error! TypeError - expected Int, got Str
+```
+- **Type arguments are mandatory at every construction site.** `<...>`
+  is required both where a generic struct is *constructed* — a struct
+  literal (`Stack<Int>{...}`) or a static factory call
+  (`Stack<Int>.new()`) — and in *type positions* (a field type, parameter
+  type, return type, `self`'s type, or an `x : T;` declaration, e.g.
+  `self: Stack<T>` above). Omitting `<...>` at a construction site is a
+  type error, not silently accepted — there's no such thing as an
+  unbound `Stack` value.
+- The one place you *don't* repeat the type argument is inside a generic
+  struct's own methods when constructing another instance of itself —
+  `fn static new() -> Stack<T> { return Stack{}; }` above writes a bare
+  `Stack{}`, and it correctly inherits whatever `T` the *caller* of
+  `new()` chose (so `Stack<Int>.new()` produces an `Int`-stack, and
+  `Stack<Str>.new()` a `Str`-stack, from that same one line of code).
+  This inheritance only happens textually inside that struct's own
+  `impl` block; a bare `Stack{}` written anywhere else, with no type
+  argument and no such enclosing context, is a type error.
+- Every value that flows into a `T`-typed slot on a given instance — a
+  method parameter, a field assignment, a return value — is checked
+  against *that instance's own bound type*, not against every other
+  `Stack` in the program. Two `Stack` values can be bound to different
+  types (a `Stack<Int>` and a `Stack<Str>`) and each independently
+  enforces its own.
+- A generic-typed field or variable with no value given defaults to the
+  ordinary default for whatever concrete type is bound for that instance
+  (`0` for a bound `Int`, `""` for a bound `Str`, etc.) — the same rule
+  every non-generic field already follows, now applied after resolving
+  `T` to its concrete binding.
 
 #### Polymorphism
 

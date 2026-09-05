@@ -9,7 +9,7 @@ class Lexer(source: String, sourceLines: List[String]):
     private var line: Int = 1
     private val whitespaces : List[Char] = List(' ', '\t', '\n', '\r')
     private val numbers : List[Char] = List('0', '1', '2', '3', '4', '5', '6', '7', '8', '9')
-    private val valid_symbols : List[Char] = List(';', '(', ')', '&', '|', '¬', '+', '-', '/', '*', '.', ',', '%', '{', '}',':','[',']')
+    private val valid_symbols : List[Char] = List(';', '(', ')', '&', '|', '¬', '+', '-', '/', '*', '.', ',', '%', '{', '}',':','[',']','<','>','=','!','~','^')
 
     private var isComment: Boolean = false
 
@@ -301,6 +301,10 @@ class Lexer(source: String, sourceLines: List[String]):
             case x if isWordMatch("static") => { advanceUntilNextWord(); Token.Static }
 
             case x if isWordMatch("locked") => { advanceUntilNextWord(); Token.Locked }
+
+            case x if isWordMatch("try") => { advanceUntilNextWord(); Token.Try }
+            case x if isWordMatch("catch") => { advanceUntilNextWord(); Token.Catch }
+            case x if isWordMatch("throw") => { advanceUntilNextWord(); Token.Throw }
 
 
             case x if isWordMatch("print") => {advanceUntilNextWord(); Token.Print}

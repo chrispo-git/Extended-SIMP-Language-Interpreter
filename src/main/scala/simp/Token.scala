@@ -105,3 +105,7 @@ enum Token:
     case Priv
     case Static
     case Locked
+
+    case Try
+    case Catch
+    case Throw

@@ -1465,7 +1465,7 @@ class EvaluatorTest extends AnyFunSuite:
     assert(!SimpUtils.isNullable(SimpType.TypeInt))
     assert(!SimpUtils.isNullable(SimpType.TypeString))
     assert(!SimpUtils.isNullable(SimpType.TypeBool))
-    assert(SimpUtils.isNullable(SimpType.TypeFloat))
+    assert(!SimpUtils.isNullable(SimpType.TypeFloat))
     assert(SimpUtils.isNullable(SimpType.TypeNull))
   }
 
@@ -1606,11 +1606,12 @@ class EvaluatorTest extends AnyFunSuite:
   // ==== SimpUtils.checkType ====
 
   test("SimpUtils.checkType allows null for a nullable type") {
-    SimpUtils.checkType(Value.NullVal, SimpType.TypeFloat, "x")
+    SimpUtils.checkType(Value.NullVal, SimpType.TypeStruct("Point"), "x")
   }
 
   test("SimpUtils.checkType throws on null for a non-nullable type") {
     assertThrows[RuntimeException](SimpUtils.checkType(Value.NullVal, SimpType.TypeInt, "x"))
+    assertThrows[RuntimeException](SimpUtils.checkType(Value.NullVal, SimpType.TypeFloat, "x"))
   }
 
   test("SimpUtils.checkType allows an empty array for any array type") {

@@ -12,7 +12,7 @@ class FunctionEnv:
     fns(name) = fn
   }
   def lookupFn(name: String): Decl.FnDecl = {
-    fns.getOrElse(name, throw RuntimeException(s"$name not found"))
+    fns.getOrElse(name, throw SimpError("NameError", s"$name not found"))
   }
   def findNamespaced(name: String): Option[String] = fns.keys.find(k => k.endsWith(s"::$name"))
   

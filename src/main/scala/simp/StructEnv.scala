@@ -5,7 +5,7 @@ class StructEnv:
 
     def register(name: String, defn: StructDef): Unit = structs(name) = defn
     def lookup(name: String): StructDef = {
-        structs.getOrElse(name, throw RuntimeException(s"Unknown struct type: $name"))
+        structs.getOrElse(name, throw SimpError("NameError", s"Unknown struct type: $name"))
     }
     def exists(name: String): Boolean = structs.contains(name)
 
@@ -18,4 +18,4 @@ class StructEnv:
         structs.clear()
     }
 
-case class StructDef(fields: List[(String, SimpType, Option[Expr], Boolean)], isLocked: Boolean = false)
+case class StructDef(fields: List[(String, SimpType, Option[Expr], Boolean)], isLocked: Boolean = false, typeParams: List[String] = List())

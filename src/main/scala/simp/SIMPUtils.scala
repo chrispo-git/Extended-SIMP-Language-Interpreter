@@ -2,7 +2,7 @@ package simp
 
 object SimpUtils:
     def isNullable(t: SimpType): Boolean = t match {
-        case SimpType.TypeInt | SimpType.TypeString | SimpType.TypeBool => false
+        case SimpType.TypeInt | SimpType.TypeString | SimpType.TypeBool | SimpType.TypeFloat => false
         case _ => true
     }
     def getType(value: Value): SimpType = value match {
@@ -11,10 +11,11 @@ object SimpUtils:
         case Value.StrVal(_)  => SimpType.TypeString
         case Value.BoolVal(_) => SimpType.TypeBool
         case Value.NullVal    => SimpType.TypeNull
-        case Value.StructVal(typeName, _) => SimpType.TypeStruct(typeName)
+        case Value.StructVal(typeName, _, _) => SimpType.TypeStruct(typeName)
         case Value.MapVal(_, keyType, valueType) => SimpType.TypeMap(keyType, valueType)
         case Value.PairVal(fst, snd) => SimpType.TypePair(getType(fst), getType(snd))
         case Value.TypeVal(_) => SimpType.TypeType
+        case Value.StructTypeVal(_, _) => SimpType.TypeType
         case Value.RefVal(loc, refStore) => 
             refStore.load(loc) match {
                 case Value.RefVal(_, _) => throw RuntimeException("Nested references are not supported")
@@ -37,8 +38,10 @@ object SimpUtils:
             case Value.RefVal(name,_) => s"Ref($name)"
             case Value.MapVal(_, keyType, valueType) => s"Map(${getSimpTypeName(keyType)} -> ${getSimpTypeName(valueType)})"
             case Value.TypeVal(t) => s"Type.${getSimpTypeName(t)}"
+            case Value.StructTypeVal(typeName, typeArgs) =>
+                if typeArgs.isEmpty then s"Type.$typeName" else s"Type.$typeName<${typeArgs.map(getSimpTypeName).mkString(", ")}>"
             case Value.PairVal(fst, snd) => s"(${getPrettyPrint(fst, structEnv)}, ${getPrettyPrint(snd, structEnv)})"
-            case Value.StructVal(typeName, fields) => {
+            case Value.StructVal(typeName, fields, _) => {
                 if visited.contains(fields) then {
                     s"$typeName { ... }"
                 } else {
@@ -60,6 +63,7 @@ object SimpUtils:
         case Value.BoolVal(_) => value
         case Value.NullVal    => value
         case Value.TypeVal(_)    => value
+        case Value.StructTypeVal(_, _) => value
         case Value.ArrVal(elements) => Value.ArrVal(TypedArray.from(elements.map(e => deepCopyValue(e, visited))))
         case Value.MapVal(entries, keyType, valueType) => {
             Value.MapVal(
@@ -69,33 +73,60 @@ object SimpUtils:
             )
         }
         case Value.PairVal(fst, snd) => Value.PairVal(deepCopyValue(fst), deepCopyValue(snd))
-        case Value.StructVal(typeName, fields) => {
+        case Value.StructVal(typeName, fields, typeArgs) => {
             if visited.contains(fields) then {
-                throw RuntimeException("deepCopy doesn't support Cyclical references")
+                throw SimpError("ValueError", "deepCopy doesn't support Cyclical references")
             } else {
                 val newVisisted = visited + fields
-                Value.StructVal(typeName, scala.collection.mutable.Map(fields.map((k, v) => k -> deepCopyValue(v, newVisisted)).toSeq*))
-            }  
+                Value.StructVal(typeName, scala.collection.mutable.Map(fields.map((k, v) => k -> deepCopyValue(v, newVisisted)).toSeq*), typeArgs)
+            }
         }
         case Value.RefVal(loc, refStore) => Value.RefVal(loc, refStore)
     }
-    def checkType(value: Value, expected: SimpType, name: String): Unit = {
+    // A type containing a generic type parameter (e.g. `T` or `T[]` inside a
+    // generic struct/method) must be resolved against the currently-bound
+    // concrete type(s) before it can be type-checked - see resolveTypeParams.
+    def containsTypeParam(t: SimpType): Boolean = t match {
+        case SimpType.TypeParam(_) => true
+        case SimpType.TypeArr(inner) => containsTypeParam(inner)
+        case SimpType.TypeRef(inner) => containsTypeParam(inner)
+        case SimpType.TypePair(fst, snd) => containsTypeParam(fst) || containsTypeParam(snd)
+        case SimpType.TypeMap(k, v) => containsTypeParam(k) || containsTypeParam(v)
+        case _ => false
+    }
+    // Substitutes every `TypeParam(name)` found in `t` with its bound concrete
+    // type from `typeBindings` (the current generic struct/method's type
+    // arguments). Throws if a type parameter has no binding - this should never
+    // happen for a well-formed program, since a generic struct's type argument
+    // is bound at construction time and threaded through every method call on
+    // that instance; seeing one unbound indicates a real bug, not something to
+    // silently paper over by allowing anything through.
+    def resolveTypeParams(t: SimpType, typeBindings: Map[String, SimpType]): SimpType = t match {
+        case SimpType.TypeParam(name) => typeBindings.getOrElse(name, throw SimpError("TypeError", s"Unbound type parameter '$name'"))
+        case SimpType.TypeArr(inner) => SimpType.TypeArr(resolveTypeParams(inner, typeBindings))
+        case SimpType.TypeRef(inner) => SimpType.TypeRef(resolveTypeParams(inner, typeBindings))
+        case SimpType.TypePair(fst, snd) => SimpType.TypePair(resolveTypeParams(fst, typeBindings), resolveTypeParams(snd, typeBindings))
+        case SimpType.TypeMap(k, v) => SimpType.TypeMap(resolveTypeParams(k, typeBindings), resolveTypeParams(v, typeBindings))
+        case other => other
+    }
+    def checkType(value: Value, expected: SimpType, name: String, typeBindings: Map[String, SimpType] = Map()): Unit = {
+        val resolved = if containsTypeParam(expected) then resolveTypeParams(expected, typeBindings) else expected
         val actual = getType(value);
         if actual == SimpType.TypeNull then {
-            if !isNullable(expected) then {
-                throw RuntimeException(s"'$name' of type $expected cannot be Null")
+            if !isNullable(resolved) then {
+                throw SimpError("TypeError", s"'$name' of type $resolved cannot be Null")
             }
         } else {
             value match {
                 case Value.ArrVal(elements) if elements.isEmpty => {
-                    expected match {
-                        case SimpType.TypeArr(_) => return  
-                        case _ => throw RuntimeException(s"Type mismatch for '$name': expected $expected, got []")
+                    resolved match {
+                        case SimpType.TypeArr(_) => return
+                        case _ => throw SimpError("TypeError", s"Type mismatch for '$name': expected $resolved, got []")
                     }
                 }
                 case _ => {
-                    if actual != expected then {
-                        throw RuntimeException(s"Type mismatch for '$name': expected $expected, got $actual")
+                    if actual != resolved then {
+                        throw SimpError("TypeError", s"Type mismatch for '$name': expected $resolved, got $actual")
                     }
                 }
             }
@@ -113,17 +144,19 @@ object SimpUtils:
         case SimpType.TypeRef(inner) => s"ref ${getSimpTypeName(inner)}"
         case SimpType.TypeMap(k, v) => s"Map(${getSimpTypeName(k)}, ${getSimpTypeName(v)})"
         case SimpType.TypePair(fst, snd) => s"Pair(${getSimpTypeName(fst)}, ${getSimpTypeName(snd)})"
+        case SimpType.TypeParam(name) => name
     }
     def getTypeName(value: Value): String = value match {
         case Value.IntVal(_)  => "Int"
         case Value.FloatVal(_)  => "Float"
         case Value.StrVal(_)  => "Str"
         case Value.BoolVal(_) => "Bool"
-        case Value.StructVal(typeName, _) => typeName
+        case Value.StructVal(typeName, _, _) => typeName
         case Value.RefVal(loc, refStore)  => s"ref ${getTypeName(refStore.load(loc))}"
         case Value.MapVal(_, keyType, valueType) => s"Map(${getSimpTypeName(keyType)} -> ${getSimpTypeName(valueType)})"
         case Value.PairVal(fst, snd) => s"Pair(${getTypeName(fst)}, ${getTypeName(snd)})"
         case Value.TypeVal(t) => s"Type.${getSimpTypeName(t)}"
+        case Value.StructTypeVal(typeName, _) => s"Type.$typeName"
         case Value.ArrVal(elements) =>
             if elements.isEmpty then elements.declaredType.map(t => s"${getSimpTypeName(t)}[]").getOrElse("Unknown[]")
             else s"${getTypeName(elements.head)}[]"
@@ -159,9 +192,13 @@ object SimpUtils:
             case Expr.MethodCall(recv, name, args) =>
                 val inner = args.map(prettyPrintExpr(_, indent + 1)).mkString(",\n")
                 s"${pad}MethodCall($name,\n${prettyPrintExpr(recv, indent + 1)},\n$inner\n${pad})"
-            case Expr.StructLiteral(name, fields) =>
+            case Expr.StructLiteral(name, fields, typeArgs) =>
                 val inner = fields.map((f, e) => s"${"  " * (indent+1)}$f:\n${prettyPrintExpr(e, indent + 2)}").mkString(",\n")
-                s"${pad}StructLiteral($name,\n$inner\n${pad})"
+                val typeArgsStr = if typeArgs.isEmpty then "" else s"<${typeArgs.map(getSimpTypeName).mkString(", ")}>"
+                s"${pad}StructLiteral($name$typeArgsStr,\n$inner\n${pad})"
+            case Expr.StructTypeRef(name, typeArgs) =>
+                val typeArgsStr = if typeArgs.isEmpty then "" else s"<${typeArgs.map(getSimpTypeName).mkString(", ")}>"
+                s"${pad}StructTypeRef($name$typeArgsStr)"
             case Expr.Pair(fst, snd) =>
                 s"${pad}Pair(\n${prettyPrintExpr(fst, indent + 1)},\n${prettyPrintExpr(snd, indent + 1)}\n${pad})"
             case Expr.Block(cmds, result) =>
@@ -211,6 +248,14 @@ object SimpUtils:
             case Cmd.Continue                  => s"${pad}Continue"
             case Cmd.ArrAssign(arr, idx, v, _) =>
                 s"${pad}ArrAssign($arr,\n${prettyPrintExpr(idx, indent + 1)},\n${prettyPrintExpr(v, indent + 1)}\n${pad})"
+            case Cmd.Try(tryBody, catches, _) => {
+                val catchesStr = catches.map(c =>
+                    s"${pad}  Catch(${c.errorType}${c.bindVar.map(v => s" as $v").getOrElse("")},\n${prettyPrintCmd(c.body, indent + 2)}\n${pad}  )"
+                ).mkString(",\n")
+                s"${pad}Try(\n${prettyPrintCmd(tryBody, indent + 1)},\n$catchesStr\n${pad})"
+            }
+            case Cmd.Throw(errorType, expr, _) =>
+                s"${pad}Throw(${errorType.getOrElse("Error")},\n${prettyPrintExpr(expr, indent + 1)}\n${pad})"
             case Cmd.FieldAssign(loc, f, v, _) =>
                 s"${pad}FieldAssign($loc.$f,\n${prettyPrintExpr(v, indent + 1)}\n${pad})"
             case _ => s"${pad}${cmd.toString}"

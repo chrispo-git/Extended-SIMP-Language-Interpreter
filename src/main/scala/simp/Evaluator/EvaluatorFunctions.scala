@@ -15,7 +15,7 @@ trait EvaluatorFunctions { self: Evaluator =>
         } catch {
             case ReturnException(Some(value)) => {
                 if function.returnType != SimpType.TypeNull then {
-                    checkType(value, function.returnType, s"return value of '$name'")
+                    checkType(value, function.returnType, s"return value of '$name'", currentTypeBindings)
                     value
                 } else {
                     throwError(s"Function '$name' has invalid return statement")
@@ -42,7 +42,7 @@ trait EvaluatorFunctions { self: Evaluator =>
         } catch {
             case ReturnException(Some(value)) => {
                 if function.returnType != SimpType.TypeNull then {
-                    checkType(value, function.returnType, s"return value of '$name'")
+                    checkType(value, function.returnType, s"return value of '$name'", currentTypeBindings)
                     value
                 } else {
                     throwError(s"Function '$name' has invalid return statement")
@@ -59,7 +59,7 @@ trait EvaluatorFunctions { self: Evaluator =>
     }
     protected def populateStore(params: List[(String, SimpType)], args: List[Expr], callerStore: Store): Store = {
         if params.length != args.length then
-            throwError(s"Expected ${params.length} arguments, got ${args.length}")
+            throwError(s"Expected ${params.length} arguments, got ${args.length}", "TypeError")
         val localStore = Store()
         params.zip(args).foreach((param, arg) => {
             val (name, expectedType) = param
@@ -69,18 +69,18 @@ trait EvaluatorFunctions { self: Evaluator =>
                         case Expr.Ref(loc) => {
                             try {
                                 val currentVal = callerStore.load(loc)
-                                checkType(currentVal, inner, name)
+                                checkType(currentVal, inner, name, currentTypeBindings)
                                 localStore.store(name, Value.RefVal(loc, callerStore))
                             } catch case e : RuntimeException => {
-                                throwError(s"${e.getMessage}")
+                                throwError(e.getMessage, SimpError.errorTypeOf(e))
                             }
                         }
-                        case _ => throwError(s"Expected a variable name for ref parameter '$name', got a value. Tip: Don't use '!' ")   
+                        case _ => throwError(s"Expected a variable name for ref parameter '$name', got a value. Tip: Don't use '!' ", "TypeError")   
                     }
                 }
                 case _ => {
                     val value = evalExpr(arg, callerStore)
-                    checkType(value, expectedType, name)
+                    checkType(value, expectedType, name, currentTypeBindings)
                     localStore.store(name, value)
                 }
             }
@@ -91,15 +91,15 @@ trait EvaluatorFunctions { self: Evaluator =>
 
     protected def populateStoreFromValues(params: List[(String, SimpType)], argVals: List[Value], callerStore: Store): Store = {
         if params.length != argVals.length then
-            throwError(s"Expected ${params.length} arguments, got ${argVals.length}")
+            throwError(s"Expected ${params.length} arguments, got ${argVals.length}", "TypeError")
         val localStore = Store()
         params.zip(argVals).foreach((param, value) => {
             val (name, expectedType) = param
             expectedType match {
                 case SimpType.TypeRef(_) =>
-                    throwError(s"Method parameter '$name' cannot be a reference type")
+                    throwError(s"Method parameter '$name' cannot be a reference type", "TypeError")
                 case _ => {
-                    checkType(value, expectedType, name)
+                    checkType(value, expectedType, name, currentTypeBindings)
                     localStore.store(name, value)
                 }
             }

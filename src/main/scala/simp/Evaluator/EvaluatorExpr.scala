@@ -32,7 +32,7 @@ trait EvaluatorExpr { self: Evaluator =>
 
             case Pattern.PStruct(typeName, fieldPats) => {
                 value match {
-                    case Value.StructVal(vTypeName, fields) if vTypeName == typeName => {
+                    case Value.StructVal(vTypeName, fields, _) if vTypeName == typeName => {
                         val bindings = scala.collection.mutable.Map[String, Value]()
                         val allMatch = fieldPats.forall((fieldName, fieldPat) => {
                             checkFieldPrivacy(vTypeName, fieldName)
@@ -59,7 +59,7 @@ trait EvaluatorExpr { self: Evaluator =>
                 case v => v
             }
         } catch case e : RuntimeException => {
-            throwError(s"${e.getMessage}")
+            throwError(e.getMessage, SimpError.errorTypeOf(e))
         }
     }
     protected def evalBlock(cmds: List[Cmd], result: Expr, store: Store): Value = {
@@ -97,7 +97,7 @@ trait EvaluatorExpr { self: Evaluator =>
         try {
             store.load(loc)
         } catch case e : RuntimeException => {
-            throwError(s"${e.getMessage}")
+            throwError(e.getMessage, SimpError.errorTypeOf(e))
         }
     }
     protected def evalArrIndex(arr: Expr, idx: Expr, store: Store): Value = {
@@ -106,12 +106,12 @@ trait EvaluatorExpr { self: Evaluator =>
         (arrVal, index) match {
             case (Value.ArrVal(elements), Value.IntVal(i)) => {
                 if i < 0 || i >= elements.length then {
-                    throwError(s"Index $i out of bounds for array of length ${elements.length}")
+                    throwError(s"Index $i out of bounds for array of length ${elements.length}", "IndexError")
                 } else {
                     elements(i)
                 }
             }
-            case _ => throwError("Expected array and integer index")
+            case _ => throwError("Expected array and integer index", "TypeError")
         }
     }
     protected def evalUnaryOp(l: Expr, op: Op, store: Store): Value = {
@@ -119,10 +119,10 @@ trait EvaluatorExpr { self: Evaluator =>
             case Value.IntVal(left) => {
                 op match {
                     case Op.BitComplement => Value.IntVal(~left)
-                    case x => throwError(s"Unsupported operation '$x'")
+                    case x => throwError(s"Unsupported operation '$x'", "TypeError")
                 }
             }
-            case _ => throwError(s"Type mismatch in unary operation")
+            case _ => throwError(s"Type mismatch in unary operation", "TypeError")
         }
     }
     protected def evalBinarySingleNormal(l: Int | Double, op: Op, r: Int | Double): Value = {
@@ -132,9 +132,9 @@ trait EvaluatorExpr { self: Evaluator =>
             case Op.Add => Value.FloatVal(left + right)
             case Op.Sub => Value.FloatVal(left - right)
             case Op.Mul => Value.FloatVal(left * right)
-            case Op.Div if right == 0 => throwError(s"Division by Zero!")
+            case Op.Div if right == 0 => throwError(s"Division by Zero!", "ValueError")
             case Op.Div => Value.FloatVal(left / right)
-            case x => throwError(s"Unsupported operation '$x'")
+            case x => throwError(s"Unsupported operation '$x'", "TypeError")
         }
     }
     val opMethodName: Map[Op, String] = Map(
@@ -148,7 +148,7 @@ trait EvaluatorExpr { self: Evaluator =>
                     case Op.Sub => Value.IntVal(left - right)
                     case Op.Mul => Value.IntVal(left * right)
                     case Op.Mod => Value.IntVal(left % right)
-                    case Op.Div if right == 0 => throwError(s"Division by Zero!")
+                    case Op.Div if right == 0 => throwError(s"Division by Zero!", "ValueError")
                     case Op.Div => Value.IntVal(left / right)
                     case Op.BitAnd => Value.IntVal(left & right)
                     case Op.BitOr => Value.IntVal(left | right)
@@ -156,7 +156,7 @@ trait EvaluatorExpr { self: Evaluator =>
                     case Op.BitLeft => Value.IntVal(left << right)
                     case Op.BitRight => Value.IntVal(left >> right)
                     case Op.BitRightFill => Value.IntVal(left >>> right)
-                    case x => throwError(s"Unsupported operation '$x'") 
+                    case x => throwError(s"Unsupported operation '$x'", "TypeError") 
                 }
             }
             case (Value.IntVal(left), Value.FloatVal(right)) => evalBinarySingleNormal(left, op, right)
@@ -165,97 +165,152 @@ trait EvaluatorExpr { self: Evaluator =>
             case (Value.StrVal(left),right) => {
                 op match {
                     case Op.Add => Value.StrVal(left + getPrettyPrint(right, structEnv))
-                    case x => throwError(s"Unsupported operation '$x'")
+                    case x => throwError(s"Unsupported operation '$x'", "TypeError")
                 }
             }
-            case (Value.StructVal(t1, fieldL), Value.StructVal(t2, fieldR)) if t1==t2 => op match {
-                case Op.Add => callMethod(t1, "_add", List(Value.StructVal(t1, fieldL), Value.StructVal(t2, fieldR)), store)
-                case Op.Sub => callMethod(t1, "_sub", List(Value.StructVal(t1, fieldL), Value.StructVal(t2, fieldR)), store)
-                case Op.Mul => callMethod(t1, "_mul", List(Value.StructVal(t1, fieldL), Value.StructVal(t2, fieldR)), store)
-                case Op.Mod => callMethod(t1, "_mod", List(Value.StructVal(t1, fieldL), Value.StructVal(t2, fieldR)), store)
-                case Op.Div => callMethod(t1, "_div", List(Value.StructVal(t1, fieldL), Value.StructVal(t2, fieldR)), store)
-                case x => throwError(s"Unsupported operation '$x'") 
+            case (sL @ Value.StructVal(t1, _, _), sR @ Value.StructVal(t2, _, _)) if t1==t2 => op match {
+                case Op.Add => callMethod(t1, "_add", List(sL, sR), store)
+                case Op.Sub => callMethod(t1, "_sub", List(sL, sR), store)
+                case Op.Mul => callMethod(t1, "_mul", List(sL, sR), store)
+                case Op.Mod => callMethod(t1, "_mod", List(sL, sR), store)
+                case Op.Div => callMethod(t1, "_div", List(sL, sR), store)
+                case x => throwError(s"Unsupported operation '$x'", "TypeError")
             }
             
-            case _ => throwError(s"Type mismatch in binary operation")
+            case _ => throwError(s"Type mismatch in binary operation", "TypeError")
         }
     }
-    protected def evalStructLiteral(typeName: String, fields: List[(String, Expr)], store: Store): Value = {
+    // Resolves the concrete type-argument bindings a generic struct literal/instance
+    // is constructed with: either from explicit `<...>` args at this literal, or
+    // (when omitted) inherited from the nearest enclosing generic context for this
+    // exact struct (e.g. `Stack{}` written inside `Stack<T>`'s own static factory
+    // method, which should bind `T` to whatever the caller of that factory chose).
+    protected def resolveStructTypeArgs(typeName: String, defn: StructDef, typeArgs: List[SimpType]): Map[String, SimpType] = {
+        if defn.typeParams.isEmpty then {
+            Map()
+        } else if typeArgs.nonEmpty then {
+            if typeArgs.length != defn.typeParams.length then {
+                throwError(s"Generic struct '$typeName' expects ${defn.typeParams.length} type argument(s), got ${typeArgs.length}", "TypeError")
+            }
+            // A given type argument may itself reference an *enclosing* generic
+            // context's own type parameter (e.g. writing `Stack<T>{}` inside
+            // `Stack<T>`'s own method, instead of the equivalent bare `Stack{}`) -
+            // resolve it against the current ambient bindings before storing it,
+            // so the instance ends up bound to the real concrete type, not a
+            // dangling, unresolved `T`.
+            val resolvedArgs = typeArgs.map(t => if containsTypeParam(t) then resolveTypeParams(t, currentTypeBindings) else t)
+            defn.typeParams.zip(resolvedArgs).toMap
+        } else {
+            typeBindingStack.find(_._1 == typeName).map(_._2).getOrElse(
+                throwError(s"Generic struct '$typeName' requires explicit type arguments, e.g. $typeName<Int>{...}", "TypeError")
+            )
+        }
+    }
+    protected def evalStructLiteral(typeName: String, fields: List[(String, Expr)], typeArgs: List[SimpType], store: Store): Value = {
         checkStructLock(typeName)
         val defn = structEnv.lookup(typeName)
-        val fieldMap = scala.collection.mutable.Map[String, Value]()
-        defn.fields.foreach((name, expectedType, default, isPriv) => {
-            val fieldExpr = fields.find(_._1 == name)
-            val value = fieldExpr match {
-                case Some((_, expr)) => evalExpr(expr, store)
-                case None => default match {
-                    case Some(expr) => evalExpr(expr, store)
-                    case None => throwError(s"Missing field '$name' in $typeName literal and no default value provided")
+        val boundTypeArgs = resolveStructTypeArgs(typeName, defn, typeArgs)
+        typeBindingStack = (typeName, boundTypeArgs) :: typeBindingStack
+        try {
+            val fieldMap = scala.collection.mutable.Map[String, Value]()
+            defn.fields.foreach((name, expectedType, default, isPriv) => {
+                val fieldExpr = fields.find(_._1 == name)
+                val value = fieldExpr match {
+                    case Some((_, expr)) => evalExpr(expr, store)
+                    case None => default match {
+                        case Some(expr) => evalExpr(expr, store)
+                        case None => throwError(s"Missing field '$name' in $typeName literal and no default value provided", "ValueError")
+                    }
                 }
-            }
-            checkType(value, expectedType, name)
-            fieldMap(name) = value
-        })
-        Value.StructVal(typeName, fieldMap)
+                checkType(value, expectedType, name, currentTypeBindings)
+                fieldMap(name) = value
+            })
+            Value.StructVal(typeName, fieldMap, boundTypeArgs)
+        } finally {
+            typeBindingStack = typeBindingStack.tail
+        }
     }
     protected def evalFieldAccess(expr: Expr, field: String, store: Store): Value = {
         evalExpr(expr, store) match {
             case Value.PairVal(fst, snd) => field match {
                 case "fst" => fst
                 case "snd" => snd
-                case _ => throwError(s"Pairs only have 'fst' and 'snd' fields")
+                case _ => throwError(s"Pairs only have 'fst' and 'snd' fields", "NameError")
             }
-            case Value.StructVal(typeName, fields) => {
+            case Value.StructVal(typeName, fields, _) => {
                 checkFieldPrivacy(typeName, field)
-                fields.getOrElse(field, throwError(s"Unknown field '$field'"))
+                fields.getOrElse(field, throwError(s"Unknown field '$field'", "NameError"))
             }
-            case _ => throwError("Field access on non-struct or pair value")
+            case _ => throwError("Field access on non-struct or pair value", "TypeError")
         }
     }
     protected def callMethod(typeName: String, methodName: String, argVals: List[Value], store: Store): Value = {
         val fnDecl = fnEnv.methodTable.getOrElse(
             (typeName, methodName),
-            throwError(s"No method '$methodName' found for struct '$typeName'")
+            throwError(s"No method '$methodName' found for struct '$typeName'", "NameError")
         )
         if fnDecl.isStatic then {
-            throwError(s"Method '$methodName' is static and must be called as '$typeName.$methodName(...)', not on an instance")
+            throwError(s"Method '$methodName' is static and must be called as '$typeName.$methodName(...)', not on an instance", "TypeError")
         }
         checkMethodPrivacy(typeName, methodName)
+        val boundTypeArgs = argVals.headOption match {
+            case Some(Value.StructVal(_, _, typeArgs)) => typeArgs
+            case _ => Map[String, SimpType]()
+        }
         implContextStack = typeName :: implContextStack
+        typeBindingStack = (typeName, boundTypeArgs) :: typeBindingStack
         try {
             callFunctionWithValues(methodName, fnDecl, argVals, store)
         } finally {
             implContextStack = implContextStack.tail
+            typeBindingStack = typeBindingStack.tail
         }
     }
-    protected def callStaticMethod(typeName: String, methodName: String, argVals: List[Value], store: Store): Value = {
+    protected def callStaticMethod(typeName: String, methodName: String, typeArgs: List[SimpType], argVals: List[Value], store: Store): Value = {
         val fnDecl = fnEnv.methodTable.getOrElse(
             (typeName, methodName),
-            throwError(s"No method '$methodName' found for struct '$typeName'")
+            throwError(s"No method '$methodName' found for struct '$typeName'", "NameError")
         )
         if !fnDecl.isStatic then {
-            throwError(s"Method '$methodName' is not static; it must be called on an instance of '$typeName'")
+            throwError(s"Method '$methodName' is not static; it must be called on an instance of '$typeName'", "TypeError")
         }
         checkMethodPrivacy(typeName, methodName)
+        val defn = structEnv.lookup(typeName)
+        val boundTypeArgs =
+            if defn.typeParams.isEmpty then Map[String, SimpType]()
+            else if typeArgs.nonEmpty then {
+                if typeArgs.length != defn.typeParams.length then {
+                    throwError(s"Generic struct '$typeName' expects ${defn.typeParams.length} type argument(s), got ${typeArgs.length}", "TypeError")
+                }
+                // Same resolution as resolveStructTypeArgs: a type argument here may
+                // itself be an enclosing generic context's own type parameter (e.g.
+                // `Stack<T>.helper()` called from within Stack<T>'s own method).
+                val resolvedArgs = typeArgs.map(t => if containsTypeParam(t) then resolveTypeParams(t, currentTypeBindings) else t)
+                defn.typeParams.zip(resolvedArgs).toMap
+            } else {
+                throwError(s"Static method '$typeName.$methodName' on a generic struct requires explicit type arguments, e.g. $typeName<Int>.$methodName(...)", "TypeError")
+            }
         implContextStack = typeName :: implContextStack
+        typeBindingStack = (typeName, boundTypeArgs) :: typeBindingStack
         try {
             callFunctionWithValues(methodName, fnDecl, argVals, store)
         } finally {
             implContextStack = implContextStack.tail
+            typeBindingStack = typeBindingStack.tail
         }
     }
     protected def evalMethodCall(receiver: Expr, methodName: String, args: List[Expr], store: Store): Value = {
         val receiverVal = evalExpr(receiver, store)
         receiverVal match {
-            case Value.TypeVal(SimpType.TypeStruct(typeName)) => {
+            case Value.StructTypeVal(typeName, typeArgs) => {
                 val argVals = args.map(evalExpr(_, store))
-                callStaticMethod(typeName, methodName, argVals, store)
+                callStaticMethod(typeName, methodName, typeArgs, argVals, store)
             }
-            case Value.StructVal(typeName, _) => {
+            case Value.StructVal(typeName, _, _) => {
                 val argVals = receiverVal :: args.map(evalExpr(_, store))
                 callMethod(typeName, methodName, argVals, store)
             }
-            case _ => throwError(s"Can't call method '$methodName' on a non-struct value")
+            case _ => throwError(s"Can't call method '$methodName' on a non-struct value", "TypeError")
         }
     }
     protected def evalFnCall(name: String, args: List[Expr], store: Store): Value = {
@@ -293,7 +348,8 @@ trait EvaluatorExpr { self: Evaluator =>
             case Expr.ArrIndex(arr, idx) => evalArrIndex(arr, idx, store)
             case Expr.UnaryOp(l, op) => evalUnaryOp(l, op, store)
             case Expr.BinaryOp(l, op, r) => evalBinaryOp(l, op, r, store)
-            case Expr.StructLiteral(typeName, fields) => evalStructLiteral(typeName, fields, store)
+            case Expr.StructLiteral(typeName, fields, typeArgs) => evalStructLiteral(typeName, fields, typeArgs, store)
+            case Expr.StructTypeRef(typeName, typeArgs) => Value.StructTypeVal(typeName, typeArgs)
             case Expr.FieldAccess(expr, field) => evalFieldAccess(expr, field, store)
             case Expr.MethodCall(receiver, methodName, args) => evalMethodCall(receiver, methodName, args, store)
             case Expr.FnCall(name, args) => evalFnCall(name, args, store)

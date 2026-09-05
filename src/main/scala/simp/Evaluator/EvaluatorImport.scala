@@ -38,7 +38,7 @@ trait EvaluatorImport { self: Evaluator =>
                 val importDir = File(fullPath).getParentFile.getAbsolutePath
                 processImport(path, alias, importDir, store)
             }
-            case Program.PDecl(Decl.StructDecl(name, fields, isLocked)) => structEnv.register(s"$alias::$name", StructDef(fields, isLocked))
+            case Program.PDecl(Decl.StructDecl(name, fields, isLocked, typeParams)) => structEnv.register(s"$alias::$name", StructDef(fields, isLocked, typeParams))
             case _ => throwError(s"Imports can only contain declarations")
         })
 

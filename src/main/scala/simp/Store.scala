@@ -18,7 +18,7 @@ class Store(val parent: Option[Store] = None):
 
     def load(loc: String): Value = findOwner(loc) match {
         case Some(owner) => owner.getLocal(loc)
-        case None => throw RuntimeException(s"Unbound location: $loc")
+        case None => throw SimpError("NameError", s"Unbound location: $loc")
     }
 
     def store(loc: String, value: Value): Unit = {

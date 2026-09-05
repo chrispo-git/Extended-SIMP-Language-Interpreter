@@ -12,6 +12,7 @@ class Parser(protected val tokens: List[Token], protected val structEnv : Struct
     with ParserRepl:
     
     protected var pos: Int = 0
+    protected var activeTypeParams: Set[String] = Set()
 
     protected def isAtEnd(): Boolean = pos >= tokens.length
 

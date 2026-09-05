@@ -20,7 +20,7 @@ trait EvaluatorCmd { self: Evaluator =>
                 try {
                     store.store(loc, value)
                 } catch case e : RuntimeException => {
-                    throwError(s"${e.getMessage}")
+                    throwError(e.getMessage, SimpError.errorTypeOf(e))
                 }
             }
         }
@@ -41,16 +41,26 @@ trait EvaluatorCmd { self: Evaluator =>
         case SimpType.TypeMap(keyType, valueType) => Value.MapVal(scala.collection.mutable.Map(), keyType, valueType)
         case SimpType.TypePair(fst, snd) => Value.PairVal(defaultValueFor(fst, store), defaultValueFor(snd, store))
         case SimpType.TypeRef(_) => throwError(s"Cannot create a default value for a reference type")
+        case SimpType.TypeParam(name) => currentTypeBindings.get(name) match {
+            case Some(concrete) => defaultValueFor(concrete, store)
+            case None => throwError(s"Unbound type parameter '$name'", "TypeError")
+        }
         case SimpType.TypeStruct(name) => {
             val defn = structEnv.lookup(name)
-            val fieldMap = scala.collection.mutable.Map[String, Value]()
-            defn.fields.foreach((fname, ftype, fdefault, _) => {
-                fieldMap(fname) = fdefault match {
-                    case Some(expr) => evalExpr(expr, store)
-                    case None => defaultValueFor(ftype, store)
-                }
-            })
-            Value.StructVal(name, fieldMap)
+            val boundTypeArgs = resolveStructTypeArgs(name, defn, List())
+            typeBindingStack = (name, boundTypeArgs) :: typeBindingStack
+            try {
+                val fieldMap = scala.collection.mutable.Map[String, Value]()
+                defn.fields.foreach((fname, ftype, fdefault, _) => {
+                    fieldMap(fname) = fdefault match {
+                        case Some(expr) => evalExpr(expr, store)
+                        case None => defaultValueFor(ftype, store)
+                    }
+                })
+                Value.StructVal(name, fieldMap, boundTypeArgs)
+            } finally {
+                typeBindingStack = typeBindingStack.tail
+            }
         }
     }
     protected def execTypeDecl(loc: String, t: SimpType, line: Int, store: Store): Unit = {
@@ -61,45 +71,45 @@ trait EvaluatorCmd { self: Evaluator =>
         pos = line
         try {
             store.load(loc) match {
-                case Value.StructVal(typeName, fields) => {
+                case Value.StructVal(typeName, fields, typeArgs) => {
                     val defn = structEnv.lookup(typeName)
                     val expectedType = defn.fields.find(_._1 == field).getOrElse(
-                        throwError(s"Unknown field '$field'")
+                        throwError(s"Unknown field '$field'", "NameError")
                     )._2
                     checkFieldPrivacy(typeName, field)
                     val value = evalExpr(valueExpr, store)
-                    checkType(value, expectedType, field)
+                    checkType(value, expectedType, field, typeArgs)
                     fields(field) = value
                 }
-                case _ => throwError(s"'$loc' is not a struct")
+                case _ => throwError(s"'$loc' is not a struct", "TypeError")
             }
         } catch case e : RuntimeException => {
-            throwError(s"${e.getMessage}")
+            throwError(e.getMessage, SimpError.errorTypeOf(e))
         }
     }
     protected def execFieldIndexAssign(loc: String, field: String, index: Expr, valueExpr: Expr, line: Int, store: Store): Unit = {
         pos = line
         try {
             store.load(loc) match {
-                case Value.StructVal(typeName, fields) => {
+                case Value.StructVal(typeName, fields, _) => {
                     checkFieldPrivacy(typeName, field)
                     fields.get(field) match {
                         case Some(Value.ArrVal(elements)) => {
                             val idx = evalExpr(index, store) match {
                                 case Value.IntVal(i) => i
-                                case _ => throwError("Array index must be an integer")
+                                case _ => throwError("Array index must be an integer", "TypeError")
                             }
                             if idx < 0 || idx >= elements.length then
-                                throwError(s"Index $idx out of bounds")
+                                throwError(s"Index $idx out of bounds", "IndexError")
                             elements(idx) = evalExpr(valueExpr, store)
                         }
-                        case _ => throwError(s"'$field' is not an array")
+                        case _ => throwError(s"'$field' is not an array", "TypeError")
                     }
                 }
-                case _ => throwError(s"'$loc' is not a struct")
+                case _ => throwError(s"'$loc' is not a struct", "TypeError")
             }
         } catch case e : RuntimeException => {
-            throwError(s"${e.getMessage}")
+            throwError(e.getMessage, SimpError.errorTypeOf(e))
         }
     }
     protected def execIf(cond: BoolExpr, thenBranch: Cmd, elseBranch: Cmd, line: Int, store: Store): Unit = {
@@ -142,7 +152,7 @@ trait EvaluatorCmd { self: Evaluator =>
                     i += 1
                 }
             }
-            case _ => throwError("for loop expects an array")
+            case _ => throwError("for loop expects an array", "TypeError")
         }
     }
     protected def execArrAssign(loc: String, idx: Expr, value: Expr, line: Int, store: Store): Unit = {
@@ -154,15 +164,15 @@ trait EvaluatorCmd { self: Evaluator =>
             (arrVal, index) match {
                 case (Value.ArrVal(elements), Value.IntVal(i)) => {
                     if i < 0 || i >= elements.length then {
-                        throwError(s"Index $i out of bounds for array of length ${elements.length}")
+                        throwError(s"Index $i out of bounds for array of length ${elements.length}", "IndexError")
                     } else {
                         elements(i) = v
                     }
                 }
-                case _ => throwError("Expected array and integer index")
+                case _ => throwError("Expected array and integer index", "TypeError")
             }
         } catch case e : RuntimeException => {
-            throwError(s"${e.getMessage}")
+            throwError(e.getMessage, SimpError.errorTypeOf(e))
         }
     }
     protected def execArrAssignNested(loc: String, indices: List[Expr], value: Expr, line: Int, store: Store): Unit = {
@@ -171,27 +181,27 @@ trait EvaluatorCmd { self: Evaluator =>
         try {
             var current = store.load(loc) match {
                 case Value.ArrVal(elements) => elements
-                case _ => throwError(s"'$loc' is not an array")
+                case _ => throwError(s"'$loc' is not an array", "TypeError")
             }
             var i = 0
             while i < indices.length - 1 do {
                 val idx = evalExpr(indices(i), store) match {
                     case Value.IntVal(n) => n
-                    case _ => throwError("Array index must be an integer")
+                    case _ => throwError("Array index must be an integer", "TypeError")
                 }
                 current = current(idx) match {
                     case Value.ArrVal(elements) => elements
-                    case _ => throwError(s"Not an array at index $idx")
+                    case _ => throwError(s"Not an array at index $idx", "IndexError")
                 }
                 i += 1
             }
             val lastIdx = evalExpr(indices.last, store) match {
                 case Value.IntVal(n) => n
-                case _ => throwError("Array index must be an integer")
+                case _ => throwError("Array index must be an integer", "TypeError")
             }
             current(lastIdx) = v
         } catch case e : RuntimeException => {
-            throwError(s"${e.getMessage}")
+            throwError(e.getMessage, SimpError.errorTypeOf(e))
         }
     }
     protected def execFieldIndexAssignNested(loc: String, field: String, indices: List[Expr], value: Expr, line: Int, store: Store): Unit = {
@@ -199,33 +209,57 @@ trait EvaluatorCmd { self: Evaluator =>
         val v = evalExpr(value, store)
         try {
             val struct = store.load(loc) match {
-                case Value.StructVal(typeName, fields) => { checkFieldPrivacy(typeName, field); fields }
-                case _ => throwError(s"[Error] '$loc' is not a struct")
+                case Value.StructVal(typeName, fields, _) => { checkFieldPrivacy(typeName, field); fields }
+                case _ => throwError(s"'$loc' is not a struct", "TypeError")
             }
             var current = struct(field) match {
                 case Value.ArrVal(elements) => elements
-                case _ => throwError(s"[Error] '$loc.$field' is not an array")
+                case _ => throwError(s"'$loc.$field' is not an array", "TypeError")
             }
             var i = 0
             while i < indices.length - 1 do {
                 val idx = evalExpr(indices(i), store) match {
                     case Value.IntVal(n) => n
-                    case _ => throwError("[Error] Array index must be an integer")
+                    case _ => throwError("Array index must be an integer", "TypeError")
                 }
                 current = current(idx) match {
                     case Value.ArrVal(elements) => elements
-                    case _ => throwError(s"[Error] Not an array at index $idx")
+                    case _ => throwError(s"Not an array at index $idx", "IndexError")
                 }
                 i += 1
             }
             val lastIdx = evalExpr(indices.last, store) match {
                 case Value.IntVal(n) => n
-                case _ => throwError("[Error] Array index must be an integer")
+                case _ => throwError("Array index must be an integer", "TypeError")
             }
             current(lastIdx) = v
         } catch case e : RuntimeException => {
-            throwError(s"${e.getMessage}")
+            throwError(e.getMessage, SimpError.errorTypeOf(e))
         }
+    }
+    protected def execTry(tryBody: Cmd, catches: List[CatchClause], line: Int, store: Store): Unit = {
+        pos = line
+        try {
+            execCmd(tryBody, store.child())
+        } catch case e: RuntimeException => {
+            val errType = SimpError.errorTypeOf(e)
+            catches.find(c => SimpError.matches(errType, c.errorType)) match {
+                case Some(clause) => {
+                    val catchStore = store.child()
+                    clause.bindVar.foreach(v => catchStore.declareConst(v, Value.StrVal(e.getMessage)))
+                    execCmd(clause.body, catchStore)
+                }
+                case None => throw e
+            }
+        }
+    }
+    protected def execThrow(errorType: Option[String], expr: Expr, line: Int, store: Store): Unit = {
+        pos = line
+        val message = evalExpr(expr, store) match {
+            case Value.StrVal(s) => s
+            case other => getPrettyPrint(other, structEnv)
+        }
+        throwError(message, errorType.getOrElse(SimpError.Root))
     }
     protected def execCmd(cmd: Cmd, store: Store): Unit = {
         cmd match {
@@ -261,6 +295,8 @@ trait EvaluatorCmd { self: Evaluator =>
             case Cmd.ArrAssign(loc, idx, value, line) => execArrAssign(loc, idx, value, line, store)
             case Cmd.ArrAssignNested(loc, indices, value, line) => execArrAssignNested(loc, indices, value, line, store)
             case Cmd.FieldIndexAssignNested(loc, field, indices, value, line) => execFieldIndexAssignNested(loc, field, indices, value, line, store)
+            case Cmd.Try(tryBody, catches, line) => execTry(tryBody, catches, line, store)
+            case Cmd.Throw(errorType, expr, line) => execThrow(errorType, expr, line, store)
         }
     }
 }

@@ -20,9 +20,10 @@ enum Expr:
     case Ref(loc: String)
     case ArrLiteral(elements: List[Expr]) 
     case ArrIndex(arr: Expr, index: Expr)
-    case StructLiteral(typeName: String, fields: List[(String, Expr)]) 
-    case FieldAccess(expr: Expr, field: String) 
-    case TypeLiteral(t: SimpType) 
+    case StructLiteral(typeName: String, fields: List[(String, Expr)], typeArgs: List[SimpType] = List())
+    case StructTypeRef(typeName: String, typeArgs: List[SimpType])
+    case FieldAccess(expr: Expr, field: String)
+    case TypeLiteral(t: SimpType)
     case Pair(fst: Expr, snd: Expr)
     case Match(expr: Expr, arms: List[MatchArm])
     case Block(cmds: List[Cmd], result: Expr)
@@ -67,7 +68,8 @@ enum Value:
   case BoolVal(b: Boolean)
   case RefVal(loc: String, store: Store)
   case ArrVal(elements: TypedArray)
-  case StructVal(typeName: String, fields: scala.collection.mutable.Map[String, Value])
+  case StructVal(typeName: String, fields: scala.collection.mutable.Map[String, Value], typeArgs: Map[String, SimpType] = Map())
+  case StructTypeVal(typeName: String, typeArgs: List[SimpType])
   case MapVal(entries: scala.collection.mutable.Map[Value, Value], keyType: SimpType, valueType: SimpType)
   case TypeVal(t: SimpType)
   case PairVal(fst: Value, snd: Value)
@@ -111,6 +113,10 @@ enum Cmd:
     case FieldIndexAssignNested(loc: String, field: String, indices: List[Expr], value: Expr, line: Int)
     case Continue
     case Break
+    case Try(tryBody: Cmd, catches: List[CatchClause], line: Int)
+    case Throw(errorType: Option[String], expr: Expr, line: Int)
+
+case class CatchClause(errorType: String, bindVar: Option[String], body: Cmd)
 
 
 enum Program:
@@ -122,7 +128,7 @@ enum Program:
 
 enum Decl:
   case FnDecl(name: String, params: List[(String, SimpType)], body: Cmd, returnType: SimpType, isPrivate: Boolean, isStatic: Boolean = false)
-  case StructDecl(name: String, fields: List[(String, SimpType, Option[Expr], Boolean)], isLocked: Boolean = false)
+  case StructDecl(name: String, fields: List[(String, SimpType, Option[Expr], Boolean)], isLocked: Boolean = false, typeParams: List[String] = List())
   case ImportDecl(path: String, alias: String)
 
 enum SimpType:
@@ -137,7 +143,26 @@ enum SimpType:
     case TypeStruct(name: String)
     case TypeMap(keyType: SimpType, valueType: SimpType)
     case TypePair(fst: SimpType, snd: SimpType)
+    case TypeParam(name: String)
 
 case class ReturnException(value: Option[Value] = None) extends Exception
 case class BreakException() extends Exception
 case class ContinueException() extends Exception
+
+// A typed runtime error, catchable by `try`/`catch` (see Cmd.Try/Cmd.Throw).
+// `errorType` is one of SimpError.KnownTypes; RuntimeExceptions thrown
+// without going through this class (raw `throw RuntimeException(...)`, or a
+// host-language exception) are treated as the generic "Error" type when caught.
+case class SimpError(errorType: String, msg: String) extends RuntimeException(msg)
+object SimpError:
+    val Root = "Error"
+    // The fixed, closed set of built-in error type names a `catch` clause or
+    // typed `throw TypeName(...)` may use. "Error" is the umbrella that
+    // matches any error regardless of its specific type.
+    val KnownTypes: Set[String] = Set(Root, "TypeError", "ValueError", "IndexError", "KeyError", "NameError")
+    def errorTypeOf(e: Throwable): String = e match {
+        case SimpError(t, _) => t
+        case _ => Root
+    }
+    def matches(caughtType: String, wantedType: String): Boolean =
+        wantedType == Root || caughtType == wantedType

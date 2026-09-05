@@ -32,74 +32,74 @@ trait EvaluatorBoolExpr { self: Evaluator =>
                 bop match {
                     case Bop.Eq => left == right 
                     case Bop.Neq => left != right 
-                    case x => throwError(s"Unsupported operation '$x'")
+                    case x => throwError(s"Unsupported operation '$x'", "TypeError")
                 }
             }
             case (Value.BoolVal(left), Value.BoolVal(right)) => {
                 bop match {
                     case Bop.Eq => left == right 
                     case Bop.Neq => left != right 
-                    case x => throwError(s"Unsupported operation '$x'")
+                    case x => throwError(s"Unsupported operation '$x'", "TypeError")
                 }
             }
             case (Value.ArrVal(left), Value.ArrVal(right)) => {
                 bop match {
                     case Bop.Eq => left == right 
                     case Bop.Neq => left != right 
-                    case x => throwError(s"Unsupported operation '$x'")
+                    case x => throwError(s"Unsupported operation '$x'", "TypeError")
                 }
             }
-            case (Value.StructVal(t1, f1), Value.StructVal(t2, f2)) if t1 == t2 => {
+            case (sL @ Value.StructVal(t1, f1, _), sR @ Value.StructVal(t2, f2, _)) if t1 == t2 => {
                 bop match {
                     case Bop.Gt => {
-                        callMethod(t1, "_gt", List(Value.StructVal(t1, f1), Value.StructVal(t2, f2)), store)  match {
+                        callMethod(t1, "_gt", List(sL, sR), store)  match {
                             case Value.BoolVal(b) => b
-                            case x => throwError(s"Incorrect return type for method '_gt'")
+                            case x => throwError(s"Incorrect return type for method '_gt'", "TypeError")
                         }
                     }
                     case Bop.Gte => {
-                        callMethod(t1, "_gte", List(Value.StructVal(t1, f1), Value.StructVal(t2, f2)), store)  match {
+                        callMethod(t1, "_gte", List(sL, sR), store)  match {
                             case Value.BoolVal(b) => b
-                            case x => throwError(s"Incorrect return type for method '_gte'")
+                            case x => throwError(s"Incorrect return type for method '_gte'", "TypeError")
                         }
                     }
                     case Bop.Lt => {
-                        callMethod(t1, "_lt", List(Value.StructVal(t1, f1), Value.StructVal(t2, f2)), store)  match {
+                        callMethod(t1, "_lt", List(sL, sR), store)  match {
                             case Value.BoolVal(b) => b
-                            case x => throwError(s"Incorrect return type for method '_lt'")
+                            case x => throwError(s"Incorrect return type for method '_lt'", "TypeError")
                         }
                     }
                     case Bop.Lte => {
-                        callMethod(t1, "_lte", List(Value.StructVal(t1, f1), Value.StructVal(t2, f2)), store)  match {
+                        callMethod(t1, "_lte", List(sL, sR), store)  match {
                             case Value.BoolVal(b) => b
-                            case x => throwError(s"Incorrect return type for method '_lte'")
+                            case x => throwError(s"Incorrect return type for method '_lte'", "TypeError")
                         }
                     }
                     case Bop.Eq if fnEnv.methodTable.contains((t1, "_eq")) => {
-                        callMethod(t1, "_eq", List(Value.StructVal(t1, f1), Value.StructVal(t2, f2)), store)  match {
+                        callMethod(t1, "_eq", List(sL, sR), store)  match {
                             case Value.BoolVal(b) => b
-                            case x => throwError(s"Incorrect return type for method '_eq'")
+                            case x => throwError(s"Incorrect return type for method '_eq'", "TypeError")
                         }
                     }
                     case Bop.Neq if fnEnv.methodTable.contains((t1, "_neq")) => {
-                        callMethod(t1, "_neq", List(Value.StructVal(t1, f1), Value.StructVal(t2, f2)), store)  match {
+                        callMethod(t1, "_neq", List(sL, sR), store)  match {
                             case Value.BoolVal(b) => b
-                            case x => throwError(s"Incorrect return type for method '_neq'")
+                            case x => throwError(s"Incorrect return type for method '_neq'", "TypeError")
                         }
                     }
                     case Bop.Eq => t1 == t2 && structsEqual(f1, f2)
                     case Bop.Neq => t1 != t2 || !structsEqual(f1, f2)
-                    case x => throwError(s"Unsupported operation '$x'")
+                    case x => throwError(s"Unsupported operation '$x'", "TypeError")
                 }
             }
-            case (Value.StructVal(t1, f1), Value.StructVal(t2, f2)) => {
+            case (Value.StructVal(t1, f1, _), Value.StructVal(t2, f2, _)) => {
                 bop match {
                     case Bop.Eq => t1 == t2 && structsEqual(f1, f2)
                     case Bop.Neq => t1 != t2 || !structsEqual(f1, f2)
-                    case x => throwError(s"Unsupported operation '$x'")
+                    case x => throwError(s"Unsupported operation '$x'", "TypeError")
                 }
             }
-            case _ => throwError(s"Type Mismatch")
+            case _ => throwError(s"Type Mismatch", "TypeError")
         }
     }
 
@@ -126,7 +126,7 @@ trait EvaluatorBoolExpr { self: Evaluator =>
                 val v = evalExpr(expr, store)
                 v match {
                     case Value.BoolVal(b) => b
-                    case x => throwError(s"Expected boolean value, got '$x'")
+                    case x => throwError(s"Expected boolean value, got '$x'", "TypeError")
                 }
             }
             case BoolExpr.Compare(l,bop,r) => evalCompare(l, bop, r, store)
@@ -151,7 +151,7 @@ trait EvaluatorBoolExpr { self: Evaluator =>
         case (Value.BoolVal(a), Value.BoolVal(b)) => a == b
         case (Value.NullVal, Value.NullVal)        => true
         case (Value.ArrVal(a), Value.ArrVal(b))   => a.length == b.length && a.zip(b).forall((x, y) => valuesEqual(x, y, visited))
-        case (Value.StructVal(t1, f1), Value.StructVal(t2, f2)) => t1 == t2 && structsEqual(f1, f2, visited)
+        case (Value.StructVal(t1, f1, _), Value.StructVal(t2, f2, _)) => t1 == t2 && structsEqual(f1, f2, visited)
         case _ => false
     }
 }

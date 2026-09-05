@@ -1,0 +1,46 @@
+locked struct Stack<T> {
+    private stack : T[] := []
+}
+impl Stack<T> {
+    fn static new() -> Stack<T> {
+        return Stack<T>{};
+    }
+    fn peek(self: Stack<T>) -> T {
+        return back(self.stack);
+    }
+    fn push(self: Stack<T>, value : T) -> Void {
+        _:= push(self.stack, value);
+    }
+    fn pop(self: Stack<T>) -> T {
+        return pop(self.stack);
+    }
+    fn isEmpty(self: Stack<T>) -> Bool {
+        return (len(self.stack) < 1);
+    }
+    fn size(self: Stack<T>) -> Int {
+        return len(self.stack);
+    }
+}
+
+myNewIntStack := Stack<Int>.new();
+print myNewIntStack.isEmpty();
+_:= myNewIntStack.push(5);
+_:= myNewIntStack.push(6);
+_:= myNewIntStack.push(7);
+print myNewIntStack.size();
+print myNewIntStack.peek();
+print myNewIntStack.pop();
+print myNewIntStack.peek();
+print myNewIntStack.size();
+
+
+myNewStrStack := Stack<Str>.new();
+print myNewStrStack.isEmpty();
+_:= myNewStrStack.push("A");
+_:= myNewStrStack.push("B");
+_:= myNewStrStack.push("C");
+print myNewStrStack.size();
+print myNewStrStack.peek();
+print myNewStrStack.pop();
+print myNewStrStack.peek();
+print myNewStrStack.size();

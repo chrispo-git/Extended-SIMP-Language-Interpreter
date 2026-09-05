@@ -67,6 +67,21 @@ trait ParserExpr { self: Parser =>
         expect(Token.CloseBrace)
         Expr.Match(expr, arms.toList)
     }
+    // Parses a `<Type, Type, ...>` type-argument list at an expression site
+    // (a generic struct literal or static method call), e.g. the `<Int>` in
+    // `Stack<Int>{...}` or `Stack<Int>.new()`. Assumes the leading `<` has not
+    // yet been consumed.
+    protected def parseTypeArgList(): List[SimpType] = {
+        expect(Token.Lt)
+        val args = scala.collection.mutable.ListBuffer[SimpType]()
+        args += parseType()
+        while peek() == Token.Comma do {
+            advance()
+            args += parseType()
+        }
+        expect(Token.Gt)
+        args.toList
+    }
     protected def parseStructLiteralFields(): List[(String, Expr)] = {
         val fields = scala.collection.mutable.ListBuffer[(String, Expr)]()
         while peek() != Token.CloseBrace do {
@@ -221,11 +236,25 @@ trait ParserExpr { self: Parser =>
                 advance()
                 val fields = parseStructLiteralFields()
                 expect(Token.CloseBrace)
-                Expr.StructLiteral(name, fields)
+                Expr.StructLiteral(name, fields, List())
+            }
+            case Token.Variable(name) if peekNext() == Token.Lt && structEnv.exists(name) => {
+                advance()
+                val typeArgs = parseTypeArgList()
+                peek() match {
+                    case Token.OpenBrace => {
+                        advance()
+                        val fields = parseStructLiteralFields()
+                        expect(Token.CloseBrace)
+                        Expr.StructLiteral(name, fields, typeArgs)
+                    }
+                    case Token.Dot => Expr.StructTypeRef(name, typeArgs)
+                    case x => throwError(s"Expected '{' or '.' after type arguments, got '$x'")
+                }
             }
             case Token.Variable(name) if peekNext() == Token.Dot && structEnv.exists(name) => {
                 advance()
-                Expr.TypeLiteral(SimpType.TypeStruct(name))
+                Expr.StructTypeRef(name, List())
             }
             case Token.Null => { advance(); Expr.Null }
             case Token.Deref => {

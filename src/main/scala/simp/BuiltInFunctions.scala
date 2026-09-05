@@ -316,11 +316,11 @@ object Builtins:
         // assert - If false, throws an Error
         fnEnv.registerBuiltin("assert", args => args match {
                 case List(Value.BoolVal(b)) => {
-                    if !b then throw RuntimeException("Assertion failed")
+                    if !b then throw SimpError("ValueError", "Assertion failed")
                     Value.BoolVal(true)
                 }
                 case List(Value.BoolVal(b), Value.StrVal(msg)) => {
-                    if !b then throw RuntimeException(s"Assertion failed: $msg")
+                    if !b then throw SimpError("ValueError", s"Assertion failed: $msg")
                     Value.BoolVal(true)
                 }
                 case _ => throw RuntimeException("assert expects a boolean and an optional message")
@@ -466,7 +466,7 @@ object Builtins:
         fnEnv.registerBuiltin("get", args => args match {
             case List(Value.MapVal(entries, keyType, _), key) =>
                 checkType(key, keyType, "map key")
-                entries.getOrElse(key, throw RuntimeException(s"Key not found in map"))
+                entries.getOrElse(key, throw SimpError("KeyError", s"Key not found in map"))
             case _ => throw RuntimeException("get expects a map and a key")
         })
 

@@ -7,12 +7,14 @@
     { "include": "#strings" },
     { "include": "#keywords-control" },
     { "include": "#keywords-declaration" },
+    { "include": "#error-types" },
     { "include": "#types" },
     { "include": "#booleans" },
     { "include": "#numbers" },
     { "include": "#namespace-call" },
     { "include": "#function-call" },
     { "include": "#struct-literal" },
+    { "include": "#generics" },
     { "include": "#operators" },
     { "include": "#punctuation" },
     { "include": "#variables" },
@@ -47,12 +49,36 @@
 
     "keywords-control": {
       "name": "keyword.control.ext-simp",
-      "match": "\\b(if|elif|else|then|while|do|for|in|skip|break|continue|return|call|import|as|print|match|case)\\b"
+      "match": "\\b(if|elif|else|then|while|do|for|in|skip|break|continue|return|call|import|as|print|match|case|try|catch|throw)\\b"
     },
 
     "keywords-declaration": {
       "name": "storage.modifier.ext-simp",
       "match": "\\b(fn|struct|impl|private|static|const|locked)\\b"
+    },
+
+    "error-types": {
+      "comment": "the fixed set of built-in error types usable in catch/throw, e.g. catch ValueError as e",
+      "name": "support.type.exception.ext-simp",
+      "match": "\\b(Error|TypeError|ValueError|IndexError|KeyError|NameError)\\b"
+    },
+
+    "generics": {
+      "comment": "generic type-parameter lists like Stack<T> or Stack<T, U>, in both declarations (struct Stack<T>, impl Stack<T>) and type positions (self: Stack<T>)",
+      "begin": "(?<=[A-Za-z0-9_])<(?=\\s*[A-Za-z_][A-Za-z0-9_]*\\s*(,\\s*[A-Za-z_][A-Za-z0-9_]*\\s*)*>)",
+      "end": ">",
+      "beginCaptures": { "0": { "name": "punctuation.definition.generic.begin.ext-simp" } },
+      "endCaptures": { "0": { "name": "punctuation.definition.generic.end.ext-simp" } },
+      "patterns": [
+        {
+          "name": "storage.type.parameter.ext-simp",
+          "match": "[A-Za-z_][A-Za-z0-9_]*"
+        },
+        {
+          "name": "punctuation.separator.comma.ext-simp",
+          "match": ","
+        }
+      ]
     },
 
     "types": {
