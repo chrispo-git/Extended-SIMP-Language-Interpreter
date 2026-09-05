@@ -11,7 +11,7 @@ class Lexer(source: String, sourceLines: List[String]):
     private val numbers : List[Char] = List('0', '1', '2', '3', '4', '5', '6', '7', '8', '9')
     private val valid_symbols : List[Char] = List(';', '(', ')', '&', '|', '¬', '+', '-', '/', '*', '.', ',', '%', '{', '}',':','[',']','<','>','=','!','~','^')
 
-    private var isComment: Boolean = false
+    private var commentDepth: Int = 0
 
     private def currentLineSource(): String = sourceLines(line-1).trim
     private def throwError(msg: String): Nothing = {
@@ -183,15 +183,15 @@ class Lexer(source: String, sourceLines: List[String]):
         if peek() == '/' && peekNext() == '*' then {
             advanceN(2);
             skipWhitespace();
-            isComment = true;
+            commentDepth += 1;
             return
         }
         if peek() == '*' && peekNext() == '/' then {
             advanceN(2);
             skipWhitespace();
-            isComment = false;
+            if commentDepth > 0 then commentDepth -= 1;
         }
-        if isComment then {
+        if commentDepth > 0 then {
             advance();
             return
         }

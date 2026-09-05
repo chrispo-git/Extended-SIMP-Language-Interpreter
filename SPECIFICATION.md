@@ -104,11 +104,15 @@ on their first character and must be disambiguated by lookahead):
 
 1. **Whitespace**: space/tab/CR always skipped; `\n` skipped *and*
    increments a line counter.
-2. **Comments**: `//` skips to end of line. `/* ... */` — a single
-   boolean "in comment" flag toggled on `/*`, cleared on the next `*/`;
-   **do not implement nesting** — a `/* /* */ */` must end at the first
-   `*/`, replicating the reference implementation's non-nesting behavior
-   exactly (§ see Phase-12 conformance item: "block comments don't nest").
+2. **Comments**: `//` skips to end of line. `/* ... */` — **nests**: keep an
+   integer depth counter (not a boolean), incremented on every `/*` seen
+   (including ones encountered while already inside a comment) and
+   decremented on every `*/` (only while depth > 0 — a stray `*/` outside
+   any comment is consumed but does not go negative); you are "in a
+   comment" whenever depth > 0. `/* outer /* inner */ still commented */`
+   is one comment from the first `/*` to the *second* `*/` — replicate
+   this, don't stop at the first `*/` the way a naive boolean-flag
+   implementation would (see Phase 12's conformance item for this).
 3. **Numeric literals**: scan the maximal run of characters that are
    letters/digits/`_`/`.` starting here (this is how the reference impl's
    `getWholeWord`/`getWholeFloat` work — note this means a numeric scan
@@ -406,16 +410,18 @@ the one above it):
    `parsePostfix(parseAtomicExpr())` on the right.
 6. **`parseAddSub`**: `parseTerm()`, then a left-associative loop
    consuming `+ -`, each time parsing another `parseTerm()` on the right.
-7. **`parseExpr`** (the "top" of the plain-expression grammar — this is
-   what call-arguments, array-literal elements, struct-literal field
-   values, index expressions, etc. all call): `parseAddSub()`, then a
+7. **`parseExprCore`** (this is *not yet* the final `parseExpr` entry
+   point everything else calls — see 4.5, right after this, for the thin
+   `&&`/`||`-adding wrapper layered on top of it; build this function
+   first since 4.5's wrapper calls it): `parseAddSub()`, then a
    left-associative loop consuming `& | ^ << >> >>>` (bitwise — note:
    **looser than `+ -`**, not tighter as in C-like languages), each time
    parsing another `parseAddSub()` on the right; **then, once that loop
    is done, check once (not in a loop) for a trailing comparison operator
    `> < >= <= == !=`** — if present, parse the right-hand side by calling
-   **`parseExpr()` again** (not `parseAddSub`), producing a
-   right-recursive (not left-associative, not "flat chain") comparison
+   **`parseExprCore()` again** (not `parseAddSub`, and — critically, see
+   4.5's trap — not the outer `&&`/`||`-including `parseExpr`), producing
+   a right-recursive (not left-associative, not "flat chain") comparison
    node wrapped as a boolean-lifted expression. This means a chained
    comparison `a < b < c` parses as `a < (b < c)` — replicate this
    exactly, don't "fix" it into a flat left-to-right chain, since that
@@ -424,8 +430,10 @@ the one above it):
    either way, but a VM claiming compatibility should error in the same
    shape).
 
-This completes the plain `Expr` grammar. **`&&`/`||` are deliberately
-*not* part of it** — see 4.5.
+This completes `parseExprCore`. **`&&`/`||` are layered on top of it, not
+part of it** — see 4.5 for the outer `parseExpr` this feeds into, and for
+a real bug that hides here if you get the two functions' call sites
+mixed up.
 
 ### 4.4 Constant folding (optional, purely an optimization pass)
 If you want it: at each binary/unary/comparison construction point in
@@ -442,37 +450,63 @@ phase is **entirely skippable** — it changes nothing observable, since an
 unfolded literal expression evaluates to the exact same value at runtime
 anyway. Do it later, or never, without consequence.
 
-### 4.5 Boolean-expression parser (the second, parallel grammar)
-Two entry points, both used only from specific higher-level call sites
-(assignment RHS, `return` value, `const` initializer, and `if`/`while`
-conditions — see 4.7):
-- **`parseBoolExpr`** (used for assignment RHS / return / const — this is
-  the one that lets `&&`/`||` appear at these specific "top level"
-  positions, and *nowhere else* in the grammar): `parseExpr()`, then a
-  left-associative loop consuming `&& ||`, each time parsing another
-  `parseExpr()` and wrapping both sides through a helper that turns a
-  plain `Expr` into a `BoolExpr` (if it's already a `BoolLift`, unwrap it;
-  if it's a literal `Bool`, turn it into `BoolExpr.Literal`; otherwise
-  wrap it as `BoolExpr.FromExpr`) before combining with `And`/`Or`, then
-  re-wraps the final combined `BoolExpr` back into an `Expr` via
-  `BoolLift` so it can be used anywhere an `Expr` is expected.
-- **`parseBool`** (used only for `if`/`while` conditions, and internally
-  by `¬`'s operand): a separate atomic-boolean parser
-  (`parseAtomicBool`) handling literal `true`/`false` (optionally
-  followed by `==`/`!=` against another expression), `¬` (recurse into
-  `parseBool`), a parenthesized `(B)`, or a plain expression position
-  (deref/literal/variable-call/variable-index/variable-dot) optionally
-  followed by a comparison operator — then the same left-associative
-  `&&`/`||` loop as above, but combining `BoolExpr`s directly (no
-  `Expr`-wrapping needed since we're already in `BoolExpr` land here).
+### 4.5 `&&`/`||`, and the second, parallel `if`/`while`-condition grammar
+`&&`/`||` are **ordinary expression operators**, usable anywhere an
+expression is usable (a function-call argument, an array-literal element,
+a struct-literal field value — anywhere `parseExpr`, 4.3.7, is called),
+not restricted to a handful of "top level" positions. Implement this by
+folding a `&&`/`||`-consuming loop directly into `parseExpr` itself, at
+the very outermost/loosest layer — i.e. `parseExpr` becomes: parse one
+level *below* `&&`/`||` (call this inner layer `parseExprCore` — it's
+everything 4.3.7 already described: the bitwise loop plus the single
+trailing comparison check), then loop consuming `&&`/`||` at equal
+precedence, left-to-right (`a || b && c` groups as `(a || b) && c` — do
+not give `&&` higher precedence than `||` the way most languages do),
+each iteration parsing another `parseExprCore()` for the right operand
+and combining both sides through a helper that turns a plain `Expr` into
+a `BoolExpr` (unwrap if already a `BoolLift`; turn a literal `Bool` into
+`BoolExpr.Literal`; otherwise wrap as `BoolExpr.FromExpr`) before
+combining via `BoolExpr.And`/`Or`, then re-wraps the combined result back
+into an `Expr` via `BoolLift`.
 
-**Why these two, and why only now:** `parseExpr` (4.3.7) must exist first
-since both entry points call it. Every place in the `Cmd` grammar that
-accepts "a boolean-ish thing" needs to pick the *correct* one of these
-two entry points — get this wrong and you'll accidentally make `&&`/`||`
-legal in more places than the reference implementation allows, which is a
-real compatibility divergence, not a harmless permissiveness (see Phase
-12's conformance list).
+**A separate, second grammar** exists only for `if`/`while` conditions
+(and `¬`'s operand): `parseBool`/`parseAtomicBool`, producing a `BoolExpr`
+directly rather than an `Expr`-wrapped one. `parseAtomicBool` handles
+literal `true`/`false` (optionally followed by `==`/`!=`), `¬` (recurse
+into `parseBool`), a parenthesized `(B)`, or a plain expression position
+(deref/literal/a postfix-expression starting with a variable — a call,
+an index, or a dot-access) optionally followed by a comparison operator;
+`parseBool` then wraps `parseAtomicBool` in the same left-to-right
+`&&`/`||`-consuming loop, combining `BoolExpr`s directly (no `Expr`
+wrapping needed, already in `BoolExpr` land).
+
+**The trap, found by actually running this against real programs**: every
+place *inside* `parseAtomicBool` that parses a comparison's right-hand
+side — the literal-`true`/`false`-followed-by-`==`/`!=` case, and both
+"postfix expression followed by a comparison operator" cases (call/index,
+and dot-access) — **must call `parseExprCore()`, not the outer, `&&`/
+`||`-including `parseExpr()`**, for that right operand. Get this wrong
+(call the outer `parseExpr()` there instead) and a condition like
+`while len(perm) > 0 && len(ops) > 0 do { ... }` silently misparses: the
+comparison's own right-hand-side parse greedily swallows `0 && len(ops) >
+0` *entirely into itself* (since that's exactly what the merged
+`parseExpr` is now designed to do at its own top level), leaving the
+outer `parseBool`'s own `&&`-loop with nothing left to consume, and
+`len(perm) > (0 && len(ops) > 0)` runtime-errors as a type mismatch
+(comparing an `Int` against whatever a `Bool && Bool` expression
+evaluates to) instead of parsing as the intended `(len(perm) > 0) &&
+(len(ops) > 0)`. This is exactly the kind of interaction bug that only
+shows up on a real, moderately complex condition — a quick smoke test
+with a single comparison and no `&&` won't trigger it at all, so test
+specifically with a *chained* `X <op> Y && Z <op> W`-shaped condition
+inside an `if`/`while` (Phase 12).
+
+Elsewhere in the parser, everywhere that already called the old, narrower
+`parseExpr` (call arguments, array-literal elements, struct-literal field
+values, array indices, etc.) needs **no changes at all** to gain `&&`/
+`||` support — that's the entire point of folding it into `parseExpr`
+itself rather than maintaining a separate more-permissive wrapper only
+reachable from a few call sites.
 
 ### 4.6 Match-arm pattern parser
 `parsePattern`: `_` → wildcard; a literal token → literal pattern
@@ -760,10 +794,24 @@ be written, and unit-tested standalone, before the evaluator proper:
   Null`, pass iff `isNullable(expected)` (now correctly following
   whatever concrete type `T` resolved to — a `T` bound to `Str` rejects
   `null` exactly like a literal `Str`-typed slot would, a `T` bound to a
-  struct type still accepts it). Else if `value` is an *empty* `Arr`,
-  pass iff `expected` is *any* `Arr(_)` (**inner element type is never
-  checked for an empty array** — a genuine hole: an empty `Int[]`
-  satisfies a `Str[]`-typed slot with no error). Else, pass iff
+  struct type still accepts it). Else if `value` is an *empty* `Arr`: if
+  `expected` isn't *some* `Arr(_)` at all, fail outright. Otherwise, check
+  the empty array's own **declared element type**, if it has one — an
+  empty array only carries a declared type when it came from an `x :
+  T[];` statement (Phase 5.3/7.1); a bare `[]` literal never has one. If
+  it has no declared type, there's nothing to check it against, so pass
+  (permissive — a genuinely untyped empty literal still satisfies any
+  array-typed slot). If it *does* have one, resolve it against
+  `typeBindings` too (it can itself contain a `Param`, e.g. inside a
+  generic method's own `x : T[];`) and require it to equal `expected`'s
+  inner type **exactly** — do not skip this check just because the array
+  happens to be empty right now: an `Int[]`-declared empty array must
+  still fail against a `Str[]`-typed slot, even though it holds zero
+  elements to inspect. (An earlier revision of this gate skipped this
+  entirely — "any empty array satisfies any array type" — which is a
+  real, easy-to-reach hole: any `x : Int[];` passed to a `Str[]`
+  parameter before ever being pushed to would sail through unchecked.)
+  Else (a non-empty array, or any non-`Arr` value), pass iff
   `getType(value) == expected` **exactly** (recursive structural equality
   on the whole type descriptor) — no numeric widening (`Int` never
   satisfies `Float` or vice versa at this gate — widening only ever
@@ -783,16 +831,28 @@ be written, and unit-tested standalone, before the evaluator proper:
   host language's default numeric/bool-to-string; strings verbatim (no
   quotes); `Null -> "null"`; `Ref(name,_) -> "Ref($name)"`; `Map(_,k,v) ->
   "Map($k -> $v)"` (type names only, **never** the map's actual entries);
-  `Type(t) -> "Type.$t"`; `Pair(f,s) -> "($f, $s)"` recursively;
-  `Arr(elems) -> "[$e0, $e1, ...]"` recursively, `"[]"` if empty;
-  `Struct(typeName, fields) -> "$typeName { $f0: $v0, ... }"` — mask any
-  field the struct's declaration marks `private` as the literal text
-  `"???"` **unconditionally** (no caller-context check here, unlike
-  actual field-access privacy in Phase 8 — printing always masks private
-  fields regardless of who's printing), and be **cycle-safe**: track a
-  `visited` set of field-maps already entered (by identity) higher up the
-  same print call, printing `"$typeName { ... }"` (literal three dots) if
-  re-entered, rather than recursing forever.
+  `Type(t) -> "Type.$t"`; `Pair(f,s) -> "($f, $s)"` recursively,
+  **threading the same `visited` set through to both `f` and `s`** (not a
+  fresh empty one for each — a pair holding a struct or array that cycles
+  back to something higher up the same print call still needs to detect
+  that, and a naive per-branch reset would silently lose the cycle
+  protection at exactly the one point it's needed); `Arr(elems) ->
+  "[$e0, $e1, ...]"` recursively, `"[]"` if empty — and **cycle-safe in
+  its own right**: track the array's own identity in `visited` before
+  recursing into its elements, printing `"[...]"` if the same array is
+  re-entered (this matters even without any struct involved at all — a
+  bare array holding itself, e.g. via `push(arr, arr)`, is directly
+  constructible and must not hang/crash `print`); `Struct(typeName,
+  fields) -> "$typeName { $f0: $v0, ... }"` — mask any field the struct's
+  declaration marks `private` as the literal text `"???"`
+  **unconditionally** (no caller-context check here, unlike actual
+  field-access privacy in Phase 8 — printing always masks private fields
+  regardless of who's printing), and cycle-safe the same way: track the
+  field-map's identity in `visited`, printing `"$typeName { ... }"`
+  (literal three dots) if re-entered. Struct and array cycle-tracking
+  share one `visited: Set[AnyRef]`, so a struct containing an array
+  containing that same struct (or vice versa) is caught too, not just a
+  struct cycling directly back to itself.
 
 ### 5.4 `FunctionEnv` and `StructEnv`
 - `FunctionEnv`: a name→`FnDecl` map (user functions), a name→native-
@@ -1049,19 +1109,27 @@ already-written pieces or a forward-declared stub of the next:
      normally for all six operators.
    - `Str,Str` / `Bool,Bool`: `==`/`!=` only, else "unsupported
      operation".
-   - `Arr,Arr`: `==`/`!=` only, via whole-array structural/elementwise
-     equality (**no cycle protection** — a genuinely cyclic array
-     structure would infinite-loop/stack-overflow here; decide whether to
-     accept that risk for parity or add protection, see Phase 12).
+   - `Arr,Arr` and `Pair,Pair`: `==`/`!=` only, via a **shared, cycle-safe**
+     recursive `valuesEqual(v1, v2, visited)` helper (the same one the
+     struct fallback below and `getPrettyPrint`'s cycle-tracking, 5.3,
+     are built from — don't implement a second, separate equality
+     routine just for arrays/pairs): compares elementwise/`fst`+`snd`
+     recursively, and for `Arr` specifically, tracks the pair of arrays'
+     own identity in `visited` *before* recursing into their elements
+     (an identity-hash pair, exactly like the struct-field-map tracking
+     below) so a value that cycles back to itself through an array
+     terminates instead of infinite-looping/stack-overflowing. `Pair` is
+     immutable and can't itself cycle back to its own identity, but still
+     needs to thread `visited` through to its `fst`/`snd` in case one of
+     them is a struct or array that does.
    - `Struct,Struct` **same type name**: `> >= < <=` dispatch to that
      struct's `_gt`/`_gte`/`_lt`/`_lte` method unconditionally (throw if
      missing — no fallback for ordering operators); `==`/`!=` dispatch to
      `_eq`/`_neq` **only if the struct actually defines one**, else fall
-     back to a deep, cycle-safe structural field-by-field comparison
-     (recursively comparing every field's value, **including private
-     ones** — this structural fallback does not check field privacy at
-     all) using an identity-hash-pair `visited` set to stay cycle-safe
-     (unlike plain array equality above).
+     back to the same cycle-safe `valuesEqual`/structural field-by-field
+     comparison as above (recursively comparing every field's value,
+     **including private ones** — this structural fallback does not
+     check field privacy at all).
    - `Struct,Struct` **different type names**: `==`/`!=` only, always
      false/true respectively (never equal by definition); any ordering
      operator throws.
@@ -1477,44 +1545,131 @@ rejects.
   lexer/parser run, with its own fresh, empty `StructEnv` (not the
   importer's) — so identifiers inside it resolve only against its own
   file's declarations while it's being parsed.
-- Only `FnDecl`/`StructDecl`/`ImportDecl` top-level items are legal
-  inside an imported file; anything else (a bare statement, or —
-  concretely — an `impl` block) is an error. **This means structs with
-  methods currently cannot be imported and keep their methods** in the
-  reference implementation (only their bare field layout transfers) —
-  decide up front whether your implementation will faithfully reproduce
-  this limitation or fix it by also handling `PImpl` entries inside
-  imports (a strictly more useful behavior, and a good candidate
-  deviation to make deliberately and document, rather than replicate).
-- Re-register every top-level function/struct from the imported file
-  into the **importer's** shared `FunctionEnv`/`StructEnv`, under the
-  qualified name `"$alias::$name"`.
-- Rewrite recursive/self-referential calls inside each re-registered
-  function's body so they call the qualified name too — **the reference
-  implementation's rewrite pass is narrow**: it only descends into
-  `Seq`/`If`/`While`/`Return`/`Assign` commands and `BinaryOp` expressions
-  looking for `FnCall`s to requalify; it does **not** descend into `For`
-  loops, `Print`, field/array-assignment commands, method calls, struct
-  literals, match expressions, block expressions, or into a call's own
-  argument expressions. A recursive call made from inside any of those
-  un-rewritten shapes, in an imported file, will resolve against the
-  wrong (unqualified, global) name at the call site — silently calling an
-  unrelated function if one happens to exist under that bare name in the
-  importer's own program, or throwing "not found" otherwise. Pick one,
-  deliberately: (a) replicate this narrow rewrite exactly, for behavioral
-  parity with any existing multi-file SIMP+ programs that happen to avoid
-  triggering it, or (b) implement a **full** recursive rewrite over every
-  `Expr`/`Cmd` shape (strictly more correct, but a genuine, documented
-  behavior change from the reference implementation).
-- `namespace::name(...)` / `namespace::StructName{...}` call/construction
-  syntax (Phase 4.3.2) resolves directly against these qualified keys in
-  the shared `FunctionEnv`/`StructEnv` — there's no nested/multi-level
-  namespacing (`a::b::c` isn't meaningful; exactly one `::` is
-  recognized).
+- `FnDecl`/`StructDecl`/`ImportDecl`/`PImpl` top-level items are all legal
+  inside an imported file — **an `impl` block is imported along with its
+  struct**, methods and all, not just the bare field layout. (An earlier
+  revision of this design rejected `PImpl` here entirely, meaning a
+  struct's methods were silently lost across an import boundary — that
+  was a real, needless limitation, not a deliberate one: nothing about
+  method dispatch is actually import-unaware, since methods are looked up
+  dynamically by the *value's own runtime type name* — Phase 8.3 — which
+  works identically whether that name happens to contain `::` or not.)
+- Before registering anything, collect two sets from the freshly-parsed
+  program: every name declared by a top-level `FnDecl`, and every name
+  declared by a top-level `StructDecl`. Bundle these two sets plus the
+  alias into one small "import context" value — every qualification step
+  below takes it as a parameter, so name this once and thread it through,
+  rather than re-deriving it per declaration.
+- **Qualify every type**, not just every call — this is the part easy to
+  under-scope: a method's `self: Stack<T>` parameter, parsed while still
+  inside the imported file's own unqualified namespace, produces a bare
+  `Struct("Stack")` type. If you only qualify *function calls* and never
+  touch *type annotations*, that `self` parameter's declared type never
+  matches the runtime value's actual type once it's constructed as
+  `alias::Stack` — every single call to every method would then fail its
+  own `self`-parameter type check. Write one recursive `qualifyType`
+  function: given a `SimpType` and the import context, rewrite any
+  `Struct(name)` where `name` is in the context's struct-name set to
+  `Struct("$alias::$name")`, recursing into `Arr`/`Ref`/`Pair`/`Map`'s
+  inner types (a `Param` or a primitive passes through unchanged). Apply
+  it to **every** function's and every method's parameter types and
+  return type, and every struct's field types, not just to expressions.
+- **Qualify the full `Cmd`/`Expr`/`BoolExpr`/`Pattern` tree, exhaustively**
+  — every single constructor of all four, recursing into every sub-
+  position that can contain another `Expr`/`Cmd`/type. This replaces an
+  earlier, narrower design that only descended into
+  `Seq`/`If`/`While`/`Return`/`Assign` commands and `BinaryOp`
+  expressions, missing (among others) any call made from inside a `for`
+  loop, a `print`, a method call's own arguments, a struct-literal field
+  value, a nested block expression, or a `match` arm — a recursive call
+  made from inside any of those shapes would resolve against the wrong,
+  unqualified, global name, either silently calling an unrelated function
+  if one coincidentally exists under that bare name in the *importing*
+  program, or throwing "not found." Concretely, qualify:
+  - Every `Expr.FnCall(name, args)` where `name` is in the declared-
+    function-name set → rename to `$alias::$name`, and recurse into
+    `args` regardless.
+  - Every `Expr.StructLiteral(typeName, fields, typeArgs)` and
+    `Expr.StructTypeRef(typeName, typeArgs)` where `typeName` is in the
+    declared-struct-name set → rename `typeName`, and additionally run
+    `qualifyType` over each entry of `typeArgs` (a type argument can
+    itself reference another locally-declared struct) and recurse into
+    each field value.
+  - Every `Pattern.PStruct(typeName, fields)` (inside a `match` arm) the
+    same way, recursing into sub-patterns and any literal-pattern
+    expression.
+  - Every plain `SimpType` appearing anywhere (a `Cmd.TypeDecl`'s type, a
+    struct field's declared type, a function/method's param types and
+    return type) via `qualifyType`.
+  - Everything else structurally: every `Cmd` variant recurses into
+    whichever `Expr`/`BoolExpr`/nested-`Cmd` fields it has (a `Cmd.Try`
+    qualifies its try-body and every catch clause's body; a `Cmd.For`
+    qualifies its iterable expression *and* its body — this specific one
+    was the concrete gap named above); every `Expr` variant recurses into
+    its sub-expressions (a `Block`'s commands and result, a `Match`'s
+    scrutinee/arms/guards, a `MethodCall`'s receiver and arguments — note
+    a method *name itself* is never qualified, since method dispatch
+    doesn't use qualified names, only the receiver's struct-literal/
+    type-ref *type* does); every `BoolExpr` variant recurses the same way
+    `Expr`'s `&&`/`||`/comparison/negation cases do. Write this as one
+    exhaustive match per type with **no wildcard fallback case** — let
+    your compiler tell you if you've missed a constructor, rather than
+    silently passing an un-recursed node through unchanged.
+- Register each qualified function into the **importer's** shared
+  `FunctionEnv` under `"$alias::$name"`, each qualified struct definition
+  into `StructEnv` under `"$alias::$name"` (field types and field-default
+  expressions qualified the same way), and — the new part — each
+  qualified method into `FunctionEnv`'s method table under the key
+  `("$alias::$structName", methodName)` (the **method name itself stays
+  bare** — only the struct-name half of the dispatch key is qualified,
+  matching how dispatch already works: it's keyed by the constructed
+  value's own runtime type name, which is exactly `$alias::$structName`
+  once you construct one via the qualified path).
+- `namespace::name(...)` (qualified function call) resolves directly
+  against `FunctionEnv` under that qualified key, with **no existence
+  check at parse time** — it's built unconditionally into an
+  `Expr.FnCall`, and only fails, if it fails, at evaluation time. The
+  qualified struct-construction forms (below) must work the **same way,
+  for a reason that isn't obvious until you actually try it**: a
+  register-then-parse ordering trap. Do not guard qualified
+  struct-literal/type-ref parsing behind a `structEnv.exists("$alias::
+  $name")` check — parsing the *entire* importing file completes fully
+  *before* any of its top-level items (including its own `import`
+  statements) are evaluated, so at the moment the parser reaches, say,
+  `alias::Stack<Int>{...}`, on some line below `import "..." as alias;`
+  in the very same file, `alias::Stack` has certainly not been
+  registered into `StructEnv` yet — evaluation of the `import` line
+  itself hasn't happened. An existence-guarded parse would make the
+  qualified-construction syntax permanently unusable in exactly the
+  single-file "import, then immediately construct" pattern that's the
+  entire point of the feature, throwing a confusing "expected name after
+  '::'" parse error instead. This is safe to do unconditionally (unlike
+  the *unqualified* struct-literal case, Phase 4.3.2, which genuinely
+  needs its existence check to disambiguate a struct literal from a bare
+  variable reference followed by an unrelated `{`-block) because there is
+  no other valid parse for `namespace::Name` followed by `{`/`<`/`.` in
+  this grammar at all — a qualified name with nothing sensible following
+  is already a hard parse error regardless, so treating `{`/`<`/`.` as
+  "this is a struct construct" unconditionally loses nothing and fixes
+  a real, previously totally-broken code path.
+- `namespace::StructName{...}` / `namespace::StructName<T0,...>{...}`
+  (qualified struct literal, with or without generic type arguments) and
+  `namespace::StructName.method(...)` / `namespace::StructName<T0,...>
+  .method(...)` (qualified static call, with or without generic type
+  arguments) all parse the same way their non-namespaced equivalents do
+  (Phase 4.3.2), just building the qualified name throughout. There's no
+  nested/multi-level namespacing (`a::b::c` isn't meaningful; exactly one
+  `::` is recognized).
 
-**Done when:** a small multi-file example (one file importing another,
-with at least one recursive call and one non-recursive call across the
-boundary) produces correct output.
+**Done when:** a small multi-file example produces correct output for
+*all* of: a plain recursive function call across the boundary; a
+recursive call made from inside a `for` loop in the imported file (the
+narrow-rewrite gap, above); and — the harder case — importing a `locked`,
+generic struct with a full `impl` block (a static factory method and at
+least one instance method), constructing it via
+`alias::StructName<Concrete>.method()`, and confirming type enforcement
+still rejects a wrong-typed value passed to one of its methods *through*
+the import boundary, exactly as it would for a locally-declared struct.
 
 ---
 
@@ -1542,61 +1697,72 @@ it) — write one small test program per item:
 
 1. `a < b < c` throws a runtime type error (right-recursive chained
    comparison — Phase 4.3.7), it does not silently mean `(a<b) and (b<c)`.
-2. `&&`/`||` are rejected by the parser inside a function-call argument,
-   array-literal element, or struct-literal field value unless wrapped
-   in a block expression (Phase 4.5) — verify your parser actually
-   rejects these positions, don't accidentally make the grammar more
-   permissive than the reference.
-3. `/* /* */ */` — the second `*/` is dangling/unconsumed input (block
-   comments don't nest, Phase 2 step 2).
+   **Keep as-is** — this is not a bug to fix, it's the specified behavior.
+2. `&&`/`||` work as **ordinary expression operators everywhere** — a
+   function-call argument, an array-literal element, a struct-literal
+   field value, all without needing a block-expression workaround (Phase
+   4.5) — not just in `if`/`while` conditions/assignment RHS/etc. Confirm
+   this *and* confirm the easy-to-miss companion case: a condition that
+   mixes a comparison with `&&`/`||` inside `if`/`while` still parses
+   correctly (`while len(a) > 0 && len(b) > 0 do {...}` must parse as
+   `(len(a) > 0) && (len(b) > 0)`, not have the first comparison's
+   right-hand side swallow the rest of the condition — Phase 4.5's trap).
+3. `/* outer /* inner */ still commented */` is **one comment** from the
+   first `/*` to the *second* `*/` — block comments nest (Phase 2 step 2).
+   **Fixed** — an earlier revision ended at the first `*/`.
 4. `x - 1` lexes as subtraction; `[-1, 2]`, `f(-1)` lex the `-1` as one
-   negative literal token (Phase 2 step 4).
-5. An empty `Int[]`-declared array satisfies a `Str[]`-typed slot with no
-   error (Phase 5.3's `checkType` hole) — decide and document if you're
-   keeping or closing this hole.
-6. `fn f(x: Float) -> Void {...}` called as `f(null)` throws a type error
-   — `Float` rejects `null` exactly like `Int`/`Str`/`Bool` do (Phase
-   5.3's `isNullable`; this was a deliberate fix over an earlier revision
-   of this spec/the reference implementation, where `Float` was
-   inconsistently left nullable — there is no longer an open question
-   here, `Float` is simply non-nullable).
-7. Top-level `Arr == Arr`/`Pair == Pair` on a value containing a cycle —
-   decide and document whether this is cycle-safe (it isn't, in the
-   reference) versus struct-field equality and struct printing, which
-   *are* cycle-safe (Phase 6.5, Phase 5.3's `getPrettyPrint`).
-8. `break`/`continue`/`return` used outside any loop/function — decide
-   and document whether this is a clean parse/compile-time error (an
-   improvement) or an unhandled-crash (matching the reference, Phase
-   7.3).
-9. Declaring a user function named identically to a builtin (e.g. `fn
-   len(...)`) — verify it's simply unreachable dead code, not an error,
-   and not actually callable (Phase 6.13).
-10. `private` alone (no `locked`) does **not** stop `S{...}` construction
-    from outside the struct's `impl` block — only `locked` does (Phase
-    8.2's `checkStructLock` is a wholly separate gate from field
-    privacy).
-11. A free function called from inside one of struct `S`'s methods,
+   negative literal token (Phase 2 step 4). **Keep as-is.**
+5. An empty `Int[]`-declared array does **not** satisfy a `Str[]`-typed
+   slot — `checkType` now checks a declared-but-empty array's element
+   type strictly, only staying permissive for a genuinely undeclared
+   bare `[]` literal with nothing to check against (Phase 5.3). **Fixed**
+   — an earlier revision let any empty array satisfy any array type.
+6. `break`/`continue`/`return` used outside any loop/function — an
+   unhandled crash (matching the reference, Phase 7.3). **Leave as-is** —
+   not treated as a bug to clean up into a parse-time error.
+7. `arr1 == arr2` / `pair1 == pair2` on values containing a cycle back to
+   themselves terminate correctly (`Arr`/`Pair` equality routes through
+   the same cycle-safe `valuesEqual` machinery struct-field equality
+   already used, Phase 6.5) — as does `print` on a self-referential array
+   (`getPrettyPrint`'s array case now tracks its own identity in
+   `visited`, matching what struct printing already did, Phase 5.3), and
+   `Pair` equality is supported at all (it previously fell through to
+   "Type Mismatch" unconditionally — there was no `Pair` case anywhere in
+   the comparison logic, not just a cycle-safety gap). **Fixed.**
+8. Declaring a user function named identically to a builtin (e.g. `fn
+   len(...)`) — confirm it's simply unreachable dead code, not an error,
+   and not actually callable (Phase 6.13). **Expected, confirmed correct
+   — this should indeed be unreachable, not a bug.**
+9. `private` alone (no `locked`) does **not** stop `S{...}` construction
+   from outside the struct's `impl` block — only `locked` does (Phase
+   8.2's `checkStructLock` is a wholly separate gate from field
+   privacy). **As expected.**
+10. A free function called from inside one of struct `S`'s methods,
     which itself then calls back into another method of `S`, still has
     `S`-level private-field access at that inner call site (the impl-
     context stack survives unchanged through intervening free-function
-    frames — Phase 8.2's precise transitivity rule).
-12. A recursive call inside an imported file's `for` loop or method body
-    resolves against the wrong (unqualified) name (or your deliberately-
-    chosen fix for this — Phase 10.2's narrow-rewrite limitation).
-13. A `for` loop whose body `push`es onto the very array it's iterating
+    frames — Phase 8.2's precise transitivity rule). **As expected.**
+11. A recursive call inside an imported file's `for` loop, method body,
+    `print` statement, or any other previously-un-rewritten shape now
+    correctly resolves to the qualified name (Phase 10.2's `qualifyBody`/
+    `qualifyExpr` — now a full, exhaustive traversal of every `Cmd`/
+    `Expr`/`BoolExpr`/`Pattern` constructor, replacing an earlier revision
+    that only descended into `Seq`/`If`/`While`/`Return`/`Assign`/
+    `BinaryOp`). **Fixed.**
+12. A `for` loop whose body `push`es onto the very array it's iterating
     sees the newly-pushed elements on later iterations (live length
-    re-check, not a snapshot — Phase 7.2).
-14. A struct default-field expression that references an outer mutable
+    re-check, not a snapshot — Phase 7.2). **As expected.**
+13. A struct default-field expression that references an outer mutable
     variable produces a different value on two separate constructions
     of the same struct type, if that outer variable changed between them
     (Phase 6.9/7.1 — defaults are evaluated per-call, not once at
-    struct-definition time).
-15. A `return` inside a `try` block still returns from the enclosing
+    struct-definition time). **As expected.**
+14. A `return` inside a `try` block still returns from the enclosing
     function — it is not caught or reported as an error by any of the
     `try`'s `catch` clauses, even a `catch Error as e` umbrella (Phase
     7.2/7.3's exception-type-separation requirement). Same for
     `break`/`continue` inside a `try` that's itself inside a loop.
-16. `throw ValueError("msg")` inside a `try { ... } catch ValueError as e
+15. `throw ValueError("msg")` inside a `try { ... } catch ValueError as e
     { ... }` is caught, with `e` holding exactly `"msg"`; the same
     `throw` inside a `try` with only `catch KeyError as e { ... }` (no
     matching clause) is **not** caught — it keeps propagating outward as
@@ -1606,14 +1772,14 @@ it) — write one small test program per item:
     enclosing `try`, or no matching clause anywhere up the chain) still
     crashes the program with that message, exactly like any other
     uncaught runtime error (Phase 7.2, 5.5).
-17. Two `catch` clauses on the same `try`, ordered `catch KeyError as e
+16. Two `catch` clauses on the same `try`, ordered `catch KeyError as e
     {...} catch IndexError as e2 {...}`, each actually independently
     reachable — trigger a `KeyError` and confirm only the first clause
     runs; trigger an `IndexError` and confirm only the second runs
     (Phase 7.2's "first matching clause, in written order" rule — a
     naive implementation might instead check all clauses for the *best*
     match, or match the *last* one, both of which are wrong here).
-18. `catch Error as e` placed *before* a more specific `catch TypeError
+17. `catch Error as e` placed *before* a more specific `catch TypeError
     as e2` on the same `try` makes the second clause unreachable dead
     code — the umbrella matches first and the specific clause never
     runs (Phase 5.5's flat-hierarchy `matches` rule: `Error` matches
@@ -1622,17 +1788,17 @@ it) — write one small test program per item:
     reference implementation doesn't either) — just confirm your
     matching logic actually produces this behavior rather than some
     "most specific match wins" logic you might be tempted to add.
-19. `catch Nonsense as e { ... }` (an error-type name outside the fixed
+18. `catch Nonsense as e { ... }` (an error-type name outside the fixed
     six-name set) is a parse error, not a runtime failure to match
     anything — validate the type name eagerly, at parse time (Phase
     4.7).
-20. Tokenizing `Stack<T>` with **zero surrounding whitespace** produces
+19. Tokenizing `Stack<T>` with **zero surrounding whitespace** produces
     four separate tokens (`Variable(Stack)`, `Lt`, `Variable(T)`, `Gt`),
     not one swallowed identifier — this is the identifier/keyword
     word-boundary trap called out in Phase 2, step 5's addendum; it's
     easy to pass every other test and still have this one silently
     broken, since ordinary spaced-out comparisons never trigger it.
-21. Inside `struct Stack<T> { items: T[] := [] } impl Stack<T> { fn
+20. Inside `struct Stack<T> { items: T[] := [] } impl Stack<T> { fn
     push(self: Stack<T>, v: T) -> Void {...} }`, calling
     `Stack<Int>.new()` then `.push(1)` succeeds, but `.push("two")` on
     that *same* instance throws a `TypeError` — this is the whole point
@@ -1642,14 +1808,14 @@ it) — write one small test program per item:
     `Stack<Str>` instance still happily accepts strings at the same
     time — one instance's binding must never leak into or override
     another's.
-22. `Stack<Int>{items: []}` and `Stack<Int>.new()` (type arguments at a
+21. `Stack<Int>{items: []}` and `Stack<Int>.new()` (type arguments at a
     construction/static-call site) are **required**, not rejected: a
     bare `Stack{items: []}` or `Stack.new()` for a generic struct is a
     `TypeError` unless written *inside that struct's own `impl` block*
-    with an ambient binding already on the type-binding stack (item 23).
+    with an ambient binding already on the type-binding stack (item 22).
     A **non**-generic struct is entirely unaffected either way — `Point
     {x: 1, y: 2}` never accepts or requires `<...>`.
-23. `fn static new() -> Stack<T> { return Stack{}; }` — a bare,
+22. `fn static new() -> Stack<T> { return Stack{}; }` — a bare,
     unparameterized literal — correctly inherits the caller's chosen
     type: `Stack<Int>.new()` produces an `Int`-bound stack, and
     `Stack<Str>.new()` (a *separate* call) produces a `Str`-bound one,
@@ -1667,10 +1833,10 @@ it) — write one small test program per item:
     should have trivially succeeded, like pushing a plain `Int` onto
     what was supposed to be a `Stack<Int>`. Test both spellings and
     diff their resulting bindings, not just their pass/fail outcome.
-24. A generic struct's static method called with *no* type arguments at
+23. A generic struct's static method called with *no* type arguments at
     all (`Stack.new()` for a generic `Stack` — there's no receiver to
     inherit a binding from the way a bare struct literal can) is a
-    `TypeError`, distinct from item 22's literal case
+    `TypeError`, distinct from item 21's literal case
     only in the wording of the message, not the underlying rule: a
     generic struct's static call site always needs its own explicit
     `<...>`.

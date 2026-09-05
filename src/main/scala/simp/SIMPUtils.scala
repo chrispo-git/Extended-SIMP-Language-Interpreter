@@ -40,7 +40,7 @@ object SimpUtils:
             case Value.TypeVal(t) => s"Type.${getSimpTypeName(t)}"
             case Value.StructTypeVal(typeName, typeArgs) =>
                 if typeArgs.isEmpty then s"Type.$typeName" else s"Type.$typeName<${typeArgs.map(getSimpTypeName).mkString(", ")}>"
-            case Value.PairVal(fst, snd) => s"(${getPrettyPrint(fst, structEnv)}, ${getPrettyPrint(snd, structEnv)})"
+            case Value.PairVal(fst, snd) => s"(${getPrettyPrint(fst, structEnv, visited)}, ${getPrettyPrint(snd, structEnv, visited)})"
             case Value.StructVal(typeName, fields, _) => {
                 if visited.contains(fields) then {
                     s"$typeName { ... }"
@@ -53,7 +53,14 @@ object SimpUtils:
                     }.mkString(", ")} }"
                 }
             }
-            case Value.ArrVal(elements) => "[" + elements.map(v => getPrettyPrint(v, structEnv, visited)).mkString(", ") + "]"
+            case Value.ArrVal(elements) => {
+                if visited.contains(elements) then {
+                    "[...]"
+                } else {
+                    val newVisited = visited + elements
+                    "[" + elements.map(v => getPrettyPrint(v, structEnv, newVisited)).mkString(", ") + "]"
+                }
+            }
         }
     }
     def deepCopyValue(value: Value, visited: Set[AnyRef] = Set()): Value = value match {
@@ -120,7 +127,20 @@ object SimpUtils:
             value match {
                 case Value.ArrVal(elements) if elements.isEmpty => {
                     resolved match {
-                        case SimpType.TypeArr(_) => return
+                        case SimpType.TypeArr(innerExpected) => {
+                            // An empty array with no declared element type carries no
+                            // information to check against, and stays permissive (it
+                            // satisfies any array type). One that *does* carry a
+                            // declared type (set by `x : T[];`, Phase 5.3/7.1) must
+                            // actually match the expected element type - otherwise an
+                            // empty `Int[]` would silently satisfy a `Str[]`-typed slot.
+                            elements.declaredType.foreach(declared => {
+                                val resolvedDeclared = if containsTypeParam(declared) then resolveTypeParams(declared, typeBindings) else declared
+                                if resolvedDeclared != innerExpected then {
+                                    throw SimpError("TypeError", s"Type mismatch for '$name': expected $resolved, got ${SimpType.TypeArr(resolvedDeclared)}")
+                                }
+                            })
+                        }
                         case _ => throw SimpError("TypeError", s"Type mismatch for '$name': expected $resolved, got []")
                     }
                 }

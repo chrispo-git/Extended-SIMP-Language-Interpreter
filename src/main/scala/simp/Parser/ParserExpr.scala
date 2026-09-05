@@ -115,7 +115,13 @@ trait ParserExpr { self: Parser =>
         }
         fields.toList
     }
-    protected def parseExpr(): Expr = {
+    // The expression grammar excluding `&&`/`||` (those are layered on top by
+    // `parseExpr`, below). Kept separate so a comparison's right-hand side
+    // (recursed into from within this same function) stays restricted to this
+    // tighter grammar - `a < b && c` must parse as `(a < b) && c`, not
+    // `a < (b && c)`, i.e. `&&`/`||` bind looser than comparisons and must not
+    // be swallowed into a comparison's own right operand.
+    protected def parseExprCore(): Expr = {
         var left = parseAddSub()
         while List(Token.BitAnd, Token.BitOr, Token.BitXor, Token.BitLeft, Token.BitRight, Token.BitRightFill).contains(peek()) do {
             val op: Op  = (peek(): @unchecked) match {
@@ -134,11 +140,29 @@ trait ParserExpr { self: Parser =>
             case Token.Gt | Token.Lt | Token.Gte | Token.Lte | Token.Eq | Token.Neq => {
                 val bop = parseBoolOp(peek())
                 advance()
-                val right = parseExpr()
+                val right = parseExprCore()
                 Expr.BoolLift(foldCompare(left, bop, right))
             }
             case _ => left
         }
+    }
+    // The full expression grammar, including `&&`/`||` at the loosest
+    // precedence - unlike an earlier revision of this parser, `&&`/`||` are
+    // ordinary expression operators usable anywhere an expression is expected
+    // (a function-call argument, an array-literal element, a struct-literal
+    // field value, etc.), not just at a handful of "top level" call sites.
+    protected def parseExpr(): Expr = {
+        var left = parseExprCore()
+        while List(Token.And, Token.Or).contains(peek()) do {
+            val op = peek()
+            advance()
+            val right = parseExprCore()
+            left = (op: @unchecked) match {
+                case Token.And => Expr.BoolLift(BoolExpr.And(makeFromExpr(left), makeFromExpr(right)))
+                case Token.Or  => Expr.BoolLift(BoolExpr.Or(makeFromExpr(left), makeFromExpr(right)))
+            }
+        }
+        left
     }
     protected def parseAddSub(): Expr = {
         var left = parseTerm()
@@ -187,12 +211,44 @@ trait ParserExpr { self: Parser =>
         advance()
         advance()
         peek() match {
-            case Token.Variable(name) if peekNext() == Token.OpenBrace && structEnv.exists(s"$namespace::$name") => {
+            // Unlike the plain (non-namespaced) struct-literal/type-ref cases in
+            // parseAtomicExpr, these don't (and can't) guard on
+            // `structEnv.exists(...)`: an imported file's structs are only
+            // registered when its `import` statement is *evaluated*, which
+            // happens strictly after the *entire* importing file has already
+            // been parsed - so the existence check would always fail here,
+            // even for a perfectly valid `alias::Struct{...}` right below a
+            // real `import ... as alias;`. That's fine: there's no other valid
+            // parse for `namespace::Name` followed by `{`/`<`/`.` in this
+            // grammar (unlike the bare, non-namespaced case, a qualified name
+            // with nothing following is already a parse error below, so there's
+            // no ambiguity to guard against by checking existence first) -
+            // any actual mistake (wrong alias, wrong struct name) still surfaces
+            // at eval time via the normal "unknown struct type" error.
+            case Token.Variable(name) if peekNext() == Token.OpenBrace => {
                 advance()
                 advance()
                 val fields = parseStructLiteralFields()
                 expect(Token.CloseBrace)
-                Expr.StructLiteral(s"$namespace::$name", fields)
+                Expr.StructLiteral(s"$namespace::$name", fields, List())
+            }
+            case Token.Variable(name) if peekNext() == Token.Lt => {
+                advance()
+                val typeArgs = parseTypeArgList()
+                peek() match {
+                    case Token.OpenBrace => {
+                        advance()
+                        val fields = parseStructLiteralFields()
+                        expect(Token.CloseBrace)
+                        Expr.StructLiteral(s"$namespace::$name", fields, typeArgs)
+                    }
+                    case Token.Dot => Expr.StructTypeRef(s"$namespace::$name", typeArgs)
+                    case x => throwError(s"Expected '{' or '.' after type arguments, got '$x'")
+                }
+            }
+            case Token.Variable(name) if peekNext() == Token.Dot => {
+                advance()
+                Expr.StructTypeRef(s"$namespace::$name", List())
             }
             case Token.Variable(name) if peekNext() == Token.OpenBracket => {
                 advance()

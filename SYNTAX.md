@@ -60,6 +60,37 @@ where F is the path of a file, and A is an optional alias
 - Importing the same file with the same alias twice is ignored
 - Importing the same file with different aliases registers it under both
 - Circular imports throw a runtime error
+- A struct's `impl` block is imported along with it — its methods (static and
+  instance, including any using generics/`locked`) work the same as if
+  declared locally, just addressed as `A::StructName` instead of the bare
+  name:
+  ```
+  // collections.simp
+  locked struct Stack<T> {
+      private stack : T[] := []
+  }
+  impl Stack<T> {
+      fn static new() -> Stack<T> { return Stack{}; }
+      fn push(self: Stack<T>, v: T) -> Void { _ := push(self.stack, v); }
+      fn pop(self: Stack<T>) -> T { return pop(self.stack); }
+  }
+  ```
+  ```
+  // main.simp
+  import "collections.simp" as collections;
+
+  s := collections::Stack<Int>.new();
+  s.push(1);
+  s.push(2);
+  print s.pop();   // 2
+  ```
+  Every reference to `Stack` inside `collections.simp` — a field type, a
+  `self`/return type, a bare `Stack{}` construction inside `new()` — is
+  understood to mean *this same imported struct* no matter which file
+  it's textually written in, so an imported generic/locked struct behaves
+  identically through the import boundary, including full type
+  enforcement (pushing a `Str` onto that same `Stack<Int>` still throws
+  `TypeError`, exactly as it would if `Stack` were declared locally).
 
 ---
 
@@ -262,19 +293,28 @@ All arithmetic operators are left-associative.
 ```
 
 #### Comparison Operators
-Valid on `Int`/`Int` or `Str`/`Str` or `Bool`/`Bool` operand pairs, produce `Bool`:
+Valid on `Int`/`Int`, `Str`/`Str`, `Bool`/`Bool`, `Array`/`Array`, `(T,U)`/`(T,U)`, or matching `Struct`/`Struct` operand pairs, produce `Bool`:
 
 ```
 bop ::= > | < | >= | <= | == | !=
 ```
 
-Note: `>`, `<`, `>=`, `<=` are only valid on `Int` operands. `==` and `!=` are valid on any matching pair.
+Note: `>`, `<`, `>=`, `<=` are only valid on `Int`/`Float` operands (or a struct overriding them, see
+Overriding Operators below). `==` and `!=` are valid on any matching pair, including arrays and
+tuples (compared element-wise, recursively, and safely on a value that cycles back to itself).
 
 ---
 
 ### Boolean Expressions
 
-Boolean expressions produce a `Bool` value. They can appear anywhere an expression is expected.
+Boolean expressions produce a `Bool` value. `&&` and `||` are ordinary
+expression operators, at the loosest precedence (looser than comparisons),
+left-to-right with **equal** precedence between each other (`a || b && c`
+groups as `(a || b) && c`, not the other way around — there's no
+"`&&` binds tighter than `||`" rule here the way most languages have). They
+can appear anywhere an expression is expected — a function-call argument, an
+array-literal element, a struct-literal field value, anywhere — not just in
+`if`/`while` conditions.
 
 ```
 B ::= true | false                         -- boolean literals
@@ -611,7 +651,7 @@ x := 5; // This is also a comment
 // x += 5; Even this is a comment!
 ```
 
-Multi-line comments are enclosed between `/*` and `*/`:
+Multi-line comments are enclosed between `/*` and `*/`, and **nest**:
 ```
 /* This 
 really
@@ -619,7 +659,13 @@ is
 a
 comment*/
 x +=/*This too*/ 2
+
+/* an outer comment /* with a nested comment inside it */ still commented out here */
 ```
+The nested example above is one single comment from the first `/*` to the
+*last* `*/` — a `/*` seen while already inside a comment starts another
+nesting level, and it takes one `*/` per level to close, so the whole thing
+only ends once every level has been closed.
 
 ---
 

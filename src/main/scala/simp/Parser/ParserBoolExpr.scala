@@ -1,19 +1,10 @@
 package simp
 
 trait ParserBoolExpr { self: Parser =>
-    protected def parseBoolExpr(): Expr = {
-        var left = parseExpr()
-        while List(Token.And, Token.Or).contains(peek()) do {
-            val op = peek()
-            advance()
-            val right = parseExpr()
-            left = (op: @unchecked) match {
-                case Token.And => Expr.BoolLift(BoolExpr.And(makeFromExpr(left), makeFromExpr(right)))
-                case Token.Or  => Expr.BoolLift(BoolExpr.Or(makeFromExpr(left), makeFromExpr(right)))
-            }
-        }
-        left
-    }
+    // `parseExpr` (ParserExpr.scala) now handles `&&`/`||` directly as part of
+    // the ordinary expression grammar, so this is just the old, now-narrower
+    // entry point kept as an alias for its existing call sites.
+    protected def parseBoolExpr(): Expr = parseExpr()
 
 
 
@@ -56,7 +47,12 @@ trait ParserBoolExpr { self: Parser =>
                     case Token.Eq | Token.Neq => {
                         val bop = parseBoolOp(peek())
                         advance()
-                        val right = parseExpr()
+                        // A comparison's right-hand side must not swallow a
+                        // trailing `&&`/`||` into itself (`parseExprCore`, not
+                        // the `&&`/`||`-including `parseExpr`) - otherwise
+                        // `a == b && c` would wrongly parse as `a == (b && c)`
+                        // instead of `(a == b) && c`.
+                        val right = parseExprCore()
                         foldCompare(left, bop, right)
                     }
                     case _ => BoolExpr.Literal(b)
@@ -83,7 +79,7 @@ trait ParserBoolExpr { self: Parser =>
                     case Token.Gt | Token.Lt | Token.Gte | Token.Lte | Token.Eq | Token.Neq =>
                         val bop = parseBoolOp(peek())
                         advance()
-                        val right = parseExpr()
+                        val right = parseExprCore()
                         foldCompare(expr, bop, right)
                     case _ => makeFromExpr(expr)
                 }
@@ -94,7 +90,7 @@ trait ParserBoolExpr { self: Parser =>
                     case Token.Gt | Token.Lt | Token.Gte | Token.Lte | Token.Eq | Token.Neq =>
                         val bop = parseBoolOp(peek())
                         advance()
-                        val right = parseExpr()
+                        val right = parseExprCore()
                         foldCompare(expr, bop, right)
                     case _ => makeFromExpr(expr)
                 }

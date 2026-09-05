@@ -44,8 +44,15 @@ trait EvaluatorBoolExpr { self: Evaluator =>
             }
             case (Value.ArrVal(left), Value.ArrVal(right)) => {
                 bop match {
-                    case Bop.Eq => left == right 
-                    case Bop.Neq => left != right 
+                    case Bop.Eq => arraysEqual(left, right, Set())
+                    case Bop.Neq => !arraysEqual(left, right, Set())
+                    case x => throwError(s"Unsupported operation '$x'", "TypeError")
+                }
+            }
+            case (pL @ Value.PairVal(_, _), pR @ Value.PairVal(_, _)) => {
+                bop match {
+                    case Bop.Eq => valuesEqual(pL, pR, Set())
+                    case Bop.Neq => !valuesEqual(pL, pR, Set())
                     case x => throwError(s"Unsupported operation '$x'", "TypeError")
                 }
             }
@@ -144,13 +151,23 @@ trait EvaluatorBoolExpr { self: Evaluator =>
         )
     }
 
+    protected def arraysEqual(a: TypedArray, b: TypedArray, visited: Set[(AnyRef, AnyRef)]): Boolean = {
+        val id1 = System.identityHashCode(a)
+        val id2 = System.identityHashCode(b)
+        val pair = if id1 <= id2 then (a, b) else (b, a)
+        if visited.contains(pair) then return true
+        if a.length != b.length then return false
+        val newVisited = visited + pair
+        a.zip(b).forall((x, y) => valuesEqual(x, y, newVisited))
+    }
     protected def valuesEqual(v1: Value, v2: Value, visited: Set[(AnyRef, AnyRef)]): Boolean = (v1, v2) match {
         case (Value.IntVal(a), Value.IntVal(b))   => a == b
         case (Value.FloatVal(a), Value.FloatVal(b))   => a == b
         case (Value.StrVal(a), Value.StrVal(b))   => a == b
         case (Value.BoolVal(a), Value.BoolVal(b)) => a == b
         case (Value.NullVal, Value.NullVal)        => true
-        case (Value.ArrVal(a), Value.ArrVal(b))   => a.length == b.length && a.zip(b).forall((x, y) => valuesEqual(x, y, visited))
+        case (Value.ArrVal(a), Value.ArrVal(b))   => arraysEqual(a, b, visited)
+        case (Value.PairVal(f1, s1), Value.PairVal(f2, s2)) => valuesEqual(f1, f2, visited) && valuesEqual(s1, s2, visited)
         case (Value.StructVal(t1, f1, _), Value.StructVal(t2, f2, _)) => t1 == t2 && structsEqual(f1, f2, visited)
         case _ => false
     }
