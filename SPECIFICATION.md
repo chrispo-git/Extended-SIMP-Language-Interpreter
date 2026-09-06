@@ -1696,67 +1696,66 @@ implementation is likely to diverge from the reference without realizing
 it) — write one small test program per item:
 
 1. `a < b < c` throws a runtime type error (right-recursive chained
-   comparison — Phase 4.3.7), it does not silently mean `(a<b) and (b<c)`.
-   **Keep as-is** — this is not a bug to fix, it's the specified behavior.
-2. `&&`/`||` work as **ordinary expression operators everywhere** — a
-   function-call argument, an array-literal element, a struct-literal
-   field value, all without needing a block-expression workaround (Phase
-   4.5) — not just in `if`/`while` conditions/assignment RHS/etc. Confirm
-   this *and* confirm the easy-to-miss companion case: a condition that
-   mixes a comparison with `&&`/`||` inside `if`/`while` still parses
-   correctly (`while len(a) > 0 && len(b) > 0 do {...}` must parse as
-   `(len(a) > 0) && (len(b) > 0)`, not have the first comparison's
-   right-hand side swallow the rest of the condition — Phase 4.5's trap).
-3. `/* outer /* inner */ still commented */` is **one comment** from the
-   first `/*` to the *second* `*/` — block comments nest (Phase 2 step 2).
-   **Fixed** — an earlier revision ended at the first `*/`.
+   comparison — Phase 4.3.7); it does not mean `(a < b) && (b < c)`. This
+   is the specified behavior — don't "fix" it into a more intuitive
+   flat chain.
+2. `&&`/`||` work as ordinary expression operators anywhere an expression
+   is valid — a function-call argument, an array-literal element, a
+   struct-literal field value — not just inside `if`/`while` conditions
+   or an assignment's right-hand side (Phase 4.5). Also test the case
+   that actually catches a naive implementation: a condition mixing a
+   comparison with `&&`/`||` inside `if`/`while`, e.g. `while len(a) > 0
+   && len(b) > 0 do {...}`, must parse as `(len(a) > 0) && (len(b) > 0)`
+   — not have the first comparison's right-hand side swallow the rest of
+   the condition (Phase 4.5's trap).
+3. `/* outer /* inner */ still commented */` is one comment, ending at
+   the *second* `*/`, not the first — block comments nest (Phase 2 step
+   2).
 4. `x - 1` lexes as subtraction; `[-1, 2]`, `f(-1)` lex the `-1` as one
-   negative literal token (Phase 2 step 4). **Keep as-is.**
-5. An empty `Int[]`-declared array does **not** satisfy a `Str[]`-typed
-   slot — `checkType` now checks a declared-but-empty array's element
-   type strictly, only staying permissive for a genuinely undeclared
-   bare `[]` literal with nothing to check against (Phase 5.3). **Fixed**
-   — an earlier revision let any empty array satisfy any array type.
-6. `break`/`continue`/`return` used outside any loop/function — an
-   unhandled crash (matching the reference, Phase 7.3). **Leave as-is** —
-   not treated as a bug to clean up into a parse-time error.
-7. `arr1 == arr2` / `pair1 == pair2` on values containing a cycle back to
-   themselves terminate correctly (`Arr`/`Pair` equality routes through
-   the same cycle-safe `valuesEqual` machinery struct-field equality
-   already used, Phase 6.5) — as does `print` on a self-referential array
-   (`getPrettyPrint`'s array case now tracks its own identity in
-   `visited`, matching what struct printing already did, Phase 5.3), and
-   `Pair` equality is supported at all (it previously fell through to
-   "Type Mismatch" unconditionally — there was no `Pair` case anywhere in
-   the comparison logic, not just a cycle-safety gap). **Fixed.**
-8. Declaring a user function named identically to a builtin (e.g. `fn
-   len(...)`) — confirm it's simply unreachable dead code, not an error,
-   and not actually callable (Phase 6.13). **Expected, confirmed correct
-   — this should indeed be unreachable, not a bug.**
-9. `private` alone (no `locked`) does **not** stop `S{...}` construction
-   from outside the struct's `impl` block — only `locked` does (Phase
-   8.2's `checkStructLock` is a wholly separate gate from field
-   privacy). **As expected.**
+   negative literal token (Phase 2 step 4).
+5. An empty `Int[]`-declared array does not satisfy a `Str[]`-typed slot
+   — `checkType` checks a declared-but-empty array's element type
+   strictly, staying permissive only for a genuinely untyped bare `[]`
+   literal with nothing to check against (Phase 5.3).
+6. `break`/`continue`/`return` used outside any loop/function crash as
+   an unhandled error rather than failing cleanly at parse time (Phase
+   7.3) — this is deliberate, not a gap to close.
+7. `arr1 == arr2` / `pair1 == pair2` on a value that cycles back to
+   itself terminate correctly, and so does `print` on a self-referential
+   array — `Arr`/`Pair` equality and array printing both route through
+   the same cycle-safe machinery struct-field equality/printing already
+   use (Phase 6.5, 5.3). `Pair` equality specifically must be supported
+   at all, not just cycle-safe: an implementation that copies the
+   struct-equality pattern but never adds a `Pair` case will throw "Type
+   Mismatch" on every `Pair == Pair` comparison, cyclic or not.
+8. Declaring a user function with the same name as a builtin (e.g. `fn
+   len(...)`) is legal, but the declaration is unreachable dead code — it
+   is never actually callable, and this is not an error (Phase 6.13).
+9. `private` alone (no `locked`) does not stop `S{...}` construction from
+   outside the struct's `impl` block — only `locked` does; `checkStructLock`
+   (Phase 8.2) is a wholly separate gate from field privacy.
 10. A free function called from inside one of struct `S`'s methods,
     which itself then calls back into another method of `S`, still has
-    `S`-level private-field access at that inner call site (the impl-
+    `S`-level private-field access at that inner call site — the impl-
     context stack survives unchanged through intervening free-function
-    frames — Phase 8.2's precise transitivity rule). **As expected.**
+    frames (Phase 8.2's precise transitivity rule).
 11. A recursive call inside an imported file's `for` loop, method body,
-    `print` statement, or any other previously-un-rewritten shape now
-    correctly resolves to the qualified name (Phase 10.2's `qualifyBody`/
-    `qualifyExpr` — now a full, exhaustive traversal of every `Cmd`/
-    `Expr`/`BoolExpr`/`Pattern` constructor, replacing an earlier revision
-    that only descended into `Seq`/`If`/`While`/`Return`/`Assign`/
-    `BinaryOp`). **Fixed.**
+    `print` statement, or any other non-trivially-nested position
+    resolves to the correctly-qualified name — `qualifyBody`/
+    `qualifyExpr` (Phase 10.2) must be a full, exhaustive traversal of
+    every `Cmd`/`Expr`/`BoolExpr`/`Pattern` constructor; a partial
+    traversal that only descends into a handful of common shapes (e.g.
+    `Seq`/`If`/`While`/`Return`/`Assign`/`BinaryOp`) will silently
+    resolve such a call against the wrong, unqualified name instead.
 12. A `for` loop whose body `push`es onto the very array it's iterating
-    sees the newly-pushed elements on later iterations (live length
-    re-check, not a snapshot — Phase 7.2). **As expected.**
+    sees the newly-pushed elements on later iterations — the loop
+    re-checks the array's live length every iteration rather than
+    snapshotting it once up front (Phase 7.2).
 13. A struct default-field expression that references an outer mutable
     variable produces a different value on two separate constructions
     of the same struct type, if that outer variable changed between them
-    (Phase 6.9/7.1 — defaults are evaluated per-call, not once at
-    struct-definition time). **As expected.**
+    — defaults are evaluated per-call, not once at struct-definition
+    time (Phase 6.9/7.1).
 14. A `return` inside a `try` block still returns from the enclosing
     function — it is not caught or reported as an error by any of the
     `try`'s `catch` clauses, even a `catch Error as e` umbrella (Phase
@@ -1836,10 +1835,9 @@ it) — write one small test program per item:
 23. A generic struct's static method called with *no* type arguments at
     all (`Stack.new()` for a generic `Stack` — there's no receiver to
     inherit a binding from the way a bare struct literal can) is a
-    `TypeError`, distinct from item 21's literal case
-    only in the wording of the message, not the underlying rule: a
-    generic struct's static call site always needs its own explicit
-    `<...>`.
+    `TypeError`, distinct from item 21's literal case only in the wording
+    of the message, not the underlying rule: a generic struct's static
+    call site always needs its own explicit `<...>`.
 
 Each item above should have a corresponding automated test in your test
 suite before calling the implementation complete.
