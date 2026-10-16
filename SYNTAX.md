@@ -149,7 +149,7 @@ Every runtime error carries one of six built-in **error types**:
 runtime error of the matching type occurs anywhere inside it, execution
 jumps to that `catch` block instead of crashing the program. Naming a
 type with no `as` just discards the error (useful when you only care
-*that* it happened); naming it with `as e` binds the error's message as
+that it happened); naming it with `as e` binds the error's message as
 a `Str` under `e`, visible only inside that `catch` block:
 ```
 arr := [1, 2, 3];
@@ -180,7 +180,7 @@ try {
 }
 ```
 Since `Error` matches any error type, `catch Error as e` is how you write
-a catch-all — put it last, since an earlier `catch Error` would shadow
+a catch-all: put it last, since an earlier `catch Error` would shadow
 every more specific clause after it. If no `catch` clause in a `try`
 matches the error that occurred, it keeps propagating outward exactly as
 if that `try` weren't there (up to an enclosing `try`, or to a crash if
@@ -188,8 +188,7 @@ there isn't one).
 
 `throw E` raises an untyped error (type `Error`) carrying `E` as its
 message (`E` must be a `Str`, or a value convertible via the same rules
-`print`/`toStr` use). `throw TypeName(E)` raises a *typed* error instead
-— this is how you signal your own errors as a specific, catchable type:
+`print`/`toStr` use). `throw TypeName(E)` raises a *typed* error. This is how you signal your own errors as a specific, catchable type:
 ```
 fn withdraw(balance: Int, amount: Int) -> Int {
     if (amount > balance) then {
@@ -205,16 +204,9 @@ try {
 }
 ```
 `TypeName` in both `catch` and `throw` must be one of the six built-in
-error types listed above — ExtSimp doesn't currently support declaring
+error types listed above. ExtSimp doesn't currently support declaring
 your own error types, only tagging a `throw` with one of the existing
 six that best fits.
-
-`try`/`catch` only intercepts genuine errors, `break`/`continue`/`return`
-still pass straight through a `try` block uninterrupted (a `return`
-inside a `try` still returns from the enclosing function, it isn't
-treated as an error). An error of a type with no matching `catch`
-clause anywhere still crashes the program exactly as before `try`/`catch`
-existed.
 
 ---
 
@@ -248,14 +240,14 @@ Note: Block expressions execute a sequence of commands and return the value of t
 The final expression can't have a trailing semicolon.
 
 Note: `null` is only valid where a non-primitive type is expected. `Int`, 
-`Str`, `Bool`, and `Float` all reject `null` — assigning, passing, or 
+`Str`, `Bool`, and `Float` all reject `null`. Assigning, passing, or 
 returning `null` where one of these four is expected is a type error. 
 Every other type (structs, arrays, maps, pairs, generic type parameters) 
 accepts `null`.
 
 #### Arithmetic Operators
 
-Here are all the operators
+Here are all the operators:
 
 | Operator | Description | Available Types |
 |----------|-------------|-------------|
@@ -284,7 +276,7 @@ Operator precedence (highest to lowest):
 All arithmetic operators are left-associative.
 
 #### String Concatenation
-`+` is also valid when the left operand is a `Str`. The right operand can be any type it's automatically converted to `Str`:
+`+` is also valid when the left operand is a `Str`. The right operand can be any type, it's automatically converted to `Str`:
 
 ```
 "hello" + " world"     -- Str + Str -> Str
@@ -461,7 +453,7 @@ print myPoint.squareY; //Error!
 
 A struct declared with `locked struct` cannot be constructed with a 
 struct literal (`Name{...}`) from outside its own `impl` block. This 
-is independent of field privacy — locking gates *construction*, while 
+is independent of field privacy, locking gates *construction*, while 
 `private` gates *field/method access* on an already-existing value. 
 Combining the two is how you force all construction to go through a 
 static factory method:
