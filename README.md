@@ -94,6 +94,7 @@ A VS Code extension for SIMP+ syntax highlighting is available [here](vsCodeExte
 - Printing Expressions
 - Inputting Strings, Integers and Booleans
 - File I/O
+- Generics
 
 ### Functions & Procedures
 - First-class functions with explicit `return`
